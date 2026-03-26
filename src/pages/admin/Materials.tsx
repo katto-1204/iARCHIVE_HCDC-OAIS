@@ -62,7 +62,7 @@ const emptyForm: MaterialForm = {
 
 export default function AdminMaterials() {
   const [search, setSearch] = React.useState("");
-  const { data, isLoading, refetch } = useGetMaterials({ params: { search, limit: 50 } });
+  const { data, isLoading, refetch } = useGetMaterials({ search, limit: 50 });
   const { data: categories } = useGetCategories();
 
   const { mutate: deleteMat } = useDeleteMaterial();

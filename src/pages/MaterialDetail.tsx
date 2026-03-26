@@ -34,10 +34,8 @@ function IsadSection({ num, title, children }: { num: number; title: string; chi
 
 export default function MaterialDetail() {
   const [, params] = useRoute("/materials/:id");
-  const { data: material, isLoading } = useGetMaterial(params?.id || "", {
-    query: { enabled: !!params?.id },
-  });
-  const { data: user } = useGetMe({ query: { retry: false } });
+  const { data: material, isLoading } = useGetMaterial(params?.id || "");
+  const { data: user } = useGetMe();
   const [activeTab, setActiveTab] = React.useState<"details" | "dc" | "related">("details");
   const [showDownloadModal, setShowDownloadModal] = React.useState(false);
 

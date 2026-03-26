@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 export function PublicLayout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
-  const { data: user } = useGetMe({ query: { retry: false } });
+  const { data: user } = useGetMe();
   const [isScrolled, setIsScrolled] = React.useState(false);
 
   React.useEffect(() => {
@@ -87,7 +87,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
-  const { data: user, isLoading } = useGetMe({ query: { retry: false } });
+  const { data: user, isLoading } = useGetMe();
   const { mutate: logoutMutate } = useLogout();
   const [sidebarOpen, setSidebarOpen] = React.useState(true);
 

@@ -44,7 +44,7 @@ export default function Register() {
     }
   }, [materialDateRaw]);
 
-  const { data: me } = useGetMe({ query: { retry: false } });
+  const { data: me } = useGetMe();
   const { mutate: mutateRegister, isPending: isRegisterPending } = useRegister();
   const { mutate: submitRequest, isPending: isRequestPending } = useSubmitAccessRequest();
 
@@ -71,7 +71,7 @@ export default function Register() {
             setLocation("/collections");
           },
           onError: (err) => {
-            toast({ title: "Request Failed", description: err.error?.error || "Error submitting request", variant: "destructive" });
+            toast({ title: "Request Failed", description: (err as any)?.data?.error || "Error submitting request", variant: "destructive" });
           },
         },
       );
@@ -84,7 +84,7 @@ export default function Register() {
         setLocation("/login");
       },
       onError: (err: any) => {
-        toast({ title: "Registration Failed", description: err.error?.error || "Error registering", variant: "destructive" });
+        toast({ title: "Registration Failed", description: err?.data?.error || "Error registering", variant: "destructive" });
       }
     });
   };
@@ -154,7 +154,7 @@ export default function Register() {
                     placeholder="Briefly describe what you will research and why you need access."
                   />
                   {form.formState.errors.purpose && (
-                    <p className="text-xs text-destructive">{form.formState.errors.purpose.message}</p>
+                    <p className="text-xs text-destructive">{String(form.formState.errors.purpose.message ?? "")}</p>
                   )}
                 </div>
 
@@ -191,19 +191,19 @@ export default function Register() {
                 <div className="space-y-2">
                   <Label>Full Name</Label>
                   <Input {...form.register("name")} placeholder="Juan Dela Cruz" />
-                  {form.formState.errors.name && <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>}
+                  {form.formState.errors.name && <p className="text-xs text-destructive">{String(form.formState.errors.name.message ?? "")}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label>Email Address</Label>
                   <Input {...form.register("email")} placeholder="name@hcdc.edu.ph" />
-                  {form.formState.errors.email && <p className="text-xs text-destructive">{form.formState.errors.email.message}</p>}
+                  {form.formState.errors.email && <p className="text-xs text-destructive">{String(form.formState.errors.email.message ?? "")}</p>}
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label>Password</Label>
                 <Input type="password" {...form.register("password")} placeholder="••••••••" />
-                {form.formState.errors.password && <p className="text-xs text-destructive">{form.formState.errors.password.message}</p>}
+                {form.formState.errors.password && <p className="text-xs text-destructive">{String(form.formState.errors.password.message ?? "")}</p>}
               </div>
 
               <div className="space-y-2">

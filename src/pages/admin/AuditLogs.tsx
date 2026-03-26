@@ -5,7 +5,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Badge } 
 import { useGetAuditLogs } from "@workspace/api-client-react";
 
 export default function AdminAuditLogs() {
-  const { data, isLoading } = useGetAuditLogs({ params: { limit: 100 } });
+  const { data, isLoading } = useGetAuditLogs({ limit: 100 });
 
   return (
     <AdminLayout>
@@ -36,7 +36,7 @@ export default function AdminAuditLogs() {
                   <TableCell className="whitespace-nowrap font-mono text-xs">{format(new Date(log.createdAt), 'yyyy-MM-dd HH:mm:ss')}</TableCell>
                   <TableCell className="font-medium text-primary">{log.userName || 'System'}</TableCell>
                   <TableCell>
-                    <Badge variant="secondary" className="capitalize text-[10px] tracking-widest">{log.action.replace('_', ' ')}</Badge>
+                    <Badge variant="outline" className="capitalize text-[10px] tracking-widest">{log.action.replace('_', ' ')}</Badge>
                   </TableCell>
                   <TableCell>
                     <span className="text-xs text-muted-foreground uppercase">{log.entityType}</span><br/>

@@ -24,9 +24,7 @@ export default function Collections() {
   }, [search]);
 
   const { data: categories } = useGetCategories();
-  const { data, isLoading } = useGetMaterials({
-    params: { search: debouncedSearch, category, access: access as any, limit: 24 },
-  });
+  const { data, isLoading } = useGetMaterials({ search: debouncedSearch, category, access: access as any, limit: 24 });
 
   const activeFilters = [
     category && { key: "category", label: categories?.find(c => c.id === category)?.name || category, clear: () => setCategory("") },

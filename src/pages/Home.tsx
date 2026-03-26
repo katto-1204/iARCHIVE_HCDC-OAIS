@@ -12,7 +12,7 @@ import { useGetStats, useGetCategories, useGetMaterials } from "@workspace/api-c
 export default function Home() {
   const { data: stats, isError: statsError } = useGetStats();
   const { data: categories, isError: categoriesError } = useGetCategories();
-  const { data: materials, isError: materialsError } = useGetMaterials({ params: { limit: 3 } });
+  const { data: materials, isError: materialsError } = useGetMaterials({ limit: 3 });
   const [scrollY, setScrollY] = React.useState(0);
 
   React.useEffect(() => {
@@ -157,14 +157,20 @@ export default function Home() {
       {/* ─── HERO ─── */}
       <section className="relative min-h-[88vh] flex flex-col items-center justify-center overflow-hidden bg-[#0a1628] pt-24">
         <div
-          className="absolute inset-0 bg-cover bg-center scale-105 opacity-55"
+          className="absolute inset-0 bg-cover bg-center scale-105 opacity-10"
           style={{
             backgroundImage: `url(${import.meta.env.BASE_URL}images/hcdchero.png)`,
             transform: `translateY(${Math.min(scrollY * 0.25, 120)}px) scale(1.08)`,
           }}
         />
         <div className="absolute inset-0">
-          <div className="absolute inset-0 bg-gradient-to-br from-[#4a0000]/85 via-[#2f0000]/55 to-[#0a1628]/75" />
+          {/* Dark red hero wash */}
+          <div className="absolute inset-0 bg-gradient-to-br from-[#3a0000]/90 via-[#240000]/60 to-[#0a1628]/80" />
+          {/* Animated glows */}
+          <div className="absolute -top-24 -right-24 h-[520px] w-[520px] rounded-full bg-[radial-gradient(circle_at_center,_rgba(150,0,0,0.55),_transparent_60%)] blur-3xl animate-float-slow" />
+          <div className="absolute -bottom-32 -left-32 h-[560px] w-[560px] rounded-full bg-[radial-gradient(circle_at_center,_rgba(65,105,225,0.25),_transparent_62%)] blur-3xl animate-float-slower" />
+          {/* Soft grain */}
+          <div className="absolute inset-0 opacity-[0.08] mix-blend-overlay pointer-events-none bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22160%22%20height%3D%22160%22%3E%3Cfilter%20id%3D%22n%22%3E%3CfeTurbulence%20type%3D%22fractalNoise%22%20baseFrequency%3D%220.9%22%20numOctaves%3D%223%22%20stitchTiles%3D%22stitch%22/%3E%3C/filter%3E%3Crect%20width%3D%22160%22%20height%3D%22160%22%20filter%3D%22url(%23n)%22%20opacity%3D%220.55%22/%3E%3C/svg%3E')]" />
           <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-white to-transparent" />
         </div>
         <div className="relative z-10 text-center px-4 max-w-4xl mx-auto reveal-up" data-reveal>
@@ -196,7 +202,7 @@ export default function Home() {
         </div>
 
         {/* Mini stats strip inside hero bottom */}
-        <div className="relative z-10 mt-16 flex items-center gap-12 bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl px-10 py-5">
+        <div className="relative z-10 mt-16 flex items-center gap-12 bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl px-10 py-5 reveal-up" data-reveal>
           {[
             { num: stats?.totalMaterials ?? "—", label: "Materials" },
             { num: stats?.totalCategories ?? "—", label: "Collections" },

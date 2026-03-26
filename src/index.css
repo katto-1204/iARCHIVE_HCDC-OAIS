@@ -78,6 +78,24 @@
   transform: translateY(0);
 }
 
+.animate-float-slow {
+  animation: float-slow 8s ease-in-out infinite;
+}
+
+.animate-float-slower {
+  animation: float-slower 12s ease-in-out infinite;
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(-18px, 14px, 0); }
+}
+
+@keyframes float-slower {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(20px, -16px, 0); }
+}
+
 .loading-bar {
   animation: loading-progress 1.2s ease-in-out infinite;
 }

@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 export default function AdminUsers() {
   const [tab, setTab] = React.useState<"pending" | "active" | "rejected">("pending");
   const [search, setSearch] = React.useState("");
-  const { data, isLoading, refetch } = useGetUsers({ params: { status: tab } });
+  const { data, isLoading, refetch } = useGetUsers({ status: tab as any });
   const { mutate: approve } = useApproveUser();
   const { mutate: reject } = useRejectUser();
   const { mutate: remove } = useDeleteUser();
@@ -28,7 +28,7 @@ export default function AdminUsers() {
   const handleReject = (id: string) => {
     const reason = prompt("Enter reason for rejection (optional):");
     if (reason !== null) {
-      reject({ id, data: { reason } }, {
+      reject({ id }, {
         onSuccess: () => {
           toast({ title: "User Rejected", description: "The registration has been denied." });
           refetch();

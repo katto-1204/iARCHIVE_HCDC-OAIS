@@ -10,7 +10,7 @@ interface EditingState {
   id: string;
   name: string;
   description: string;
-  level: string;
+  level: any;
 }
 
 export default function AdminCategories() {
@@ -22,14 +22,14 @@ export default function AdminCategories() {
 
   const [newName, setNewName] = React.useState("");
   const [newDesc, setNewDesc] = React.useState("");
-  const [newLevel, setNewLevel] = React.useState("fonds");
+  const [newLevel, setNewLevel] = React.useState<any>("fonds");
   const [editing, setEditing] = React.useState<EditingState | null>(null);
   const [isAdding, setIsAdding] = React.useState(false);
 
   const handleCreate = () => {
     if (!newName.trim()) return;
     create(
-      { data: { name: newName.trim(), description: newDesc.trim() || undefined, level: newLevel, parentId: undefined } },
+      { data: { name: newName.trim(), description: newDesc.trim() || undefined, level: newLevel as any, parentId: undefined } },
       {
         onSuccess: () => {
           toast({ title: "Category Created", description: `"${newName}" has been added.` });
@@ -47,7 +47,7 @@ export default function AdminCategories() {
   const handleUpdate = () => {
     if (!editing || !editing.name.trim()) return;
     update(
-      { id: editing.id, data: { name: editing.name.trim(), description: editing.description.trim() || undefined, level: editing.level, parentId: undefined } },
+      { id: editing.id, data: { name: editing.name.trim(), description: editing.description.trim() || undefined, level: editing.level as any, parentId: undefined } },
       {
         onSuccess: () => {
           toast({ title: "Updated", description: "Category has been updated." });

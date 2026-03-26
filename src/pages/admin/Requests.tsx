@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function AdminRequests() {
   const [tab, setTab] = React.useState<"pending" | "approved" | "rejected">("pending");
-  const { data, isLoading, refetch } = useGetAccessRequests({ params: { status: tab } });
+  const { data, isLoading, refetch } = useGetAccessRequests({ status: tab });
   
   const { mutate: approve } = useApproveRequest();
   const { mutate: reject } = useRejectRequest();

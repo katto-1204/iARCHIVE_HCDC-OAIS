@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Library, ShieldCheck, Search, Users } from "lucide-react";
+import { Library, ShieldCheck, Search, Users, LogIn, KeyRound } from "lucide-react";
 import { Button, Card, Input, Label } from "@/components/ui-components";
 import { useLogin } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
@@ -38,7 +38,7 @@ export default function Login() {
         }
       },
       onError: (err) => {
-        toast({ title: "Login Failed", description: err.error?.error || "Invalid credentials", variant: "destructive" });
+        toast({ title: "Login Failed", description: (err as any)?.data?.error || "Invalid credentials", variant: "destructive" });
       }
     });
   };
@@ -46,8 +46,9 @@ export default function Login() {
   return (
     <div className="min-h-screen flex bg-muted/30">
       {/* Left side info panel */}
-      <div className="hidden lg:flex flex-1 bg-primary relative flex-col justify-between p-12 overflow-hidden">
-        <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: `url(${import.meta.env.BASE_URL}images/pattern.png)` }} />
+      <div className="hidden lg:flex flex-1 relative flex-col justify-between p-12 overflow-hidden bg-[#0a1628]">
+        <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: `url(${import.meta.env.BASE_URL}images/hcdchero.png)` }} />
+        <div className="absolute inset-0 bg-gradient-to-br from-[#3a0000]/85 via-[#240000]/45 to-[#0a1628]/90" />
         
         <div className="relative z-10">
           <Link href="/" className="inline-flex items-center gap-3 text-white hover:opacity-80 transition-opacity">
@@ -57,7 +58,13 @@ export default function Login() {
         </div>
 
         <div className="relative z-10 max-w-lg mt-20">
-          <h1 className="text-4xl font-display font-bold text-white mb-6 leading-snug">Secure Access to Institutional Heritage</h1>
+          <div className="inline-flex items-center gap-2 bg-white/10 border border-white/15 rounded-full px-4 py-1.5 mb-7">
+            <KeyRound className="w-4 h-4 text-[#4169E1]" />
+            <span className="text-white/80 text-xs font-semibold tracking-widest uppercase">Role-Based Secure Access</span>
+          </div>
+          <h1 className="text-4xl font-display font-bold text-white mb-6 leading-snug">
+            Sign in to access<br />HCDC’s digital archive
+          </h1>
           <div className="space-y-6">
             <div className="flex gap-4 p-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm">
               <ShieldCheck className="w-8 h-8 text-accent shrink-0" />
@@ -94,8 +101,11 @@ export default function Login() {
         </Link>
         
         <Card className="w-full max-w-md p-8 shadow-2xl border-none">
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-primary mb-2">Welcome Back</h2>
+          <div className="mb-7">
+            <div className="w-12 h-12 rounded-2xl bg-[#960000]/10 border border-[#960000]/15 flex items-center justify-center mb-4">
+              <LogIn className="w-5 h-5 text-[#960000]" />
+            </div>
+            <h2 className="text-3xl font-bold text-[#0a1628] mb-1">Welcome back</h2>
             <p className="text-muted-foreground">Sign in to your iArchive account</p>
           </div>
 
@@ -134,8 +144,8 @@ export default function Login() {
               {form.formState.errors.password && <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>}
             </div>
 
-            <Button type="submit" className="w-full h-12 text-base mt-2" isLoading={isPending}>
-              Sign In
+            <Button type="submit" className="w-full h-12 text-base mt-2 gap-2" isLoading={isPending}>
+              <LogIn className="w-4 h-4" /> Sign In
             </Button>
           </form>
 
