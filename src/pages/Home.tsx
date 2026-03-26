@@ -3,17 +3,26 @@ import { Link } from "wouter";
 import {
   Search, Shield, Database, Lock, CheckCircle, GitBranch, BookOpen,
   Users, FileSearch, ChevronRight, Download, ArrowRight, LayoutDashboard,
-  FolderOpen, Eye, ClipboardList, Settings, LogIn
+  FolderOpen, Eye, ClipboardList, Settings, LogIn, Sparkles
 } from "lucide-react";
 import { PublicLayout } from "@/components/layout";
 import { Button } from "@/components/ui-components";
 import { useGetStats, useGetCategories, useGetMaterials } from "@workspace/api-client-react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Home() {
   const { data: stats, isError: statsError } = useGetStats();
   const { data: categories, isError: categoriesError } = useGetCategories();
   const { data: materials, isError: materialsError } = useGetMaterials({ limit: 3 });
   const [scrollY, setScrollY] = React.useState(0);
+  const { toast } = useToast();
+
+  // Show errors as toasts instead of a banner
+  React.useEffect(() => {
+    if (statsError || categoriesError || materialsError) {
+      toast({ title: "Connection Issue", description: "Some archive data could not be loaded. Please refresh.", variant: "destructive" });
+    }
+  }, [statsError, categoriesError, materialsError]);
 
   React.useEffect(() => {
     const onScroll = () => setScrollY(window.scrollY);
@@ -25,10 +34,18 @@ export default function Home() {
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting) entry.target.classList.add("reveal-visible");
+          if (entry.isIntersecting) {
+            entry.target.classList.add("reveal-visible");
+            // Stagger children animations
+            const children = entry.target.querySelectorAll('[data-stagger]');
+            children.forEach((child, idx) => {
+              (child as HTMLElement).style.transitionDelay = `${idx * 120}ms`;
+              child.classList.add('reveal-visible');
+            });
+          }
         });
       },
-      { threshold: 0.12 },
+      { threshold: 0.08 },
     );
     document.querySelectorAll("[data-reveal]").forEach((el) => observer.observe(el));
     return () => observer.disconnect();
@@ -128,73 +145,77 @@ export default function Home() {
     <div className="min-h-screen bg-white font-sans">
       {/* ─── NAVBAR ─── */}
       <header className="fixed top-4 inset-x-0 z-50">
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="h-16 flex items-center justify-between px-5 rounded-2xl bg-[#0a1628]/85 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/30">
-          <Link href="/" className="flex items-center gap-2.5">
-            <img src={`${import.meta.env.BASE_URL}logos/iarchive%20white%20logo.png`} alt="iArchive logo" className="h-8 w-auto object-contain" />
+        <div className="max-w-5xl mx-auto px-4">
+          <div className={`h-14 flex items-center justify-between px-5 rounded-full transition-all duration-500 shadow-2xl ring-1 ring-white/5 ${
+            scrollY > 500
+              ? 'bg-[#6b0000] border border-[#960000]/40 shadow-[#960000]/25'
+              : 'bg-[#5a0000]/60 backdrop-blur-2xl border border-red-400/15 shadow-[#960000]/20'
+          }`}>
+          <Link href="/" className="flex items-center gap-2">
+            <img src={`${import.meta.env.BASE_URL}logos/iarchive%20white%20logo.png`} alt="iArchive logo" className="h-7 w-auto object-contain" />
           </Link>
-          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-white/70">
-            <Link href="/collections" className="hover:text-white transition-colors">Collections</Link>
-            <a href="#features" className="hover:text-white transition-colors">Features</a>
-            <Link href="/about" className="hover:text-white transition-colors">About OAIS</Link>
-            <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
+          <nav className="hidden md:flex items-center gap-1 text-sm font-medium text-white/70">
+            <Link href="/collections" className="hover:text-white hover:bg-white/10 px-3.5 py-1.5 rounded-full transition-all">Collections</Link>
+            <a href="#features" className="hover:text-white hover:bg-white/10 px-3.5 py-1.5 rounded-full transition-all">Features</a>
+            <Link href="/about" className="hover:text-white hover:bg-white/10 px-3.5 py-1.5 rounded-full transition-all">About OAIS</Link>
+            <Link href="/terms" className="hover:text-white hover:bg-white/10 px-3.5 py-1.5 rounded-full transition-all">Terms</Link>
           </nav>
           <Link href="/login">
-            <button className="flex items-center gap-2 bg-[#960000] hover:bg-[#7a0000] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
-              <LogIn className="w-4 h-4" /> Login
+            <button className="flex items-center gap-2 bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white text-sm font-semibold px-4 py-1.5 rounded-full transition-all border border-white/10 hover:border-white/20">
+              <LogIn className="w-3.5 h-3.5" /> Login
             </button>
           </Link>
           </div>
         </div>
       </header>
 
-      {(statsError || categoriesError || materialsError) && (
-        <div className="fixed top-16 inset-x-0 z-40 bg-[#960000] text-white text-center text-xs py-2">
-          Some archive data could not be loaded. Please refresh or try again shortly.
-        </div>
-      )}
+      {/* Error toasts replace the old banner */}
+
+
 
       {/* ─── HERO ─── */}
-      <section className="relative min-h-[88vh] flex flex-col items-center justify-center overflow-hidden bg-[#0a1628] pt-24">
+      <section className="relative min-h-[92vh] flex flex-col items-center justify-center overflow-hidden bg-[#0a1628] pt-24">
         <div
-          className="absolute inset-0 bg-cover bg-center scale-105 opacity-10"
+          className="absolute inset-0 bg-cover bg-center scale-110 opacity-12"
           style={{
             backgroundImage: `url(${import.meta.env.BASE_URL}images/hcdchero.png)`,
-            transform: `translateY(${Math.min(scrollY * 0.25, 120)}px) scale(1.08)`,
+            transform: `translateY(${Math.min(scrollY * 0.35, 160)}px) scale(1.1)`,
+            transition: 'transform 0.1s linear',
           }}
         />
         <div className="absolute inset-0">
           {/* Dark red hero wash */}
-          <div className="absolute inset-0 bg-gradient-to-br from-[#3a0000]/90 via-[#240000]/60 to-[#0a1628]/80" />
-          {/* Animated glows */}
-          <div className="absolute -top-24 -right-24 h-[520px] w-[520px] rounded-full bg-[radial-gradient(circle_at_center,_rgba(150,0,0,0.55),_transparent_60%)] blur-3xl animate-float-slow" />
-          <div className="absolute -bottom-32 -left-32 h-[560px] w-[560px] rounded-full bg-[radial-gradient(circle_at_center,_rgba(65,105,225,0.25),_transparent_62%)] blur-3xl animate-float-slower" />
+          <div className="absolute inset-0 bg-gradient-to-br from-[#3a0000]/95 via-[#240000]/70 to-[#0a1628]/85" />
+          {/* Animated glows - more vivid */}
+          <div className="absolute -top-24 -right-24 h-[600px] w-[600px] rounded-full bg-[radial-gradient(circle_at_center,_rgba(150,0,0,0.6),_transparent_55%)] blur-3xl animate-float-slow" />
+          <div className="absolute -bottom-32 -left-32 h-[600px] w-[600px] rounded-full bg-[radial-gradient(circle_at_center,_rgba(65,105,225,0.3),_transparent_58%)] blur-3xl animate-float-slower" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[400px] w-[400px] rounded-full bg-[radial-gradient(circle_at_center,_rgba(150,0,0,0.15),_transparent_60%)] blur-2xl animate-pulse-glow" />
           {/* Soft grain */}
-          <div className="absolute inset-0 opacity-[0.08] mix-blend-overlay pointer-events-none bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22160%22%20height%3D%22160%22%3E%3Cfilter%20id%3D%22n%22%3E%3CfeTurbulence%20type%3D%22fractalNoise%22%20baseFrequency%3D%220.9%22%20numOctaves%3D%223%22%20stitchTiles%3D%22stitch%22/%3E%3C/filter%3E%3Crect%20width%3D%22160%22%20height%3D%22160%22%20filter%3D%22url(%23n)%22%20opacity%3D%220.55%22/%3E%3C/svg%3E')]" />
-          <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-white to-transparent" />
+          <div className="absolute inset-0 opacity-[0.06] mix-blend-overlay pointer-events-none bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22160%22%20height%3D%22160%22%3E%3Cfilter%20id%3D%22n%22%3E%3CfeTurbulence%20type%3D%22fractalNoise%22%20baseFrequency%3D%220.9%22%20numOctaves%3D%223%22%20stitchTiles%3D%22stitch%22/%3E%3C/filter%3E%3Crect%20width%3D%22160%22%20height%3D%22160%22%20filter%3D%22url(%23n)%22%20opacity%3D%220.55%22/%3E%3C/svg%3E')]" />
+          <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-white to-transparent" />
         </div>
-        <div className="relative z-10 text-center px-4 max-w-4xl mx-auto reveal-up" data-reveal>
-          <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 mb-8">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#4169E1] animate-pulse" />
+        <div className="relative z-10 text-center px-4 max-w-4xl mx-auto hero-content" style={{ transform: `translateY(${Math.min(scrollY * -0.15, 0)}px)`, opacity: Math.max(1 - scrollY / 600, 0) }}>
+          <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 mb-8 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+            <Sparkles className="w-3.5 h-3.5 text-[#ff4444] animate-pulse" />
             <span className="text-white/80 text-xs font-medium tracking-widest uppercase">Holy Cross of Davao College · Est. 1951</span>
           </div>
-          <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-white leading-[1.08] mb-6">
+          <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-white leading-[1.08] mb-6 animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
             Preserving HCDC's<br />
             <span className="font-serif italic text-white/90">institutional memory,</span><br />
-            <span className="font-serif italic text-white/90">digitally <span className="text-[#4169E1]">forever.</span></span>
+            <span className="font-serif italic text-white/90">digitally <span className="text-[#ff2222] drop-shadow-[0_0_20px_rgba(255,34,34,0.5)]">forever.</span></span>
           </h1>
-          <p className="text-white/60 text-lg max-w-2xl mx-auto mb-10 leading-relaxed font-light">
+          <p className="text-white/60 text-lg max-w-2xl mx-auto mb-10 leading-relaxed font-light animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
             iArchive is HCDC's secure, OAIS-compliant digital repository — built to preserve, organize,
             and provide controlled access to the institution's historical records and research materials.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in-up" style={{ animationDelay: '0.8s' }}>
             <Link href="/collections">
-              <button className="inline-flex items-center gap-2 bg-[#4169E1] hover:bg-[#3558c8] text-white font-semibold px-7 py-3.5 rounded-lg transition-all shadow-lg shadow-[#4169E1]/30 hover:shadow-xl hover:shadow-[#4169E1]/40">
+              <button className="inline-flex items-center gap-2 bg-[#4169E1] hover:bg-[#3558c8] text-white font-semibold px-7 py-3.5 rounded-full transition-all shadow-lg shadow-[#4169E1]/30 hover:shadow-xl hover:shadow-[#4169E1]/40 hover:scale-105">
                 <Search className="w-4 h-4" /> Explore Archive
               </button>
             </Link>
             <Link href="/login">
-              <button className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold px-7 py-3.5 rounded-lg transition-all backdrop-blur-sm">
+              <button className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold px-7 py-3.5 rounded-full transition-all backdrop-blur-sm hover:scale-105">
                 Login to iArchive <ArrowRight className="w-4 h-4" />
               </button>
             </Link>
@@ -202,7 +223,7 @@ export default function Home() {
         </div>
 
         {/* Mini stats strip inside hero bottom */}
-        <div className="relative z-10 mt-16 flex items-center gap-12 bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl px-10 py-5 reveal-up" data-reveal>
+        <div className="relative z-10 mt-16 flex items-center gap-12 bg-white/5 border border-white/10 backdrop-blur-md rounded-full px-10 py-5 animate-fade-in-up" style={{ animationDelay: '1s' }}>
           {[
             { num: stats?.totalMaterials ?? "—", label: "Materials" },
             { num: stats?.totalCategories ?? "—", label: "Collections" },
@@ -247,7 +268,7 @@ export default function Home() {
       </section>
 
       {/* ─── FEATURED COLLECTIONS ─── */}
-      <section className="py-20 bg-white reveal-up" data-reveal>
+      <section className="py-20 bg-white" data-reveal>
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-end justify-between mb-10">
             <div>
@@ -273,7 +294,7 @@ export default function Home() {
                 ]
             ).map((cat, i) => (
               <Link key={cat.id} href={`/collections?category=${cat.id}`}>
-                <div className={`${catColors[i % catColors.length]} rounded-2xl overflow-hidden group cursor-pointer hover:scale-[1.02] transition-transform duration-300 shadow-lg`}>
+                <div data-stagger className={`reveal-up ${catColors[i % catColors.length]} rounded-2xl overflow-hidden group cursor-pointer hover:scale-[1.03] transition-all duration-500 shadow-lg hover:shadow-2xl`}>
                   <div className="h-44 flex items-center justify-center relative overflow-hidden">
                     <div className="absolute inset-0 opacity-10">
                       <div className="grid grid-cols-6 gap-2 p-4">
@@ -298,7 +319,7 @@ export default function Home() {
       </section>
 
       {/* ─── FEATURES ─── */}
-      <section id="features" className="py-20 bg-[#f7f8fc] reveal-up" data-reveal>
+      <section id="features" className="py-20 bg-[#f7f8fc]" data-reveal>
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center max-w-2xl mx-auto mb-14">
             <p className="text-xs font-semibold text-[#4169E1] uppercase tracking-widest mb-3">WHY IARCHIVE</p>
@@ -312,7 +333,7 @@ export default function Home() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((f, i) => (
-              <div key={i} className="bg-white rounded-2xl p-7 border border-border/60 hover:border-[#4169E1]/30 hover:shadow-lg hover:shadow-[#4169E1]/5 transition-all duration-300 group">
+              <div key={i} data-stagger className="reveal-up bg-white rounded-2xl p-7 border border-border/60 hover:border-[#4169E1]/30 hover:shadow-xl hover:shadow-[#4169E1]/10 transition-all duration-500 group hover:-translate-y-1">
                 <div className="w-12 h-12 rounded-xl bg-[#4169E1]/10 flex items-center justify-center mb-5 group-hover:bg-[#4169E1]/20 transition-colors">
                   <f.icon className="w-6 h-6 text-[#4169E1]" />
                 </div>
@@ -325,7 +346,7 @@ export default function Home() {
       </section>
 
       {/* ─── HOW IT WORKS ─── */}
-      <section id="how-it-works" className="py-20 bg-white">
+      <section id="how-it-works" className="py-20 bg-white" data-reveal>
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center max-w-2xl mx-auto mb-14">
             <p className="text-xs font-semibold text-[#960000] uppercase tracking-widest mb-3">GETTING STARTED</p>
@@ -336,8 +357,8 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
             <div className="hidden md:block absolute top-10 left-[22%] right-[22%] h-px bg-gradient-to-r from-[#4169E1]/30 via-[#960000]/30 to-emerald-500/30" />
             {steps.map((step, i) => (
-              <div key={i} className="text-center relative">
-                <div className={`w-20 h-20 ${step.color} rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg`}>
+              <div key={i} data-stagger className="reveal-up text-center relative">
+                <div className={`w-20 h-20 ${step.color} rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg hover:scale-110 transition-transform duration-300`}>
                   <step.icon className="w-9 h-9 text-white" />
                 </div>
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-3 bg-white border border-border text-xs font-bold text-muted-foreground px-2 py-0.5 rounded-full">{step.num}</div>
@@ -350,13 +371,13 @@ export default function Home() {
       </section>
 
       {/* ─── DARK PREVIEW SECTION ─── */}
-      <section className="py-20 bg-[#0a1628] relative overflow-hidden">
+      <section className="py-20 bg-[#0a1628] relative overflow-hidden" data-reveal>
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_#4169E1/20,_transparent_60%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_#960000/15,_transparent_60%)]" />
         <div className="max-w-7xl mx-auto px-6 relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             {/* Left: Admin preview mockup */}
-            <div className="bg-[#111d30] rounded-2xl border border-white/10 overflow-hidden shadow-2xl">
+            <div className="reveal-up bg-[#111d30] rounded-2xl border border-white/10 overflow-hidden shadow-2xl" data-stagger>
               <div className="border-b border-white/10 px-4 py-3 flex items-center gap-2">
                 <div className="flex gap-1.5">
                   <div className="w-3 h-3 rounded-full bg-[#960000]/70" />
@@ -396,7 +417,7 @@ export default function Home() {
               </div>
             </div>
             {/* Right: Copy */}
-            <div>
+            <div className="reveal-up" data-stagger>
               <p className="text-xs font-semibold text-[#4169E1] uppercase tracking-widest mb-4">ADMIN CONTROL CENTER</p>
               <h2 className="text-4xl font-bold text-white mb-6">
                 Preserving HCDC's<br />
@@ -431,7 +452,7 @@ export default function Home() {
       </section>
 
       {/* ─── ACCESS LEVELS ─── */}
-      <section className="py-20 bg-white">
+      <section className="py-20 bg-white" data-reveal>
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center max-w-2xl mx-auto mb-14">
             <p className="text-xs font-semibold text-[#960000] uppercase tracking-widest mb-3">PERMISSIONS FRAMEWORK</p>
@@ -444,7 +465,7 @@ export default function Home() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {accessLevels.map((al, i) => (
-              <div key={i} className={`rounded-2xl border-2 ${al.border} ${al.bg} p-7`}>
+              <div key={i} data-stagger className={`reveal-up rounded-2xl border-2 ${al.border} ${al.bg} p-7 hover:-translate-y-1 transition-all duration-500`}>
                 <div className="flex items-center gap-2 mb-4">
                   <span className={`w-2.5 h-2.5 rounded-full ${al.dot}`} />
                   <span className={`text-xs font-bold tracking-widest ${al.color}`}>{al.label}</span>
@@ -466,7 +487,7 @@ export default function Home() {
       </section>
 
       {/* ─── WHO USES IARCHIVE ─── */}
-      <section className="py-20 bg-[#f7f8fc]">
+      <section className="py-20 bg-[#f7f8fc]" data-reveal>
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center max-w-2xl mx-auto mb-14">
             <p className="text-xs font-semibold text-[#4169E1] uppercase tracking-widest mb-3">FOR EVERYONE AT HCDC</p>
@@ -474,7 +495,7 @@ export default function Home() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {userTypes.map((u, i) => (
-              <div key={i} className={`${u.color} ${u.border || ''} rounded-2xl overflow-hidden shadow-lg`}>
+              <div key={i} data-stagger className={`reveal-up ${u.color} ${u.border || ''} rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-500`}>
                 <div className="p-7">
                   <div className={`w-12 h-12 rounded-xl ${i === 2 ? 'bg-[#4169E1]/10' : 'bg-white/15'} flex items-center justify-center mb-5`}>
                     <u.icon className={`w-6 h-6 ${i === 2 ? 'text-[#4169E1]' : 'text-white'}`} />
@@ -502,16 +523,16 @@ export default function Home() {
       </section>
 
       {/* ─── STATS COUNTER BAR ─── */}
-      <section className="py-14 bg-[#0a1628]">
+      <section className="py-14 bg-[#0a1628]" data-reveal>
         <div className="max-w-7xl mx-auto px-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             {[
               { num: `${stats?.totalMaterials ?? 8}`, label: "Archival Materials", color: "text-[#4169E1]" },
-              { num: "25+", label: "Years of History", color: "text-[#960000]" },
+              { num: "25+", label: "Years of History", color: "text-[#ff2222]" },
               { num: `${stats?.totalCategories ?? 5}`, label: "Collection Series", color: "text-[#4169E1]" },
               { num: "3", label: "Access Tiers", color: "text-white" },
             ].map((s, i) => (
-              <div key={i}>
+              <div key={i} data-stagger className="reveal-up">
                 <div className={`text-5xl font-bold ${s.color} mb-2`}>{s.num}</div>
                 <div className="text-sm text-white/40 uppercase tracking-widest">{s.label}</div>
               </div>
@@ -521,7 +542,7 @@ export default function Home() {
       </section>
 
       {/* ─── CTA ─── */}
-      <section className="py-24 bg-white" id="contact">
+      <section className="py-24 bg-white reveal-up" id="contact" data-reveal>
         <div className="max-w-3xl mx-auto px-6 text-center">
           <p className="text-xs font-semibold text-[#4169E1] uppercase tracking-widest mb-4">GET STARTED TODAY</p>
           <h2 className="text-5xl font-bold text-[#0a1628] mb-6">
