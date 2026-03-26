@@ -1,0 +1,38 @@
+[
+  {
+    "id": "4c2401fc-febb-4157-a7e2-84c95ba5e12e",
+    "materialId": "26iA010000002",
+    "userId": "demo-student",
+    "purpose": "Researching yearbook history for class project",
+    "status": "pending",
+    "createdAt": "2026-03-26T01:46:33.162Z",
+    "updatedAt": "2026-03-26T01:46:33.162Z"
+  },
+  {
+    "id": "a16571fe-7ad8-4718-9fe6-b2fe2e17e810",
+    "materialId": "26iA010000002",
+    "userId": "demo-student",
+    "purpose": "Requesting yearbook pages for research",
+    "status": "pending",
+    "createdAt": "2026-03-26T01:47:29.496Z",
+    "updatedAt": "2026-03-26T01:47:29.496Z"
+  },
+  {
+    "id": "71e222b8-64e2-439f-addc-bc574a99a146",
+    "materialId": "26iA010000002",
+    "userId": "demo-student",
+    "purpose": "Need yearbook images",
+    "status": "pending",
+    "createdAt": "2026-03-26T01:48:03.142Z",
+    "updatedAt": "2026-03-26T01:48:03.142Z"
+  },
+  {
+    "id": "0af02e12-ed41-457a-8e59-97e9144c5658",
+    "materialId": "26iA010000002",
+    "userId": "demo-student",
+    "purpose": "Need yearbook images",
+    "status": "approved",
+    "createdAt": "2026-03-26T01:48:03.150Z",
+    "updatedAt": "2026-03-26T01:48:03.163Z"
+  }
+]

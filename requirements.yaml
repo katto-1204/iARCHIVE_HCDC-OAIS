@@ -1,0 +1,21 @@
+packages:
+  "framer-motion": "Animations and page transitions for premium feel"
+  "lucide-react": "Beautiful iconography"
+  "date-fns": "Date formatting for materials and audit logs"
+  "recharts": "Dashboard analytics charts"
+  "@hookform/resolvers": "Zod validation for forms"
+  "react-hook-form": "Form state management"
+  "clsx": "Classname utilities"
+  "tailwind-merge": "Classname merge utilities"
+
+images:
+  - path: "artifacts/iarchive/public/images/hero-bg.png"
+    description: "Abstract architectural interior of a historic college library or archives room, deep navy blue and subtle crimson red lighting, dramatic shadows, volumetric light, very clean, modern, and professional. No text."
+    aspect_ratio: "16:9"
+  - path: "artifacts/iarchive/public/images/pattern.png"
+    description: "Subtle geometric abstract grid pattern with very thin lines on a solid dark navy blue background, premium institutional academic feel, perfect for a subtle background texture. Minimalist."
+    aspect_ratio: "16:9"
+
+notes:
+  - Global fetch interceptor added in App.tsx to automatically append localStorage JWT to all @workspace/api-client-react generated hooks.
+  - Assuming UI components need to be generated locally to match the highly specific aesthetic requirements.

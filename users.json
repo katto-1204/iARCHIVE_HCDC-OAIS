@@ -1,0 +1,15 @@
+[
+  {
+    "id": "5626e6d1-cb9c-4b0f-9843-e41389fdcfb5",
+    "name": "Test User",
+    "email": "testuser@example.com",
+    "passwordHash": "$2b$12$KYDxa19DyoNri1O2ybYpzet.gAUPMqPyyyF2x9eivz.sfz5dMjUtO",
+    "role": "student",
+    "userCategory": "student",
+    "institution": "HCDC",
+    "purpose": "Testing registration",
+    "status": "pending",
+    "createdAt": "2026-03-26T01:46:31.507Z",
+    "updatedAt": "2026-03-26T01:46:31.507Z"
+  }
+]
