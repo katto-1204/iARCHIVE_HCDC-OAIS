@@ -1,14 +1,35 @@
+import * as React from "react";
 import { PublicLayout } from "@/components/layout";
 import { Database, ShieldCheck, BookOpenText, ScrollText, CheckCircle2, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
+import { motion } from "framer-motion";
+
+const fadeInUp = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.6 }
+};
+
+const staggerContainer = {
+  animate: {
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
 
 export default function About() {
   return (
     <PublicLayout>
       <div className="min-h-screen bg-[#f7f8fc] pt-24 pb-16">
-        <div className="max-w-5xl mx-auto px-6">
+        <motion.div 
+          initial="initial"
+          animate="animate"
+          variants={staggerContainer}
+          className="max-w-5xl mx-auto px-6"
+        >
           {/* Hero */}
-          <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-[#0a1628] p-8 md:p-10 shadow-xl shadow-black/10 mb-8">
+          <motion.div variants={fadeInUp} className="relative overflow-hidden rounded-3xl border border-border/60 bg-[#0a1628] p-8 md:p-10 shadow-xl shadow-black/10 mb-8">
             <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: `url(${import.meta.env.BASE_URL}images/hcdchero.png)` }} />
             <div className="absolute inset-0 bg-gradient-to-br from-[#3a0000]/85 via-[#240000]/50 to-[#0a1628]/85" />
             <div className="relative z-10">
@@ -39,11 +60,11 @@ export default function About() {
                 </Link>
               </div>
             </div>
-          </div>
+          </motion.div>
 
           {/* Core cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <div className="bg-white rounded-2xl border border-border/60 shadow-sm p-7">
+          <motion.div variants={staggerContainer} className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <motion.div variants={fadeInUp} className="bg-white rounded-2xl border border-border/60 shadow-sm p-7">
               <div className="flex items-center gap-3 mb-4">
                 <ShieldCheck className="w-5 h-5 text-[#4169E1]" />
                 <h2 className="text-xl font-bold text-[#0a1628]">Mission</h2>
@@ -55,8 +76,8 @@ export default function About() {
                 community connections, illuminating the institution's identity, achievements, and evolution for students,
                 alumni, researchers, and all stakeholders across generations.
               </p>
-            </div>
-            <div className="bg-white rounded-2xl border border-border/60 shadow-sm p-7">
+            </motion.div>
+            <motion.div variants={fadeInUp} className="bg-white rounded-2xl border border-border/60 shadow-sm p-7">
               <div className="flex items-center gap-3 mb-4">
                 <BookOpenText className="w-5 h-5 text-[#960000]" />
                 <h2 className="text-xl font-bold text-[#0a1628]">Usually Archived</h2>
@@ -69,11 +90,11 @@ export default function About() {
                   </li>
                 ))}
               </ul>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
 
           {/* OAIS section */}
-          <div className="bg-white rounded-2xl border border-border/60 shadow-sm overflow-hidden">
+          <motion.div variants={fadeInUp} className="bg-white rounded-2xl border border-border/60 shadow-sm overflow-hidden">
             <div className="px-7 py-5 border-b border-border/60 bg-[#f7f8fc]">
               <div className="flex items-center gap-3">
                 <ScrollText className="w-5 h-5 text-[#4169E1]" />
@@ -103,8 +124,8 @@ export default function About() {
                 ))}
               </div>
             </div>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       </div>
     </PublicLayout>
   );

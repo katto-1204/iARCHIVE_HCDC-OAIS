@@ -18,7 +18,10 @@
   --color-muted-foreground: hsl(var(--muted-foreground));
   --color-card: hsl(var(--card));
   --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
   --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
 }
 
@@ -43,7 +46,11 @@
   --card-foreground: 220 40% 12%;
   
   --border: 225 25% 90%;
+  --input: 225 25% 90%;
   --ring: 225 73% 57%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 220 40% 12%;
 
   --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
@@ -132,5 +139,38 @@
 /* Parallax scroll smoothing */
 .hero-content {
   will-change: transform, opacity;
+}
+
+/* Premium Background Animations */
+.bg-grid-white {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' width='32' height='32' fill='none' stroke='white' stroke-opacity='0.05'%3E%3Cpath d='M0 .5H31.5V32'/%3E%3C/svg%3E");
+}
+
+.animate-grid-flow {
+  background-position: 0 0;
+  animation: grid-flow 20s linear infinite;
+}
+
+@keyframes grid-flow {
+  from { background-position: 0 0; }
+  to { background-position: 32px 32px; }
+}
+
+.animate-gradient-xy {
+  background-size: 400% 400%;
+  animation: gradient-xy 15s ease infinite;
+}
+
+@keyframes gradient-xy {
+  0%, 100% { background-position: 0% 0%; }
+  50% { background-position: 100% 100%; }
+}
+
+.glass-morphism {
+  @apply bg-white/70 backdrop-blur-md border border-white/20 shadow-xl;
+}
+
+.toast-opaque {
+  @apply bg-white border border-border shadow-2xl !opacity-100;
 }
 

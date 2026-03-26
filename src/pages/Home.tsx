@@ -3,8 +3,9 @@ import { Link, useLocation } from "wouter";
 import {
   Search, Shield, Database, Lock, CheckCircle, GitBranch, BookOpen,
   Users, FileSearch, ChevronRight, Download, ArrowRight, LayoutDashboard,
-  FolderOpen, Eye, ClipboardList, Settings, LogIn, Sparkles
+  FolderOpen, Eye, ClipboardList, Settings, LogIn, Sparkles, Activity
 } from "lucide-react";
+import { motion, useScroll, useTransform, useSpring } from "framer-motion";
 import { PublicLayout } from "@/components/layout";
 import { Button } from "@/components/ui-components";
 import { useGetStats, useGetCategories, useGetMaterials } from "@workspace/api-client-react";
@@ -12,6 +13,16 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function Home() {
   const [, setLocation] = useLocation();
+  const targetRef = React.useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: targetRef });
+  const x = useTransform(scrollYProgress, [0, 1], ["0%", "-82%"]);
+  
+  // Smoother transition for the transform
+  const springX = useSpring(x, {
+    stiffness: 100,
+    damping: 30,
+    restDelta: 0.001
+  });
   const { data: stats, isError: statsError } = useGetStats();
   const { data: categories, isError: categoriesError } = useGetCategories();
   const { data: materials, isError: materialsError } = useGetMaterials({ limit: 3 });
@@ -63,12 +74,14 @@ export default function Home() {
   }, []);
 
   const features = [
-    { icon: FileSearch, title: "Full-Text Search", desc: "Search across all metadata fields including ISAD(G) descriptions, identifiers, and Dublin Core elements." },
-    { icon: Database, title: "ISAD(G) Metadata", desc: "Full compliance with international standards for archival description and metadata structure." },
-    { icon: Lock, title: "Role-Based Access Control", desc: "Granular permissions separating Public, Restricted, and Confidential materials by user clearance." },
-    { icon: Shield, title: "Preservation Integrity", desc: "Automated SHA-256 fixity checks and OAIS-compliant AIP generation keep records verifiably authentic." },
-    { icon: GitBranch, title: "Access Request Workflow", desc: "Researchers can petition for restricted material access with an integrated approval system." },
-    { icon: CheckCircle, title: "Audit Logging", desc: "Every action is recorded. Know exactly who viewed, downloaded, or modified any record." },
+    { icon: FileSearch, title: "Full-Text Search", desc: "Instantly search across millions of metadata fields, ISAD(G) descriptions, and Dublin Core elements with OCR-powered accuracy." },
+    { icon: Database, title: "ISAD(G) Metadata", desc: "Rigorous adherence to international archival standards ensures every record is described with its full multi-level provenance." },
+    { icon: Lock, title: "Role-Based Access", desc: "Advanced security protocols separate Public, Restricted, and Confidential materials based on verified institutional clearance levels." },
+    { icon: Shield, title: "Fixity & Integrity", desc: "Automated SHA-256 bit-level checks ensure your archival information packages (AIP) remain authentic and unaltered over decades." },
+    { icon: GitBranch, title: "Request Workflow", desc: "A streamlined researcher portal for petitioning access to restricted items, integrated directly with archivist approval queues." },
+    { icon: Activity, title: "Audit & Compliance", desc: "Complete transparency with granular activity logs tracking every view, download, and modification for institutional oversight." },
+    { icon: LayoutDashboard, title: "OAIS Compliance", desc: "Built on the ISO 14721:2012 framework, managing the full lifecycle from SIP ingestion to DIP access." },
+    { icon: ClipboardList, title: "Login Monitoring", desc: "Proactive security tracking for all user sessions, ensuring archival access remains within authorized institutional boundaries." },
   ];
 
   const accessLevels = [
@@ -162,21 +175,29 @@ export default function Home() {
               ? 'bg-[#6b0000] border border-[#960000]/40 shadow-[#960000]/25'
               : 'bg-[#5a0000]/60 backdrop-blur-2xl border border-red-400/15 shadow-[#960000]/20'
           }`}>
-          <Link href="/" className="flex items-center gap-2">
-            <img src={`${import.meta.env.BASE_URL}logos/iarchive%20white%20logo.png`} alt="iArchive logo" className="h-7 w-auto object-contain" />
+          <Link href="/" className="flex items-center gap-4">
+            <img src={`${import.meta.env.BASE_URL}logos/iarchive%20white%20logo.png`} alt="iArchive logo" className="h-11 w-auto object-contain" />
           </Link>
           <nav className="hidden md:flex items-center gap-1 text-sm font-medium text-white/70">
-            <button onClick={() => setLocation('/collections')} className="hover:text-white hover:bg-white/10 px-3.5 py-1.5 rounded-full transition-all cursor-pointer">Collections</button>
+            <Link href="/collections">
+              <button className="hover:text-white hover:bg-white/10 px-3.5 py-1.5 rounded-full transition-all cursor-pointer">Collections</button>
+            </Link>
             <button onClick={() => {
               const el = document.getElementById('features');
               if (el) el.scrollIntoView({ behavior: 'smooth' });
             }} className="hover:text-white hover:bg-white/10 px-3.5 py-1.5 rounded-full transition-all cursor-pointer">Features</button>
-            <button onClick={() => setLocation('/about')} className="hover:text-white hover:bg-white/10 px-3.5 py-1.5 rounded-full transition-all cursor-pointer">About OAIS</button>
-            <button onClick={() => setLocation('/terms')} className="hover:text-white hover:bg-white/10 px-3.5 py-1.5 rounded-full transition-all cursor-pointer">Terms</button>
+            <Link href="/about">
+              <button className="hover:text-white hover:bg-white/10 px-3.5 py-1.5 rounded-full transition-all cursor-pointer">About OAIS</button>
+            </Link>
+            <Link href="/terms">
+              <button className="hover:text-white hover:bg-white/10 px-3.5 py-1.5 rounded-full transition-all cursor-pointer">Terms</button>
+            </Link>
           </nav>
-          <button onClick={() => setLocation('/login')} className="flex items-center gap-2 bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white text-sm font-semibold px-4 py-1.5 rounded-full transition-all border border-white/10 hover:border-white/20 cursor-pointer">
-            <LogIn className="w-3.5 h-3.5" /> Login
-          </button>
+          <Link href="/login">
+            <button className="flex items-center gap-2 bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white text-sm font-semibold px-4 py-1.5 rounded-full transition-all border border-white/10 hover:border-white/20 cursor-pointer">
+              <LogIn className="w-3.5 h-3.5" /> Login
+            </button>
+          </Link>
           </div>
         </div>
       </header>
@@ -330,83 +351,156 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ─── FEATURES ─── */}
-      <section id="features" className="py-28 bg-[#f7f8fc] relative overflow-hidden" data-reveal>
-        {/* Deep Parallax Backgrounds */}
-        <div 
-          className="absolute -top-32 -right-32 w-[800px] h-[800px] bg-gradient-to-br from-[#4169E1]/10 to-transparent rounded-full blur-[120px] pointer-events-none transition-transform duration-100 ease-out"
-          style={{ transform: `translateY(${scrollY * -0.15}px)` }}
-        />
-        <div 
-          className="absolute -bottom-40 -left-40 w-[900px] h-[900px] bg-gradient-to-tr from-[#960000]/10 to-transparent rounded-full blur-[140px] pointer-events-none transition-transform duration-100 ease-out"
-          style={{ transform: `translateY(${scrollY * -0.08}px)` }}
-        />
-
-        <div className="max-w-7xl mx-auto px-6 relative z-10">
-          <div className="text-center max-w-2xl mx-auto mb-16 relative">
-            <p className="text-xs font-bold text-[#4169E1] uppercase tracking-[0.2em] mb-4">Why iArchive</p>
-            <h2 className="text-5xl font-bold text-[#0a1628] leading-tight">
-              Built for <span className="font-serif italic text-[#4169E1] relative">
-                archival excellence
-                <svg className="absolute -bottom-2 lg:-bottom-3 left-0 w-full h-3 text-[#960000] opacity-40 animate-pulse" viewBox="0 0 100 20" preserveAspectRatio="none">
-                  <path d="M0 10 Q 50 20 100 10" stroke="currentColor" strokeWidth="4" fill="none" />
-                </svg>
-              </span>
-            </h2>
-            <p className="mt-6 text-muted-foreground/80 leading-relaxed text-lg font-light">
-              iArchive implements strict international standards to ensure digital materials remain
-              accessible, authentic, and securely preserved for generations.
-            </p>
+      {/* ─── FEATURES HORIZONTAL SCROLL ─── */}
+      <section ref={targetRef} className="relative h-[400vh] bg-[#f7f8fc]">
+        <div className="sticky top-0 flex h-screen items-center overflow-hidden">
+          <div className="absolute inset-x-0 top-20 text-center z-20 pointer-events-none">
+             <motion.div 
+               initial={{ opacity: 0, y: 20 }}
+               whileInView={{ opacity: 1, y: 0 }}
+               transition={{ duration: 0.8 }}
+               className="max-w-2xl mx-auto px-6"
+             >
+                <p className="text-xs font-bold text-[#4169E1] uppercase tracking-[0.2em] mb-4">Why iArchive</p>
+                <h2 className="text-5xl font-bold text-[#0a1628] leading-tight">
+                  Built for <span className="font-serif italic text-[#4169E1] relative">
+                    archival excellence
+                    <svg className="absolute -bottom-2 lg:-bottom-3 left-0 w-full h-3 text-[#960000] opacity-40" viewBox="0 0 100 20" preserveAspectRatio="none">
+                      <path d="M0 10 Q 50 20 100 10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    </svg>
+                  </span>
+                </h2>
+             </motion.div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {features.map((f, i) => {
-              // Calculate individual parallax speeds for staggered moving effect
-              const parallaxSpeed = 0.05 + (i % 3) * 0.03;
-              const offsetY = Math.max(-40, Math.min(40, (scrollY - 800) * parallaxSpeed));
-              
-              return (
-                <div 
-                  key={i} 
-                  className="transition-transform duration-300 ease-out h-full"
-                  style={{ transform: `translateY(${offsetY}px)` }}
-                  data-stagger
-                >
-                  <div className="reveal-up h-full bg-white/70 backdrop-blur-xl rounded-3xl p-8 border border-border/40 hover:border-[#4169E1]/40 hover:shadow-2xl hover:shadow-[#4169E1]/20 transition-all duration-500 group hover:-translate-y-4">
-                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#4169E1]/10 to-[#960000]/5 flex items-center justify-center mb-6 group-hover:scale-110 group-hover:from-[#4169E1] group-hover:to-[#960000] transition-all duration-500 shadow-inner">
-                      <f.icon className="w-7 h-7 text-[#4169E1] group-hover:text-white transition-colors duration-500" />
+          <motion.div style={{ x: springX }} className="flex gap-10 px-24">
+            {features.map((f, i) => (
+              <div 
+                key={i} 
+                className="group relative h-[320px] w-[500px] overflow-hidden rounded-[2.5rem] bg-white border border-border/50 shadow-sm transition-all duration-700 hover:shadow-2xl hover:border-[#4169E1]/40 shrink-0"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-[#4169E1]/5 via-white to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+                <div className="p-8 flex items-start gap-8 h-full relative z-10">
+                  <div className="w-16 h-16 rounded-2xl bg-[#0a1628]/5 group-hover:bg-[#4169E1] flex items-center justify-center shrink-0 group-hover:scale-110 group-hover:-rotate-3 transition-all duration-500 shadow-sm">
+                    <f.icon className="w-8 h-8 text-[#0a1628] group-hover:text-white transition-colors duration-500" />
+                  </div>
+                  <div className="flex flex-col justify-center h-full">
+                    <h3 className="text-2xl font-bold text-[#0a1628] mb-3 group-hover:text-[#4169E1] transition-colors">{f.title}</h3>
+                    <p className="text-muted-foreground leading-relaxed text-[15px] font-light group-hover:text-[#0a1628]/80 transition-colors">
+                      {f.desc}
+                    </p>
+                    <div className="mt-6 flex items-center gap-2 text-[#4169E1] font-bold text-[10px] uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 group-hover:translate-x-3 transition-all duration-500">
+                      View Capability <ArrowRight className="w-3 h-3" />
                     </div>
-                    <h3 className="text-xl font-bold text-[#0a1628] mb-3 group-hover:text-[#4169E1] transition-colors">{f.title}</h3>
-                    <p className="text-muted-foreground leading-relaxed font-light">{f.desc}</p>
                   </div>
                 </div>
-              );
-            })}
-          </div>
+
+                {/* Decorative element - subtle grid pattern on hover */}
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-[0.03] pointer-events-none transition-opacity duration-700 bg-[radial-gradient(#0a1628_1px,transparent_1px)] [background-size:20px_20px]" />
+                <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-[#4169E1]/5 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+              </div>
+            ))}
+            
+            {/* View Collection Card - Matching style */}
+            <div className="h-[320px] w-[500px] flex items-center justify-center shrink-0">
+               <Link href="/collections">
+                 <div className="flex flex-col items-center gap-6 group cursor-pointer">
+                    <motion.div 
+                      whileHover={{ scale: 1.1, rotate: 5 }}
+                      className="w-20 h-20 rounded-3xl bg-[#0a1628] flex items-center justify-center text-white shadow-2xl transition-all duration-500 group-hover:bg-[#4169E1]"
+                    >
+                       <Search className="w-7 h-7" />
+                    </motion.div>
+                    <div className="text-center">
+                       <h4 className="text-xl font-bold text-[#0a1628] mb-1">Access the Full Archive</h4>
+                       <p className="text-[#4169E1] text-[10px] uppercase tracking-[0.3em] font-black">Begin Research Pipeline →</p>
+                    </div>
+                 </div>
+               </Link>
+            </div>
+          </motion.div>
         </div>
       </section>
 
-      {/* ─── HOW IT WORKS ─── */}
-      <section id="how-it-works" className="py-20 bg-white" data-reveal>
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center max-w-2xl mx-auto mb-14">
-            <p className="text-xs font-semibold text-[#960000] uppercase tracking-widest mb-3">GETTING STARTED</p>
-            <h2 className="text-4xl font-bold text-[#0a1628]">
-              How <span className="font-serif italic text-[#4169E1]">iArchive</span> Works
+      {/* ─── HOW IT WORKS (CIRCUIT MILESTONE) ─── */}
+      <section id="how-it-works" className="py-28 bg-[#fdfdfd] relative overflow-hidden" data-reveal>
+        <div className="max-w-7xl mx-auto px-6 relative z-10">
+          <div className="text-center max-w-2xl mx-auto mb-20">
+            <p className="text-[10px] font-bold text-[#960000] uppercase tracking-[0.4em] mb-4 opacity-70">Infrastructure & Logic</p>
+            <h2 className="text-5xl font-bold text-[#0a1628] tracking-tight">
+              Archival <span className="text-[#4169E1]">Framework</span>
             </h2>
+            <div className="mt-6 flex justify-center gap-1.5">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="w-1.5 h-1.5 rounded-full bg-border" />
+              ))}
+            </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
-            <div className="hidden md:block absolute top-10 left-[22%] right-[22%] h-px bg-gradient-to-r from-[#4169E1]/30 via-[#960000]/30 to-emerald-500/30" />
-            {steps.map((step, i) => (
-              <div key={i} data-stagger className="reveal-up text-center relative">
-                <div className={`w-20 h-20 ${step.color} rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg hover:scale-110 transition-transform duration-300`}>
-                  <step.icon className="w-9 h-9 text-white" />
-                </div>
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-3 bg-white border border-border text-xs font-bold text-muted-foreground px-2 py-0.5 rounded-full">{step.num}</div>
-                <h3 className="text-xl font-bold text-[#0a1628] mb-3">{step.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">{step.desc}</p>
-              </div>
-            ))}
+
+          <div className="relative">
+            {/* High-Fidelity Circuit SVG Background */}
+            <div className="hidden md:block absolute inset-0 -top-10 pointer-events-none">
+              <svg className="w-full h-40" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="circuit-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#4169E1" />
+                    <stop offset="50%" stopColor="#960000" />
+                    <stop offset="100%" stopColor="#10b981" />
+                  </linearGradient>
+                </defs>
+                {/* Horizontal segment 1 */}
+                <motion.path 
+                  initial={{ pathLength: 0 }}
+                  whileInView={{ pathLength: 1 }}
+                  transition={{ duration: 1.5, ease: "easeInOut" }}
+                  d="M 16.6% 75 L 25% 75 L 25% 40 L 41.6% 40" 
+                  fill="none" stroke="url(#circuit-grad)" strokeWidth="2" strokeDasharray="6 6"
+                />
+                {/* Horizontal segment 2 */}
+                <motion.path 
+                  initial={{ pathLength: 0 }}
+                  whileInView={{ pathLength: 1 }}
+                  transition={{ duration: 1.5, delay: 0.5, ease: "easeInOut" }}
+                  d="M 58.3% 40 L 75% 40 L 75% 75 L 83.3% 75" 
+                  fill="none" stroke="url(#circuit-grad)" strokeWidth="2" strokeDasharray="6 6"
+                />
+              </svg>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative lg:px-12">
+              {steps.map((step, i) => (
+                <motion.div 
+                  key={i}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  whileInView={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: i * 0.2, duration: 0.6 }}
+                  className="relative flex flex-col items-center text-center group"
+                >
+                  {/* Step Node */}
+                  <div className="relative mb-8">
+                    <div className={`w-28 h-28 rounded-3xl ${step.color} shadow-xl flex items-center justify-center relative z-20 overflow-hidden`}>
+                      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20" />
+                      <step.icon className="w-10 h-10 text-white relative z-10 group-hover:scale-110 transition-transform duration-500" />
+                    </div>
+                    
+                    {/* Pulsing Outer Ring */}
+                    <div className="absolute -inset-4 border border-[#4169E1]/10 rounded-full animate-[ping_3s_infinite] opacity-50" />
+                    
+                    {/* Index Label - Fixed visibility & type safe */}
+                    <div className="absolute -top-3 -left-3 w-10 h-10 bg-white border-2 border-[#4169E1] rounded-xl flex items-center justify-center text-xs font-black text-[#0a1628] shadow-xl z-30">
+                      {parseInt(String(step.num)) < 10 ? `0${step.num}` : step.num}
+                    </div>
+                  </div>
+
+                  <h3 className="text-2xl font-bold text-[#0a1628] mb-4">{step.title}</h3>
+                  <p className="text-muted-foreground leading-relaxed text-[15px] font-medium max-w-[260px]">
+                    {step.desc}
+                  </p>
+
+                  <div className="mt-10 h-1 w-12 bg-border group-hover:w-20 group-hover:bg-[#4169E1] transition-all duration-700 rounded-full" />
+                </motion.div>
+              ))}
+            </div>
           </div>
         </div>
       </section>

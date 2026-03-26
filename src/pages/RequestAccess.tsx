@@ -101,8 +101,8 @@ export default function RequestAccess() {
                   <Lock className="w-3 h-3" /> Restricted Material
                 </Badge>
                 <div className="aspect-[3/4] w-full rounded-2xl overflow-hidden bg-white/5 border border-white/10 shadow-inner group relative">
-                  {material.coverUrl ? (
-                    <img src={material.coverUrl} alt="Cover" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                  {material.thumbnailUrl ? (
+                    <img src={material.thumbnailUrl} alt="Cover" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center text-white/20">
                       <FileText className="w-16 h-16 mb-2 opacity-50" />

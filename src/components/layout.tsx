@@ -23,16 +23,23 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
         isScrolled || location !== "/" ? "bg-white/90 backdrop-blur-lg border-border/50 shadow-sm py-3" : "bg-transparent border-transparent py-5"
       )}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3 group">
-            <img src={`${import.meta.env.BASE_URL}logos/iarchive%20icon.png`} alt="iArchive icon" className="w-10 h-10 object-contain drop-shadow-sm group-hover:scale-105 transition-transform" />
+          <Link href="/" className="flex items-center gap-4 group">
+            <img src={`${import.meta.env.BASE_URL}logos/iarchive%20icon.png`} alt="iArchive icon" className="w-12 h-12 object-contain drop-shadow-sm group-hover:scale-105 transition-transform" />
             <div>
-              <h1 className="font-display font-bold text-xl leading-none text-primary">iArchive</h1>
-              <p className={cn("text-[10px] font-semibold tracking-wider uppercase", isScrolled || location !== "/" ? "text-muted-foreground" : "text-primary/70")}>Holy Cross of Davao College</p>
+              <h1 className="font-display font-black text-2xl leading-none text-primary uppercase tracking-tight">iArchive</h1>
+              <p className={cn("text-[9px] font-bold tracking-[0.2em] uppercase mt-1", isScrolled || location !== "/" ? "text-muted-foreground" : "text-primary/70")}>HCDC Digital Collections</p>
             </div>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-8 font-medium">
+          <nav className="hidden md:flex items-center gap-8 text-sm font-bold uppercase tracking-wider">
             <Link href="/collections" className="text-foreground/80 hover:text-accent transition-colors">Collections</Link>
+            <button onClick={() => {
+              if (location !== '/') {
+                setLocation('/#features');
+              } else {
+                document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
+              }
+            }} className="text-foreground/80 hover:text-accent transition-colors cursor-pointer">Features</button>
             <Link href="/about" className="text-foreground/80 hover:text-accent transition-colors">About OAIS</Link>
             <Link href="/terms" className="text-foreground/80 hover:text-accent transition-colors">Terms</Link>
             {user ? (
@@ -140,9 +147,9 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="h-16 flex items-center px-6 border-b border-white/10 bg-black/10">
-          <Library className="w-6 h-6 text-accent mr-3" />
-          <h2 className="font-display font-bold text-xl tracking-wide">
-            {user.role === "admin" ? "iArchive Admin" : user.role === "archivist" ? "iArchive Archivist" : "iArchive Student"}
+          <img src={`${import.meta.env.BASE_URL}logos/iarchive%20icon.png`} className="w-8 h-8 object-contain mr-3" alt="Logo" />
+          <h2 className="font-display font-bold text-xl tracking-tight uppercase">
+            {user.role === "admin" ? "Admin" : user.role === "archivist" ? "Archivist" : "Student"}
           </h2>
         </div>
         <div className="flex-1 py-6 overflow-y-auto custom-scrollbar">

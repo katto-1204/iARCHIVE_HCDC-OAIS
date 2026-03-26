@@ -12,10 +12,14 @@ import {
   Input,
 } from "@/components/ui-components";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui-components";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Plus, ExternalLink, Edit, Trash2 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format as formatDate } from "date-fns";
+import { cn } from "@/lib/utils";
+import { Search, Plus, ExternalLink, Edit, Trash2, FileText, Calendar as CalendarIcon } from "lucide-react";
 import { Link } from "wouter";
 import {
   useGetMaterials,
@@ -71,6 +75,7 @@ export default function AdminMaterials() {
   const { toast } = useToast();
 
   const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [step, setStep] = React.useState(0);
   const [mode, setMode] = React.useState<"create" | "edit">("create");
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [form, setForm] = React.useState<MaterialForm>(emptyForm);
@@ -113,6 +118,7 @@ export default function AdminMaterials() {
     setMode("create");
     setEditingId(null);
     setForm(emptyForm);
+    setStep(0);
     setDialogOpen(true);
   };
 
@@ -135,6 +141,7 @@ export default function AdminMaterials() {
       fileUrl: mat.fileUrl ?? "",
       thumbnailUrl: mat.thumbnailUrl ?? "",
     });
+    setStep(0);
     setDialogOpen(true);
   };
 
@@ -313,167 +320,227 @@ export default function AdminMaterials() {
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>{mode === "create" ? "Ingest New Material" : "Edit Material"}</DialogTitle>
+            <DialogDescription className="sr-only">
+               Fill in the archival metadata across 5 steps to {mode === "create" ? "ingest" : "update"} a digital material.
+            </DialogDescription>
+            <div className="flex items-center gap-2 mt-2">
+              {[1, 2, 3, 4, 5].map((s, i) => (
+                <div key={s} className="flex-1 flex items-center gap-2">
+                  <div className={`h-1.5 flex-1 rounded-full transition-colors ${step >= i ? "bg-[#4169E1]" : "bg-muted"}`} />
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mt-2 uppercase font-bold tracking-widest">
+              Step {step + 1} of 5: {
+                ["Identity Statement", "Context & Content", "Access & Structure", "Upload Materials", "Preview & Finalize"][step]
+              }
+            </p>
           </DialogHeader>
 
-          <div className="grid grid-cols-1 gap-4">
-            <div>
-              <label className="text-sm font-medium mb-1 block">
-                Title <span className="text-destructive">*</span>
-              </label>
-              <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Material title" />
-            </div>
+          <div className="min-h-[340px] py-2">
+            {step === 0 && (
+              <div className="space-y-5 animate-in fade-in slide-in-from-right-2 duration-300">
+                <div>
+                  <label className="text-sm font-semibold mb-1.5 block">Title <span className="text-[#960000]">*</span></label>
+                  <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Main archival title" className="h-11 shadow-sm" />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold mb-1.5 block">Alternative Title</label>
+                  <Input value={form.altTitle} onChange={(e) => setForm({ ...form, altTitle: e.target.value })} placeholder="Parallel or alternative title" className="h-11 shadow-sm" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-semibold mb-1.5 block">Date of Creation</label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full h-11 justify-start text-left font-normal shadow-sm",
+                            !form.date && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {form.date ? formatDate(new Date(form.date), "PPP") : <span>Pick a date</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={form.date ? new Date(form.date) : undefined}
+                          onSelect={(date) => setForm({ ...form, date: date ? date.toISOString() : "" })}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <div>
+                    <label className="text-sm font-semibold mb-1.5 block">Series Category</label>
+                    <Select value={form.categoryId} onValueChange={(v) => setForm({ ...form, categoryId: v })}>
+                      <SelectTrigger className="h-11 shadow-sm">
+                        <SelectValue placeholder="Select series" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(categories ?? []).map((c: any) => (
+                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium mb-1 block">Access</label>
-                <Select value={form.access} onValueChange={(v) => setForm({ ...form, access: v as any })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="public">public</SelectItem>
-                    <SelectItem value="restricted">restricted</SelectItem>
-                    <SelectItem value="confidential">confidential</SelectItem>
-                  </SelectContent>
-                </Select>
+            {step === 1 && (
+              <div className="space-y-5 animate-in fade-in slide-in-from-right-2 duration-300">
+                <div>
+                  <label className="text-sm font-semibold mb-1.5 block">Creator / Author</label>
+                  <Input value={form.creator} onChange={(e) => setForm({ ...form, creator: e.target.value })} placeholder="Individual or corporate body" className="h-11 shadow-sm" />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold mb-1.5 block">Publisher / Institution</label>
+                  <Input value={form.publisher} onChange={(e) => setForm({ ...form, publisher: e.target.value })} placeholder="Publishing body" className="h-11 shadow-sm" />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold mb-1.5 block">Language</label>
+                  <Input value={form.language} onChange={(e) => setForm({ ...form, language: e.target.value })} placeholder="English, Filipino, etc." className="h-11 shadow-sm" />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold mb-1.5 block">Archive Description</label>
+                  <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Scope and content summary" className="min-h-[100px] shadow-sm" />
+                </div>
               </div>
+            )}
 
-              <div>
-                <label className="text-sm font-medium mb-1 block">Category</label>
-                <Select value={form.categoryId} onValueChange={(v) => setForm({ ...form, categoryId: v })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(categories ?? []).map((c: any) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            {step === 2 && (
+              <div className="space-y-5 animate-in fade-in slide-in-from-right-2 duration-300">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-semibold mb-1.5 block">Access Level</label>
+                    <Select value={form.access} onValueChange={(v) => setForm({ ...form, access: v as any })}>
+                      <SelectTrigger className="h-11 shadow-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="public">Public</SelectItem>
+                        <SelectItem value="restricted">Restricted</SelectItem>
+                        <SelectItem value="confidential">Confidential</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-semibold mb-1.5 block">Physical Format</label>
+                    <Input value={form.format} onChange={(e) => setForm({ ...form, format: e.target.value })} placeholder="application/pdf, image/tiff" className="h-11 shadow-sm" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-semibold mb-1.5 block">File Size</label>
+                    <Input value={form.fileSize} onChange={(e) => setForm({ ...form, fileSize: e.target.value })} placeholder="e.g. 2.5 MB" className="h-11 shadow-sm" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-semibold mb-1.5 block">Extent (Pages)</label>
+                    <Input value={form.pages} onChange={(e) => setForm({ ...form, pages: e.target.value })} placeholder="e.g. 50" className="h-11 shadow-sm" />
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium mb-1 block">Creator</label>
-                <Input value={form.creator} onChange={(e) => setForm({ ...form, creator: e.target.value })} placeholder="Creator / author" />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Date</label>
-                <Input value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} placeholder="YYYY-MM-DD" />
-              </div>
-            </div>
+            {step === 3 && (
+              <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-300">
+                <div className="bg-muted/30 p-4 rounded-xl border border-dashed border-muted-foreground/30">
+                  <label className="text-sm font-semibold mb-2 block">Thumbnail Image</label>
+                  <Input type="file" accept="image/*" className="bg-white mb-3" onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const url = await readFileAsDataUrl(file);
+                      setForm({ ...form, thumbnailUrl: url });
+                    }
+                  }} />
+                  <Input value={form.thumbnailUrl} onChange={(e) => setForm({ ...form, thumbnailUrl: e.target.value })} placeholder="Or paste image URL" className="h-11 shadow-sm bg-white" />
+                </div>
 
-            <div>
-              <label className="text-sm font-medium mb-1 block">Description</label>
-              <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Short archival description" />
-            </div>
+                <div className="bg-muted/30 p-4 rounded-xl border border-dashed border-muted-foreground/30">
+                  <label className="text-sm font-semibold mb-2 block">Material Asset (PDF/Image)</label>
+                  <Input type="file" className="bg-white mb-3" onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const url = await readFileAsDataUrl(file);
+                      setForm({ ...form, fileUrl: url });
+                    }
+                  }} />
+                  <Input value={form.fileUrl} onChange={(e) => setForm({ ...form, fileUrl: e.target.value })} placeholder="Or paste file URL" className="h-11 shadow-sm bg-white" />
+                </div>
+              </div>
+            )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium mb-1 block">Format</label>
-                <Input value={form.format} onChange={(e) => setForm({ ...form, format: e.target.value })} placeholder="application/pdf, image/tiff, etc." />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">File Size</label>
-                <Input value={form.fileSize} onChange={(e) => setForm({ ...form, fileSize: e.target.value })} placeholder="e.g., 2.4 MB" />
-              </div>
-            </div>
+            {step === 4 && (
+              <div className="space-y-4 animate-in fade-in slide-in-from-right-2 duration-300">
+                <div className="bg-[#0a1628] text-white p-5 rounded-2xl shadow-xl flex gap-4 border border-white/10">
+                  <div className="w-20 h-24 bg-white/10 rounded-lg flex items-center justify-center shrink-0 border border-white/5">
+                    {form.thumbnailUrl ? <img src={form.thumbnailUrl} className="w-full h-full object-cover rounded-lg" /> : <FileText className="w-8 h-8 text-white/20" />}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg leading-tight mb-1">{form.title || "Untitled Material"}</h3>
+                    <p className="text-white/60 text-xs font-mono uppercase tracking-widest">{form.creator || "Unknown Creator"}</p>
+                    <div className="flex gap-2 mt-3">
+                      <Badge variant="success" className="bg-[#4169E1] text-white border-0 text-[10px] lowercase px-2 h-5 tracking-wide">{form.access}</Badge>
+                      <Badge variant="outline" className="text-white/60 border-white/20 text-[10px] uppercase font-bold tracking-widest px-2 h-5">{form.format || "N/A"}</Badge>
+                    </div>
+                  </div>
+                </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="text-sm font-medium mb-1 block">Pages</label>
-                <Input value={form.pages} onChange={(e) => setForm({ ...form, pages: e.target.value })} placeholder="e.g., 45" />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Language</label>
-                <Input value={form.language} onChange={(e) => setForm({ ...form, language: e.target.value })} placeholder="eng, fil, etc." />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Publisher</label>
-                <Input value={form.publisher} onChange={(e) => setForm({ ...form, publisher: e.target.value })} placeholder="Publisher / institution" />
-              </div>
-            </div>
-
-            <div className="pt-3 border-t border-border/60">
-              <div className="flex items-center justify-between mb-3">
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold">Material Asset (optional)</p>
-                  <p className="text-xs text-muted-foreground">
-                    Upload a small demo file/cover as data URL so it can be previewed.
+                <div className="grid grid-cols-2 gap-x-8 gap-y-3 px-2 pt-2">
+                  {[
+                    { label: "Date", val: form.date },
+                    { label: "Category", val: categories?.find(c => c.id === form.categoryId)?.name },
+                    { label: "Publisher", val: form.publisher },
+                    { label: "Pages", val: form.pages },
+                  ].map(f => (
+                    <div key={f.label}>
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{f.label}</p>
+                      <p className="text-sm font-medium border-b border-muted py-1">{f.val || "—"}</p>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="px-2">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Description</p>
+                  <p className="text-xs text-muted-foreground line-clamp-3 bg-muted/20 p-3 rounded-lg border italic">
+                    {form.description || "No description provided."}
                   </p>
                 </div>
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium mb-1 block">Thumbnail Upload (image)</label>
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    onChange={async (e) => {
-                      try {
-                        const file = e.currentTarget.files?.[0];
-                        if (!file) return;
-                        if (file.size > 3_000_000) {
-                          toast({ title: "File too large", description: "Use a smaller cover (<= 3MB) for demo uploads.", variant: "destructive" });
-                          return;
-                        }
-                        const dataUrl = await readFileAsDataUrl(file);
-                        setForm((prev) => ({ ...prev, thumbnailUrl: dataUrl }));
-                      } catch {
-                        toast({ title: "Upload failed", description: "Could not read the selected thumbnail file.", variant: "destructive" });
-                      }
-                    }}
-                  />
-                  <Input
-                    value={form.thumbnailUrl ?? ""}
-                    onChange={(e) => setForm({ ...form, thumbnailUrl: e.target.value })}
-                    placeholder="Or paste thumbnail URL / data URL"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium mb-1 block">Material File URL / Data URL</label>
-                  <Input
-                    type="file"
-                    onChange={async (e) => {
-                      try {
-                        const file = e.currentTarget.files?.[0];
-                        if (!file) return;
-                        if (file.size > 3_000_000) {
-                          toast({ title: "File too large", description: "Use a smaller demo file (<= 3MB) for data URL uploads.", variant: "destructive" });
-                          return;
-                        }
-                        const dataUrl = await readFileAsDataUrl(file);
-                        setForm((prev) => ({ ...prev, fileUrl: dataUrl }));
-                      } catch {
-                        toast({ title: "Upload failed", description: "Could not read the selected material file.", variant: "destructive" });
-                      }
-                    }}
-                  />
-                  <Input
-                    value={form.fileUrl ?? ""}
-                    onChange={(e) => setForm({ ...form, fileUrl: e.target.value })}
-                    placeholder="Paste file URL / data URL"
-                  />
-                </div>
-              </div>
-            </div>
+            )}
           </div>
 
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={onSave} className="gap-2" disabled={!form.title.trim()}>
-              {mode === "create" ? "Create Material" : "Save Changes"}
-            </Button>
+          <DialogFooter className="flex items-center justify-between sm:justify-between border-t pt-4">
+            <div className="flex gap-2">
+              {step > 0 && (
+                <Button variant="ghost" onClick={() => setStep(step - 1)}>
+                  Back
+                </Button>
+              )}
+              {step === 0 && (
+                <Button variant="ghost" onClick={() => setDialogOpen(false)}>
+                  Cancel
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              {step < 4 ? (
+                <Button onClick={() => setStep(step + 1)} disabled={step === 0 && !form.title.trim()}>
+                  Next Step
+                </Button>
+              ) : (
+                <Button onClick={onSave} className="bg-[#0a1628] hover:bg-[#4169E1] transition-all px-8 shadow-lg shadow-primary/20">
+                  {mode === "create" ? "Finalize Ingest" : "Save Changes"}
+                </Button>
+              )}
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

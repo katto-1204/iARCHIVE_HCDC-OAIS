@@ -154,7 +154,10 @@ export default function AdminUsers() {
                   <TableCell className="text-sm text-muted-foreground">{user.institution || <span className="text-muted-foreground/40 italic">—</span>}</TableCell>
                   <TableCell className="text-sm text-muted-foreground capitalize">{user.userCategory || <span className="text-muted-foreground/40 italic">—</span>}</TableCell>
                   <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                    {format(new Date(user.createdAt), 'MMM d, yyyy')}
+                    {user.createdAt ? (() => {
+                      const date = new Date(user.createdAt);
+                      return isNaN(date.getTime()) ? "N/A" : format(date, 'MMM d, yyyy');
+                    })() : "N/A"}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">

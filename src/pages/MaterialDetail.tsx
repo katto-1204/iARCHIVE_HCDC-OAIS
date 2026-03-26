@@ -6,7 +6,7 @@ import {
   ZoomIn, ZoomOut, RotateCcw, Maximize2, ExternalLink,
   Database, HardDrive, Calendar, User, Tag, BookOpen, AlertTriangle
 } from "lucide-react";
-import { useGetMaterial, useGetMe } from "@workspace/api-client-react";
+import { useGetMaterial, useGetMe, useGetAccessRequests } from "@workspace/api-client-react";
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   if (!value) return null;
@@ -36,8 +36,11 @@ export default function MaterialDetail() {
   const [, params] = useRoute("/materials/:id");
   const { data: material, isLoading } = useGetMaterial(params?.id || "");
   const { data: user } = useGetMe();
+  const { data: requests } = useGetAccessRequests({ status: "approved" });
   const [activeTab, setActiveTab] = React.useState<"details" | "dc" | "related">("details");
   const [showDownloadModal, setShowDownloadModal] = React.useState(false);
+
+  const isApproved = requests?.requests?.some((r: any) => r.materialId === params?.id);
 
   const fmt = (d?: string | null) => {
     if (!d) return null;
@@ -79,7 +82,7 @@ export default function MaterialDetail() {
   }[material.access] ?? { label: material.access.toUpperCase(), className: "bg-muted text-muted-foreground border border-border" };
 
   const fixityVerified = material.fixityStatus === "verified" || material.sha256;
-  const canDownload = material.access === "public" || user?.role === "admin" || user?.role === "archivist";
+  const canDownload = material.access === "public" || user?.role === "admin" || user?.role === "archivist" || isApproved;
 
   return (
     <div className="min-h-screen bg-[#f7f8fc] font-sans">

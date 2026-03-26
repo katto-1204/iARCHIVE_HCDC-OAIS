@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Link } from "wouter";
-import { Search, SlidersHorizontal, Lock, Unlock, ShieldAlert, FileText, Database, X, ChevronRight, ArrowRight } from "lucide-react";
-import { useGetMaterials, useGetCategories } from "@workspace/api-client-react";
+import { Search, SlidersHorizontal, Lock, Unlock, ShieldAlert, FileText, Database, X, ChevronRight, ArrowRight, User } from "lucide-react";
+import { useGetMaterials, useGetCategories, useGetMe } from "@workspace/api-client-react";
 
 const ACCESS_COLORS = {
   public: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", dot: "bg-emerald-500", label: "Public" },
@@ -25,6 +25,13 @@ export default function Collections() {
 
   const { data: categories } = useGetCategories();
   const { data, isLoading } = useGetMaterials({ search: debouncedSearch, category, access: access as any, limit: 24 });
+  const { data: user } = useGetMe();
+
+  const roleBranding = {
+    admin: { bg: "bg-[#002366]", label: "Admin" }, // Deep Royal Blue
+    archivist: { bg: "bg-black", label: "Archivist" },
+    student: { bg: "bg-[#960000]", label: "Student" }, // Red
+  }[user?.role as string] || { bg: "bg-[#0a1628]", label: "" };
 
   const activeFilters = [
     category && { key: "category", label: categories?.find(c => c.id === category)?.name || category, clear: () => setCategory("") },
@@ -34,22 +41,36 @@ export default function Collections() {
   return (
     <div className="min-h-screen bg-[#f7f8fc] font-sans">
       {/* ─── HEADER ─── */}
-      <header className="bg-[#0a1628] border-b border-white/10 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-md bg-[#4169E1] flex items-center justify-center">
-              <Database className="w-3.5 h-3.5 text-white" />
+      <header className={`${roleBranding.bg} border-b border-white/10 sticky top-0 z-50 transition-colors duration-500`}>
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-4 group">
+            <img src={`${import.meta.env.BASE_URL}logos/iarchive%20white%20logo.png`} alt="iArchive logo" className="h-11 w-auto object-contain drop-shadow-lg group-hover:scale-105 transition-transform duration-300" />
+            <div className="flex flex-col">
+              <span className="text-white font-black text-2xl tracking-tight leading-none uppercase">iArchive</span>
+              <span className="text-[9px] text-white/40 font-bold uppercase tracking-[0.2em] mt-1.5 whitespace-nowrap">HCDC Digital Collections</span>
             </div>
-            <span className="text-white font-bold">iArchive</span>
           </Link>
-          <nav className="hidden md:flex items-center gap-6 text-sm text-white/60">
-            <Link href="/" className="hover:text-white transition-colors">Home</Link>
-            <span className="text-white/20">›</span>
-            <span className="text-white font-medium">Collections</span>
+          <nav className="hidden md:flex items-center gap-8 text-sm text-white/60">
+            <Link href="/" className="hover:text-white transition-colors font-medium">Home</Link>
+            <span className="text-white/20">|</span>
+            <span className="text-white font-bold tracking-wide">Collections</span>
           </nav>
-          <Link href="/login">
-            <button className="text-sm font-semibold text-white/70 hover:text-white transition-colors">Sign In</button>
-          </Link>
+          
+          {user ? (
+            <div className="flex items-center gap-4">
+              <div className="flex flex-col items-end">
+                <span className="text-xs font-bold text-white/40 uppercase tracking-tighter">{roleBranding.label}</span>
+                <span className="text-sm font-semibold text-white">{user.name}</span>
+              </div>
+              <div className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center">
+                <User className="w-5 h-5 text-white/70" />
+              </div>
+            </div>
+          ) : (
+            <Link href="/login">
+              <button className="text-sm font-bold text-white bg-[#4169E1] px-5 py-2 rounded-lg hover:bg-[#3558c8] transition-all shadow-lg shadow-black/20">Sign In</button>
+            </Link>
+          )}
         </div>
       </header>
 
@@ -241,9 +262,10 @@ export default function Collections() {
                     {/* Content */}
                     <div className="p-4">
                       <p className="text-[10px] font-mono text-muted-foreground/70 mb-1.5 uppercase tracking-wider">{mat.materialId}</p>
-                      <h3 className="font-bold text-[#0a1628] text-sm leading-snug mb-2 group-hover:text-[#4169E1] transition-colors line-clamp-2">
+                      <h3 className="font-bold text-[#0a1628] text-sm leading-snug mb-2 group-hover:text-[#4169E1] transition-colors line-clamp-2 h-10">
                         {mat.title}
                       </h3>
+                      
                       <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/50">
                         <span className="text-[11px] text-muted-foreground font-medium truncate max-w-[110px]">
                           {mat.categoryName || "Uncategorized"}
@@ -252,6 +274,17 @@ export default function Collections() {
                           {mat.date ? new Date(mat.date).getFullYear() : "—"}
                         </span>
                       </div>
+
+                      {/* Request Access Button for restricted items */}
+                      {(mat.access === "restricted" || mat.access === "confidential") && (user?.role !== "admin" && user?.role !== "archivist") && (
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <Link href={`/request-access?materialId=${mat.id}`}>
+                            <button className="w-full mt-4 bg-[#960000] hover:bg-[#7a0000] text-white text-[10px] font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-inner">
+                              <Lock className="w-3 h-3" /> Request Access
+                            </button>
+                          </Link>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </Link>

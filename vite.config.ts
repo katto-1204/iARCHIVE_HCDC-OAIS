@@ -320,9 +320,30 @@ function mockAuthPlugin(): Plugin {
 
           // GET /materials logic with filtering
           if (method === "GET") {
+            const mapMaterial = (m: any) => ({
+              ...m,
+              materialId: m.material_id,
+              categoryId: m.category_id,
+              fileUrl: m.file_url,
+              thumbnailUrl: m.thumbnail_url,
+              createdAt: m.created_at,
+              updatedAt: m.updated_at,
+              aipId: m.aip_id,
+              sipId: m.sip_id,
+              fixityStatus: m.fixity_status,
+              accessionNo: m.accession_no,
+              scopeContent: m.scope_content,
+              archivalHistory: m.archival_history,
+              custodialHistory: m.custodial_history,
+              physicalLocation: m.physical_location,
+              physicalCondition: m.physical_condition,
+              bindingType: m.binding_type,
+              preferredCitation: m.preferred_citation,
+            });
+
             if (idMatch && idMatch[1]) {
                const mat = materials.find(m => m.id === idMatch[1]);
-               if (mat) res.end(JSON.stringify(mat));
+               if (mat) res.end(JSON.stringify(mapMaterial(mat)));
                else { res.statusCode = 404; res.end(JSON.stringify({ error: "Not found" })); }
                return;
             }
@@ -351,7 +372,8 @@ function mockAuthPlugin(): Plugin {
             
             // Limit and format correctly
             const limit = parseInt(parsedUrl.searchParams.get("limit") || "50", 10);
-            res.end(JSON.stringify({ materials: results.slice(0, limit), total: results.length }));
+            const mappedResults = results.slice(0, limit).map(mapMaterial);
+            res.end(JSON.stringify({ materials: mappedResults, total: results.length }));
             return;
           }
         }
