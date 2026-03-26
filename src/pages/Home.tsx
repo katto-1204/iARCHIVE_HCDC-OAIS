@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import {
   Search, Shield, Database, Lock, CheckCircle, GitBranch, BookOpen,
   Users, FileSearch, ChevronRight, Download, ArrowRight, LayoutDashboard,
@@ -11,13 +11,13 @@ import { useGetStats, useGetCategories, useGetMaterials } from "@workspace/api-c
 import { useToast } from "@/hooks/use-toast";
 
 export default function Home() {
+  const [, setLocation] = useLocation();
   const { data: stats, isError: statsError } = useGetStats();
   const { data: categories, isError: categoriesError } = useGetCategories();
   const { data: materials, isError: materialsError } = useGetMaterials({ limit: 3 });
   const [scrollY, setScrollY] = React.useState(0);
   const { toast } = useToast();
 
-  // Show errors as toasts instead of a banner
   React.useEffect(() => {
     if (statsError || categoriesError || materialsError) {
       toast({ title: "Connection Issue", description: "Some archive data could not be loaded. Please refresh.", variant: "destructive" });
@@ -36,19 +36,30 @@ export default function Home() {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
             entry.target.classList.add("reveal-visible");
-            // Stagger children animations
+            // Also apply to children with reveal-up
+            entry.target.querySelectorAll('.reveal-up').forEach(c => c.classList.add('reveal-visible'));
+            
             const children = entry.target.querySelectorAll('[data-stagger]');
             children.forEach((child, idx) => {
               (child as HTMLElement).style.transitionDelay = `${idx * 120}ms`;
               child.classList.add('reveal-visible');
+              child.querySelectorAll('.reveal-up').forEach(c => c.classList.add('reveal-visible'));
             });
           }
         });
       },
-      { threshold: 0.08 },
+      { threshold: 0.05, rootMargin: '0px 0px -50px 0px' },
     );
-    document.querySelectorAll("[data-reveal]").forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
+
+    const observeNodes = () => {
+      document.querySelectorAll("[data-reveal], .reveal-up, [data-stagger]").forEach((el) => observer.observe(el));
+    };
+    
+    observeNodes();
+    const mo = new MutationObserver(observeNodes);
+    mo.observe(document.body, { childList: true, subtree: true });
+
+    return () => { observer.disconnect(); mo.disconnect(); };
   }, []);
 
   const features = [
@@ -155,16 +166,17 @@ export default function Home() {
             <img src={`${import.meta.env.BASE_URL}logos/iarchive%20white%20logo.png`} alt="iArchive logo" className="h-7 w-auto object-contain" />
           </Link>
           <nav className="hidden md:flex items-center gap-1 text-sm font-medium text-white/70">
-            <Link href="/collections" className="hover:text-white hover:bg-white/10 px-3.5 py-1.5 rounded-full transition-all">Collections</Link>
-            <a href="#features" className="hover:text-white hover:bg-white/10 px-3.5 py-1.5 rounded-full transition-all">Features</a>
-            <Link href="/about" className="hover:text-white hover:bg-white/10 px-3.5 py-1.5 rounded-full transition-all">About OAIS</Link>
-            <Link href="/terms" className="hover:text-white hover:bg-white/10 px-3.5 py-1.5 rounded-full transition-all">Terms</Link>
+            <button onClick={() => setLocation('/collections')} className="hover:text-white hover:bg-white/10 px-3.5 py-1.5 rounded-full transition-all cursor-pointer">Collections</button>
+            <button onClick={() => {
+              const el = document.getElementById('features');
+              if (el) el.scrollIntoView({ behavior: 'smooth' });
+            }} className="hover:text-white hover:bg-white/10 px-3.5 py-1.5 rounded-full transition-all cursor-pointer">Features</button>
+            <button onClick={() => setLocation('/about')} className="hover:text-white hover:bg-white/10 px-3.5 py-1.5 rounded-full transition-all cursor-pointer">About OAIS</button>
+            <button onClick={() => setLocation('/terms')} className="hover:text-white hover:bg-white/10 px-3.5 py-1.5 rounded-full transition-all cursor-pointer">Terms</button>
           </nav>
-          <Link href="/login">
-            <button className="flex items-center gap-2 bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white text-sm font-semibold px-4 py-1.5 rounded-full transition-all border border-white/10 hover:border-white/20">
-              <LogIn className="w-3.5 h-3.5" /> Login
-            </button>
-          </Link>
+          <button onClick={() => setLocation('/login')} className="flex items-center gap-2 bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white text-sm font-semibold px-4 py-1.5 rounded-full transition-all border border-white/10 hover:border-white/20 cursor-pointer">
+            <LogIn className="w-3.5 h-3.5" /> Login
+          </button>
           </div>
         </div>
       </header>
@@ -319,28 +331,57 @@ export default function Home() {
       </section>
 
       {/* ─── FEATURES ─── */}
-      <section id="features" className="py-20 bg-[#f7f8fc]" data-reveal>
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center max-w-2xl mx-auto mb-14">
-            <p className="text-xs font-semibold text-[#4169E1] uppercase tracking-widest mb-3">WHY IARCHIVE</p>
-            <h2 className="text-4xl font-bold text-[#0a1628]">
-              Built for <span className="font-serif italic text-[#4169E1]">archival excellence</span>
+      <section id="features" className="py-28 bg-[#f7f8fc] relative overflow-hidden" data-reveal>
+        {/* Deep Parallax Backgrounds */}
+        <div 
+          className="absolute -top-32 -right-32 w-[800px] h-[800px] bg-gradient-to-br from-[#4169E1]/10 to-transparent rounded-full blur-[120px] pointer-events-none transition-transform duration-100 ease-out"
+          style={{ transform: `translateY(${scrollY * -0.15}px)` }}
+        />
+        <div 
+          className="absolute -bottom-40 -left-40 w-[900px] h-[900px] bg-gradient-to-tr from-[#960000]/10 to-transparent rounded-full blur-[140px] pointer-events-none transition-transform duration-100 ease-out"
+          style={{ transform: `translateY(${scrollY * -0.08}px)` }}
+        />
+
+        <div className="max-w-7xl mx-auto px-6 relative z-10">
+          <div className="text-center max-w-2xl mx-auto mb-16 relative">
+            <p className="text-xs font-bold text-[#4169E1] uppercase tracking-[0.2em] mb-4">Why iArchive</p>
+            <h2 className="text-5xl font-bold text-[#0a1628] leading-tight">
+              Built for <span className="font-serif italic text-[#4169E1] relative">
+                archival excellence
+                <svg className="absolute -bottom-2 lg:-bottom-3 left-0 w-full h-3 text-[#960000] opacity-40 animate-pulse" viewBox="0 0 100 20" preserveAspectRatio="none">
+                  <path d="M0 10 Q 50 20 100 10" stroke="currentColor" strokeWidth="4" fill="none" />
+                </svg>
+              </span>
             </h2>
-            <p className="mt-4 text-muted-foreground leading-relaxed">
+            <p className="mt-6 text-muted-foreground/80 leading-relaxed text-lg font-light">
               iArchive implements strict international standards to ensure digital materials remain
               accessible, authentic, and securely preserved for generations.
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {features.map((f, i) => (
-              <div key={i} data-stagger className="reveal-up bg-white rounded-2xl p-7 border border-border/60 hover:border-[#4169E1]/30 hover:shadow-xl hover:shadow-[#4169E1]/10 transition-all duration-500 group hover:-translate-y-1">
-                <div className="w-12 h-12 rounded-xl bg-[#4169E1]/10 flex items-center justify-center mb-5 group-hover:bg-[#4169E1]/20 transition-colors">
-                  <f.icon className="w-6 h-6 text-[#4169E1]" />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {features.map((f, i) => {
+              // Calculate individual parallax speeds for staggered moving effect
+              const parallaxSpeed = 0.05 + (i % 3) * 0.03;
+              const offsetY = Math.max(-40, Math.min(40, (scrollY - 800) * parallaxSpeed));
+              
+              return (
+                <div 
+                  key={i} 
+                  className="transition-transform duration-300 ease-out h-full"
+                  style={{ transform: `translateY(${offsetY}px)` }}
+                  data-stagger
+                >
+                  <div className="reveal-up h-full bg-white/70 backdrop-blur-xl rounded-3xl p-8 border border-border/40 hover:border-[#4169E1]/40 hover:shadow-2xl hover:shadow-[#4169E1]/20 transition-all duration-500 group hover:-translate-y-4">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#4169E1]/10 to-[#960000]/5 flex items-center justify-center mb-6 group-hover:scale-110 group-hover:from-[#4169E1] group-hover:to-[#960000] transition-all duration-500 shadow-inner">
+                      <f.icon className="w-7 h-7 text-[#4169E1] group-hover:text-white transition-colors duration-500" />
+                    </div>
+                    <h3 className="text-xl font-bold text-[#0a1628] mb-3 group-hover:text-[#4169E1] transition-colors">{f.title}</h3>
+                    <p className="text-muted-foreground leading-relaxed font-light">{f.desc}</p>
+                  </div>
                 </div>
-                <h3 className="text-lg font-bold text-[#0a1628] mb-2">{f.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>

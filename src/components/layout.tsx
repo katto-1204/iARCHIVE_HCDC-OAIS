@@ -128,15 +128,15 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         ];
 
   const roleAsideBg =
-    user.role === "admin" ? "bg-[#0B2D5A]" : user.role === "archivist" ? "bg-[#4169E1]" : "bg-[#960000]";
+    user.role === "admin" ? "bg-[#0B2D5A]" : user.role === "archivist" ? "bg-[#000000]" : "bg-[#960000]";
   const roleActiveBg =
-    user.role === "admin" ? "bg-[#0B3D91]" : user.role === "archivist" ? "bg-[#4169E1]" : "bg-[#960000]";
+    user.role === "admin" ? "bg-[#0B3D91]" : user.role === "archivist" ? "bg-[#1A1A1A]" : "bg-[#B91C1C]";
 
   return (
     <div className="min-h-screen bg-muted/30 flex">
       {/* Sidebar */}
       <aside className={cn(
-        `fixed inset-y-0 left-0 z-40 w-64 ${roleAsideBg} text-white transition-transform duration-300 flex flex-col border-r border-white/15 shadow-2xl`,
+        `fixed inset-y-0 left-0 z-40 w-64 ${roleAsideBg} text-white transition-transform duration-300 flex flex-col border-r border-white/10 shadow-2xl`,
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="h-16 flex items-center px-6 border-b border-white/10 bg-black/10">
@@ -148,7 +148,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         <div className="flex-1 py-6 overflow-y-auto custom-scrollbar">
           <nav className="space-y-1 px-3">
             {links.map((link) => {
-              const active = location === link.href || (link.href !== '/admin' && location.startsWith(link.href));
+              const active = location === link.href || (link.href !== '/admin' && link.href !== '/archivist' && location.startsWith(link.href));
               return (
                 <Link key={link.href} href={link.href} className={cn(
                   "flex items-center px-3 py-2.5 rounded-lg transition-colors font-medium text-sm group",
@@ -162,11 +162,11 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           </nav>
         </div>
         <div className="p-4 border-t border-white/10 bg-black/10">
-          <Link href="/terms" className="mb-3 flex items-center px-2 text-xs text-white/60 hover:text-white transition-colors">
+          <Link href="/terms" className="mb-3 flex items-center px-2 text-xs text-white/50 hover:text-white transition-colors">
             Terms of Use
           </Link>
           <div className="flex items-center gap-3 mb-4 px-2">
-            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-bold text-white uppercase">{user.name.charAt(0)}</div>
+            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-bold text-white uppercase border border-white/10">{user.name.charAt(0)}</div>
             <div className="overflow-hidden">
               <p className="text-sm font-bold text-white truncate">{user.name}</p>
               <p className="text-xs text-white/50 capitalize truncate">{user.role}</p>

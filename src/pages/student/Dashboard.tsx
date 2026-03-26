@@ -1,13 +1,14 @@
 import { Link } from "wouter";
 import { AdminLayout } from "@/components/layout";
 import { Card, CardContent } from "@/components/ui-components";
-import { BookOpen, Search, Shield, Megaphone, ArrowRight, Clock, Star } from "lucide-react";
-import { useGetAnnouncements } from "@workspace/api-client-react";
+import { BookOpen, Search, Shield, Megaphone, ArrowRight, Clock, Star, ArrowUpRight } from "lucide-react";
+import { useGetAnnouncements, useGetMaterials } from "@workspace/api-client-react";
 import { format } from "date-fns";
 
 export default function StudentDashboard() {
   const { data: announcements } = useGetAnnouncements();
   const activeAnnouncements = (announcements ?? []).filter((a: any) => a.isActive);
+  const { data: materialsData } = useGetMaterials({ access: "public", limit: 5 });
 
   return (
     <AdminLayout>
@@ -125,12 +126,35 @@ export default function StudentDashboard() {
           <Card className="shadow-sm border-border/50 bg-white">
             <div className="p-4 border-b border-border/50 bg-muted/20">
               <h2 className="text-sm font-bold flex items-center gap-2 text-[#0a1628] uppercase tracking-wider">
-                <Clock className="w-4 h-4 text-muted-foreground" /> Recently Views
+                <BookOpen className="w-4 h-4 text-emerald-600" /> Accessible to You
               </h2>
             </div>
-            <div className="p-8 text-center">
-              <Star className="w-8 h-8 text-muted-foreground/20 mx-auto mb-3" />
-              <p className="text-xs text-muted-foreground">Your reading history will appear here once you start exploring materials.</p>
+            <div className="p-0">
+              {(materialsData?.materials?.length ?? 0) > 0 ? (
+                <div className="divide-y divide-border/50">
+                  {materialsData?.materials?.slice(0, 4).map((mat: any) => (
+                    <Link key={mat.id} href={`/materials/${mat.id}`}>
+                      <div className="p-4 hover:bg-muted/30 transition-colors group cursor-pointer flex items-center justify-between">
+                        <div>
+                          <h3 className="font-bold text-sm text-[#0a1628] group-hover:text-[#960000] transition-colors line-clamp-1">{mat.title}</h3>
+                          <p className="text-xs text-muted-foreground mt-1">{mat.categoryName || 'General Collection'}</p>
+                        </div>
+                        <ArrowUpRight className="w-4 h-4 text-muted-foreground opacity-50 group-hover:opacity-100 group-hover:text-[#960000]" />
+                      </div>
+                    </Link>
+                  ))}
+                  <Link href="/collections?access=public">
+                    <div className="p-3 text-center text-xs font-semibold text-[#4169E1] hover:bg-muted/30 transition-colors cursor-pointer bg-muted/10">
+                      View all public resources →
+                    </div>
+                  </Link>
+                </div>
+              ) : (
+                <div className="p-8 text-center">
+                  <Star className="w-8 h-8 text-muted-foreground/20 mx-auto mb-3" />
+                  <p className="text-xs text-muted-foreground">Your reading history will appear here once you start exploring materials.</p>
+                </div>
+              )}
             </div>
           </Card>
         </div>

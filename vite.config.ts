@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
+import fs from "node:fs";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import type { Plugin } from "vite";
 
@@ -78,77 +79,185 @@ function mockAuthPlugin(): Plugin {
         res.end(JSON.stringify({ message: "Registration submitted. Awaiting admin approval." }));
       });
 
-      /* ─── In-memory announcement store ─── */
+      /* ─── In-memory Data stores ─── */
+      let materials: any[] = [];
+      let categories: any[] = [];
+      
+      try {
+        const matPath = path.resolve(import.meta.dirname, "materials.json");
+        if (fs.existsSync(matPath)) {
+          materials = JSON.parse(fs.readFileSync(matPath, "utf-8"));
+        }
+      } catch (e) { console.error("MockAPI: Failed to load materials", e); }
+
+      try {
+        const catPath = path.resolve(import.meta.dirname, "categories.json");
+        if (fs.existsSync(catPath)) {
+          categories = JSON.parse(fs.readFileSync(catPath, "utf-8"));
+        }
+      } catch (e) { console.error("MockAPI: Failed to load categories", e); }
+
       const announcements: Array<{ id: string; title: string; content: string; isActive: boolean; createdAt: string }> = [
         { id: "ann-1", title: "Welcome to iArchive!", content: "HCDC's digital repository is now live. Browse public collections or request access to restricted materials.", isActive: true, createdAt: new Date().toISOString() },
         { id: "ann-2", title: "System Maintenance Notice", content: "Scheduled maintenance this weekend. The archive will be briefly unavailable Saturday 2-4 AM.", isActive: true, createdAt: new Date(Date.now() - 86400000).toISOString() },
       ];
 
-      /* ─── Announcements CRUD ─── */
-      server.middlewares.use("/api/announcements", (req, res, next) => {
-        if (res.headersSent) { next(); return; }
-
-        // DELETE /api/announcements/:id
-        const deleteMatch = (req.url || "").match(/^\/([^/?]+)/);
-        if (req.method === "DELETE" && deleteMatch) {
-          const idx = announcements.findIndex(a => a.id === deleteMatch[1]);
-          if (idx >= 0) announcements.splice(idx, 1);
-          res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify({ message: "Deleted" }));
-          return;
-        }
-
-        // POST /api/announcements (create)
-        if (req.method === "POST") {
-          let body = "";
-          req.on("data", (c: Buffer) => (body += c.toString()));
-          req.on("end", () => {
-            try {
-              const { title, content, isActive } = JSON.parse(body);
-              const ann = { id: `ann-${Date.now()}`, title, content, isActive: isActive !== false, createdAt: new Date().toISOString() };
-              announcements.unshift(ann);
-              res.statusCode = 201;
-              res.setHeader("Content-Type", "application/json");
-              res.end(JSON.stringify(ann));
-            } catch {
-              res.statusCode = 400;
-              res.setHeader("Content-Type", "application/json");
-              res.end(JSON.stringify({ error: "Bad request" }));
-            }
-          });
-          return;
-        }
-
-        // GET /api/announcements
-        res.setHeader("Content-Type", "application/json");
-        res.end(JSON.stringify(announcements));
-      });
-
-      /* Fallback for other /api routes so they don't 500 */
+      /* ─── Generic CRUD handler helper ─── */
       server.middlewares.use("/api", (req, res, next) => {
         if (res.headersSent) { next(); return; }
         const url = req.url || "";
+        const method = req.method || "GET";
+
         if (url.startsWith("/auth")) { next(); return; }
+
         res.setHeader("Content-Type", "application/json");
-        if (url.includes("/stats")) { res.end(JSON.stringify({ totalMaterials: 8, totalCategories: 5, totalUsers: 3, pendingRequests: 0 })); return; }
-        if (url.includes("/categories")) {
-          try {
-            const data = require("fs").readFileSync(require("path").resolve(import.meta.dirname, "categories.json"), "utf-8");
-            res.end(data);
-          } catch {
-            res.end("[]");
+
+        // Announcements CRUD
+        if (url.startsWith("/announcements")) {
+          const deleteMatch = url.match(/^\/announcements\/([^/?]+)/);
+          if (method === "DELETE" && deleteMatch) {
+            const idx = announcements.findIndex(a => a.id === deleteMatch[1]);
+            if (idx >= 0) announcements.splice(idx, 1);
+            res.end(JSON.stringify({ message: "Deleted" }));
+            return;
           }
+          if (method === "POST") {
+            let body = ""; req.on("data", (c) => (body += c.toString()));
+            req.on("end", () => {
+              try {
+                const { title, content, isActive } = JSON.parse(body);
+                const ann = { id: `ann-${Date.now()}`, title, content, isActive: isActive !== false, createdAt: new Date().toISOString() };
+                announcements.unshift(ann);
+                res.statusCode = 201; res.end(JSON.stringify(ann));
+              } catch { res.statusCode = 400; res.end(JSON.stringify({ error: "Bad request" })); }
+            });
+            return;
+          }
+          res.end(JSON.stringify(announcements));
           return;
         }
-        if (url.includes("/materials")) {
-          try {
-            const data = require("fs").readFileSync(require("path").resolve(import.meta.dirname, "materials.json"), "utf-8");
-            res.end(data);
-          } catch {
-            res.end("[]");
+
+        // Categories CRUD
+        if (url.startsWith("/categories")) {
+          const idMatch = url.match(/^\/categories\/([^/?]+)/);
+          if (method === "DELETE" && idMatch) {
+            const idx = categories.findIndex(c => c.id === idMatch[1]);
+            if (idx >= 0) categories.splice(idx, 1);
+            res.end(JSON.stringify({ message: "Deleted" }));
+            return;
           }
+          if (method === "PATCH" || method === "PUT") {
+            if (!idMatch) { res.statusCode = 400; res.end(JSON.stringify({ error: "Missing ID" })); return; }
+            let body = ""; req.on("data", (c) => (body += c.toString()));
+            req.on("end", () => {
+              try {
+                const updates = JSON.parse(body);
+                const idx = categories.findIndex(c => c.id === idMatch[1]);
+                if (idx >= 0) {
+                  categories[idx] = { ...categories[idx], ...updates, updated_at: new Date().toISOString() };
+                  res.end(JSON.stringify(categories[idx]));
+                } else {
+                  res.statusCode = 404; res.end(JSON.stringify({ error: "Not found" }));
+                }
+              } catch { res.statusCode = 400; res.end(JSON.stringify({ error: "Bad request" })); }
+            });
+            return;
+          }
+          if (method === "POST") {
+            let body = ""; req.on("data", (c) => (body += c.toString()));
+            req.on("end", () => {
+              try {
+                const data = JSON.parse(body);
+                const cat = { id: `cat-${Date.now()}`, ...data, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+                categories.unshift(cat);
+                res.statusCode = 201; res.end(JSON.stringify(cat));
+              } catch { res.statusCode = 400; res.end(JSON.stringify({ error: "Bad request" })); }
+            });
+            return;
+          }
+          res.end(JSON.stringify(categories));
           return;
         }
+
+        // Materials CRUD
+        if (url.startsWith("/materials")) {
+          const idMatch = url.match(/^\/materials\/([^/?]+)/);
+          if (method === "DELETE" && idMatch) {
+            const idx = materials.findIndex(m => m.id === idMatch[1]);
+            if (idx >= 0) materials.splice(idx, 1);
+            res.end(JSON.stringify({ message: "Deleted" }));
+            return;
+          }
+          if (method === "PATCH" || method === "PUT") {
+            if (!idMatch) { res.statusCode = 400; res.end(JSON.stringify({ error: "Missing ID" })); return; }
+            let body = ""; req.on("data", (c) => (body += c.toString()));
+            req.on("end", () => {
+              try {
+                const updates = JSON.parse(body);
+                const idx = materials.findIndex(m => m.id === idMatch[1]);
+                if (idx >= 0) {
+                  materials[idx] = { ...materials[idx], ...updates, updated_at: new Date().toISOString() };
+                  res.end(JSON.stringify(materials[idx]));
+                } else {
+                  res.statusCode = 404; res.end(JSON.stringify({ error: "Not found" }));
+                }
+              } catch { res.statusCode = 400; res.end(JSON.stringify({ error: "Bad request" })); }
+            });
+            return;
+          }
+          if (method === "POST") {
+            let body = ""; req.on("data", (c) => (body += c.toString()));
+            req.on("end", () => {
+              try {
+                const data = JSON.parse(body);
+                const mat = { id: `mat-${Date.now()}`, material_id: `MAT-${Date.now().toString().slice(-6)}`, ...data, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+                materials.unshift(mat);
+                res.statusCode = 201; res.end(JSON.stringify(mat));
+              } catch { res.statusCode = 400; res.end(JSON.stringify({ error: "Bad request" })); }
+            });
+            return;
+          }
+
+          // GET /materials logic with filtering
+          if (method === "GET") {
+            if (idMatch && idMatch[1]) {
+               const mat = materials.find(m => m.id === idMatch[1]);
+               if (mat) res.end(JSON.stringify(mat));
+               else { res.statusCode = 404; res.end(JSON.stringify({ error: "Not found" })); }
+               return;
+            }
+
+            const parsedUrl = new URL(req.url || "", "http://localhost/");
+            const search = parsedUrl.searchParams.get("search")?.toLowerCase() || "";
+            const categoryMatch = parsedUrl.searchParams.get("category");
+            const accessMatch = parsedUrl.searchParams.get("access");
+            let results = materials;
+
+            if (search) {
+               results = results.filter(m => 
+                 m.title?.toLowerCase().includes(search) || 
+                 m.description?.toLowerCase().includes(search) || 
+                 m.material_id?.toLowerCase().includes(search) || 
+                 m.materialId?.toLowerCase().includes(search) || 
+                 m.creator?.toLowerCase().includes(search)
+               );
+            }
+            if (categoryMatch) {
+               results = results.filter(m => m.category_id === categoryMatch || m.categoryId === categoryMatch);
+            }
+            if (accessMatch) {
+               results = results.filter(m => m.access === accessMatch);
+            }
+            
+            // Limit and format correctly
+            const limit = parseInt(parsedUrl.searchParams.get("limit") || "50", 10);
+            res.end(JSON.stringify({ materials: results.slice(0, limit), total: results.length }));
+            return;
+          }
+        }
+
+        // Stats Mock
+        if (url.includes("/stats")) { res.end(JSON.stringify({ totalMaterials: materials.length, totalCategories: categories.length, totalUsers: 3, pendingRequests: 0 })); return; }
         if (url.includes("/requests")) { res.end(JSON.stringify({ requests: [] })); return; }
         if (url.includes("/users")) { res.end(JSON.stringify(DEMO_USERS.map(u => ({ ...u, createdAt: new Date().toISOString() })))); return; }
         if (url.includes("/audit")) { res.end(JSON.stringify({ logs: [] })); return; }

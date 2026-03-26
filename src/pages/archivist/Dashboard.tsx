@@ -10,23 +10,23 @@ export default function ArchivistDashboard() {
   const activeAnnouncements = (announcements ?? []).filter((a: any) => a.isActive);
 
   const statCards = [
-    { title: "Total Materials", value: stats?.totalMaterials || 0, icon: Database, color: "text-[#4169E1]", bg: "bg-[#4169E1]/10" },
-    { title: "Active Categories", value: stats?.totalCategories || 0, icon: FolderTree, color: "text-[#4169E1]", bg: "bg-[#4169E1]/10" },
-    { title: "Queue / Pending", value: stats?.pendingRequests || 0, icon: GitPullRequest, color: "text-amber-500", bg: "bg-amber-500/10" },
+    { title: "Total Materials", value: stats?.totalMaterials || 0, icon: Database, color: "text-[#0a1628]", bg: "bg-[#0a1628]/10" },
+    { title: "Active Categories", value: stats?.totalCategories || 0, icon: FolderTree, color: "text-[#0a1628]", bg: "bg-[#0a1628]/10" },
+    { title: "Queue / Pending", value: stats?.pendingRequests || 0, icon: GitPullRequest, color: "text-amber-600", bg: "bg-amber-600/10" },
   ];
 
   return (
     <AdminLayout>
       <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between border-b border-border/50 pb-6">
         <div>
-          <div className="inline-flex items-center gap-2 bg-[#4169E1]/10 text-[#4169E1] border border-[#4169E1]/20 rounded-full px-3 py-1 text-xs font-bold mb-3 uppercase tracking-widest">
+          <div className="inline-flex items-center gap-2 bg-[#0a1628]/10 text-[#0a1628] border border-[#0a1628]/20 rounded-full px-3 py-1 text-xs font-bold mb-3 uppercase tracking-widest">
             <Database className="w-4 h-4" /> Archivist Workspace
           </div>
           <h1 className="text-4xl font-display font-bold text-[#0a1628]">Cataloging & Access Workflow</h1>
           <p className="text-muted-foreground mt-2">Metadata enrichment, controlled access review, and preserving HCDC history.</p>
         </div>
         <div className="mt-4 md:mt-0 text-sm font-medium text-muted-foreground bg-muted/50 px-4 py-2 rounded-xl border border-border/50 flex flex-col items-end">
-          <span className="text-[#4169E1]">Shift Active</span>
+          <span className="text-[#0a1628]">Shift Active</span>
           <span className="text-xs font-normal">OAIS Compliant Mode</span>
         </div>
       </div>
@@ -54,7 +54,7 @@ export default function ArchivistDashboard() {
           <Card className="shadow-sm border-border/50 bg-white">
             <CardHeader className="border-b border-border/50 pb-4">
               <CardTitle className="text-lg flex items-center gap-2 text-[#0a1628]">
-                <CheckCircle2 className="w-5 h-5 text-[#4169E1]" /> Tasks & Workflow
+                <CheckCircle2 className="w-5 h-5 text-[#0a1628]" /> Tasks & Workflow
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
@@ -69,7 +69,7 @@ export default function ArchivistDashboard() {
                       <p className="text-xs text-muted-foreground mt-0.5">There are 0 researcher requests waiting to be reviewed.</p>
                     </div>
                   </div>
-                  <button className="text-[#4169E1] text-sm font-semibold px-3 py-1.5 rounded-lg hover:bg-[#4169E1]/10 transition-colors">Go to Requests →</button>
+                  <button className="text-[#0a1628] text-sm font-semibold px-3 py-1.5 rounded-lg hover:bg-[#0a1628]/10 transition-colors">Go to Requests →</button>
                 </div>
                 <div className="p-6 flex items-center justify-between hover:bg-muted/30 transition-colors">
                   <div className="flex items-center gap-4">
@@ -81,7 +81,7 @@ export default function ArchivistDashboard() {
                       <p className="text-xs text-muted-foreground mt-0.5">Upload new materials to begin metadata cataloging.</p>
                     </div>
                   </div>
-                  <button className="text-[#4169E1] text-sm font-semibold px-3 py-1.5 rounded-lg hover:bg-[#4169E1]/10 transition-colors">Upload SIPs →</button>
+                  <button className="text-[#0a1628] text-sm font-semibold px-3 py-1.5 rounded-lg hover:bg-[#0a1628]/10 transition-colors">Upload SIPs →</button>
                 </div>
                 <div className="p-6 flex items-center justify-between hover:bg-muted/30 transition-colors">
                   <div className="flex items-center gap-4">
@@ -93,7 +93,7 @@ export default function ArchivistDashboard() {
                       <p className="text-xs text-muted-foreground mt-0.5">Run checksum validation on the digital preservation archive.</p>
                     </div>
                   </div>
-                  <button className="text-[#4169E1] text-sm font-semibold px-3 py-1.5 rounded-lg hover:bg-[#4169E1]/10 transition-colors">Run Scans →</button>
+                  <button className="text-[#0a1628] text-sm font-semibold px-3 py-1.5 rounded-lg hover:bg-[#0a1628]/10 transition-colors">Run Scans →</button>
                 </div>
               </div>
             </CardContent>
@@ -104,7 +104,7 @@ export default function ArchivistDashboard() {
           <Card className="shadow-sm border-border/50 bg-white">
             <div className="p-4 border-b border-border/50 bg-muted/20">
               <h2 className="text-sm font-bold flex items-center gap-2 text-[#0a1628] uppercase tracking-wider">
-                <Megaphone className="w-4 h-4 text-[#4169E1]" /> Notice Board
+                <Megaphone className="w-4 h-4 text-[#0a1628]" /> Notice Board
               </h2>
             </div>
             <div className="p-0 max-h-[500px] overflow-y-auto custom-scroll">
@@ -113,7 +113,7 @@ export default function ArchivistDashboard() {
                   {activeAnnouncements.map((ann: any) => (
                     <div key={ann.id} className="p-5 hover:bg-muted/30 transition-colors group">
                       <div className="flex items-start justify-between gap-2 mb-2">
-                        <h3 className="font-bold text-sm text-[#0a1628] group-hover:text-[#4169E1] transition-colors">{ann.title}</h3>
+                        <h3 className="font-bold text-sm text-[#0a1628] group-hover:text-[#0a1628] transition-colors">{ann.title}</h3>
                         <span className="text-[10px] font-medium text-muted-foreground/60 whitespace-nowrap bg-muted px-2 py-0.5 rounded-full">
                           {format(new Date(ann.createdAt), "MMM d")}
                         </span>
