@@ -34,5 +34,14 @@
     "status": "approved",
     "createdAt": "2026-03-26T01:48:03.150Z",
     "updatedAt": "2026-03-26T01:48:03.163Z"
+  },
+  {
+    "id": "eec27cf7-72e0-4713-b2ed-63987e5eb242",
+    "materialId": "9eaed59e-5647-43f5-9611-1021c2190688",
+    "userId": "demo-student",
+    "purpose": "UI test request 2026-03-26",
+    "status": "pending",
+    "createdAt": "2026-03-26T03:41:31.825Z",
+    "updatedAt": "2026-03-26T03:41:31.825Z"
   }
 ]

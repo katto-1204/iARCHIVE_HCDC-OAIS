@@ -28,11 +28,11 @@ const originalFetch = window.fetch;
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const token = localStorage.getItem("iarchive_token");
   if (token) {
-    init = init || {};
-    init.headers = {
-      ...init.headers,
-      Authorization: `Bearer ${token}`,
-    };
+    const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+    if (!headers.has("authorization")) {
+      headers.set("authorization", `Bearer ${token}`);
+    }
+    init = { ...(init ?? {}), headers };
   }
   const response = await originalFetch(input, init);
   if (response.status === 401 && window.location.pathname !== '/login' && window.location.pathname !== '/') {

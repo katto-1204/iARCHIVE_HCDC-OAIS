@@ -39,6 +39,8 @@ type MaterialForm = {
   pages: string;
   language: string;
   publisher: string;
+  fileUrl?: string;
+  thumbnailUrl?: string;
 };
 
 const emptyForm: MaterialForm = {
@@ -54,6 +56,8 @@ const emptyForm: MaterialForm = {
   pages: "",
   language: "",
   publisher: "",
+  fileUrl: "",
+  thumbnailUrl: "",
 };
 
 export default function AdminMaterials() {
@@ -70,6 +74,14 @@ export default function AdminMaterials() {
   const [mode, setMode] = React.useState<"create" | "edit">("create");
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [form, setForm] = React.useState<MaterialForm>(emptyForm);
+
+  const readFileAsDataUrl = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new Error("Failed to read file"));
+      reader.readAsDataURL(file);
+    });
 
   const materialsCount = data?.materials?.length ?? 0;
 
@@ -120,6 +132,8 @@ export default function AdminMaterials() {
       pages: mat.pages != null ? String(mat.pages) : "",
       language: mat.language ?? "",
       publisher: mat.publisher ?? "",
+      fileUrl: mat.fileUrl ?? "",
+      thumbnailUrl: mat.thumbnailUrl ?? "",
     });
     setDialogOpen(true);
   };
@@ -139,6 +153,8 @@ export default function AdminMaterials() {
       pages: form.pages.trim() ? Number(form.pages.trim()) : undefined,
       language: form.language.trim() || undefined,
       publisher: form.publisher.trim() || undefined,
+      fileUrl: form.fileUrl?.trim() ? form.fileUrl.trim() : undefined,
+      thumbnailUrl: form.thumbnailUrl?.trim() ? form.thumbnailUrl.trim() : undefined,
     };
     return payload;
   };
@@ -381,6 +397,72 @@ export default function AdminMaterials() {
               <div>
                 <label className="text-sm font-medium mb-1 block">Publisher</label>
                 <Input value={form.publisher} onChange={(e) => setForm({ ...form, publisher: e.target.value })} placeholder="Publisher / institution" />
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-border/60">
+              <div className="flex items-center justify-between mb-3">
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold">Material Asset (optional)</p>
+                  <p className="text-xs text-muted-foreground">
+                    Upload a small demo file/cover as data URL so it can be previewed.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium mb-1 block">Thumbnail Upload (image)</label>
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={async (e) => {
+                      try {
+                        const file = e.currentTarget.files?.[0];
+                        if (!file) return;
+                        if (file.size > 3_000_000) {
+                          toast({ title: "File too large", description: "Use a smaller cover (<= 3MB) for demo uploads.", variant: "destructive" });
+                          return;
+                        }
+                        const dataUrl = await readFileAsDataUrl(file);
+                        setForm((prev) => ({ ...prev, thumbnailUrl: dataUrl }));
+                      } catch {
+                        toast({ title: "Upload failed", description: "Could not read the selected thumbnail file.", variant: "destructive" });
+                      }
+                    }}
+                  />
+                  <Input
+                    value={form.thumbnailUrl ?? ""}
+                    onChange={(e) => setForm({ ...form, thumbnailUrl: e.target.value })}
+                    placeholder="Or paste thumbnail URL / data URL"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium mb-1 block">Material File URL / Data URL</label>
+                  <Input
+                    type="file"
+                    onChange={async (e) => {
+                      try {
+                        const file = e.currentTarget.files?.[0];
+                        if (!file) return;
+                        if (file.size > 3_000_000) {
+                          toast({ title: "File too large", description: "Use a smaller demo file (<= 3MB) for data URL uploads.", variant: "destructive" });
+                          return;
+                        }
+                        const dataUrl = await readFileAsDataUrl(file);
+                        setForm((prev) => ({ ...prev, fileUrl: dataUrl }));
+                      } catch {
+                        toast({ title: "Upload failed", description: "Could not read the selected material file.", variant: "destructive" });
+                      }
+                    }}
+                  />
+                  <Input
+                    value={form.fileUrl ?? ""}
+                    onChange={(e) => setForm({ ...form, fileUrl: e.target.value })}
+                    placeholder="Paste file URL / data URL"
+                  />
+                </div>
               </div>
             </div>
           </div>

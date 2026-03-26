@@ -9,16 +9,16 @@ export default function AdminDashboard() {
   const { data: stats } = useGetStats();
 
   const statCards = [
-    { title: "Total Materials", value: stats?.totalMaterials || 0, icon: Database, color: "text-blue-500", bg: "bg-blue-500/10" },
-    { title: "Categories", value: stats?.totalCategories || 0, icon: FolderTree, color: "text-indigo-500", bg: "bg-indigo-500/10" },
-    { title: "Pending Requests", value: stats?.pendingRequests || 0, icon: GitPullRequest, color: "text-rose-500", bg: "bg-rose-500/10" },
+    { title: "Total Materials", value: stats?.totalMaterials || 0, icon: Database, color: "text-[#0B3D91]", bg: "bg-[#0B3D91]/10" },
+    { title: "Categories", value: stats?.totalCategories || 0, icon: FolderTree, color: "text-[#0B3D91]", bg: "bg-[#0B3D91]/10" },
+    { title: "Pending Requests", value: stats?.pendingRequests || 0, icon: GitPullRequest, color: "text-rose-600", bg: "bg-rose-600/10" },
     { title: "Active Users", value: stats?.totalUsers || 0, icon: Users, color: "text-emerald-500", bg: "bg-emerald-500/10" },
   ];
 
   return (
     <AdminLayout>
       <div className="mb-8">
-        <h1 className="text-3xl font-display font-bold text-primary">Dashboard Overview</h1>
+        <h1 className="text-3xl font-display font-bold text-[#0B3D91]">Dashboard Overview</h1>
         <p className="text-muted-foreground">System-wide metrics and recent archival activities.</p>
       </div>
 
@@ -41,7 +41,7 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <Card className="col-span-2 shadow-md border-none">
           <CardHeader className="border-b">
-            <CardTitle className="text-xl flex items-center"><Activity className="w-5 h-5 mr-2 text-accent" /> Recent Audit Trail</CardTitle>
+            <CardTitle className="text-xl flex items-center"><Activity className="w-5 h-5 mr-2 text-[#0B3D91]" /> Recent Audit Trail</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <div className="divide-y divide-border/50">
@@ -62,7 +62,7 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-md border-none bg-gradient-to-br from-primary to-primary/90 text-white">
+        <Card className="shadow-md border-none bg-gradient-to-br from-[#0B3D91] to-[#0B3D91]/90 text-white">
           <CardHeader>
             <CardTitle className="text-white text-xl">Quick Actions</CardTitle>
           </CardHeader>

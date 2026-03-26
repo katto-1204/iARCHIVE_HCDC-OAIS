@@ -3,11 +3,13 @@ import { Link, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { FileText, Library, Lock } from "lucide-react";
+import { FileText, Library, Lock, CalendarDays } from "lucide-react";
 import { Button, Card, Input, Label } from "@/components/ui-components";
 import { Textarea } from "@/components/ui/textarea";
+import { useQueryClient } from "@tanstack/react-query";
 import { useGetMe, useRegister, useSubmitAccessRequest } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 const registerSchema = z.object({
   name: z.string().min(2, "Name is required"),
@@ -24,12 +26,23 @@ const requestSchema = z.object({
 
 export default function Register() {
   const [location, setLocation] = useLocation();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const params = new URLSearchParams(location.includes("?") ? location.split("?")[1] : "");
   const materialId = params.get("materialId") ?? "";
   const materialTitle = params.get("title") ?? "Selected Material";
+  const materialDateRaw = params.get("date") ?? "";
   const cover = params.get("cover") ?? "";
   const isRequestMode = !!materialId;
+
+  const materialDate = React.useMemo(() => {
+    if (!materialDateRaw) return null;
+    try {
+      return format(new Date(materialDateRaw), "MMM d, yyyy");
+    } catch {
+      return materialDateRaw;
+    }
+  }, [materialDateRaw]);
 
   const { data: me } = useGetMe({ query: { retry: false } });
   const { mutate: mutateRegister, isPending: isRegisterPending } = useRegister();
@@ -54,6 +67,7 @@ export default function Register() {
         {
           onSuccess: () => {
             toast({ title: "Request Submitted", description: "Your access request is pending review by an archivist." });
+            queryClient.invalidateQueries({ queryKey: ["/api/requests"] });
             setLocation("/collections");
           },
           onError: (err) => {
@@ -87,13 +101,14 @@ export default function Register() {
       <Card className="w-full max-w-3xl p-8 shadow-2xl border-none relative z-10">
         {isRequestMode ? (
           <div className="grid grid-cols-1 md:grid-cols-[340px_1fr] gap-8">
-            <div className="rounded-2xl border border-border/60 bg-white p-5 overflow-hidden">
-              <div className="flex items-center justify-between mb-3">
+            <div className="rounded-2xl border border-border/60 bg-white overflow-hidden flex flex-col min-h-[520px]">
+              <div className="p-5 pb-0 flex items-center justify-between">
                 <div className="inline-flex items-center gap-2 bg-[#0a1628] text-white rounded-xl px-3 py-1 text-xs font-bold">
                   <FileText className="w-4 h-4" /> Material
                 </div>
               </div>
-              <div className="h-56 bg-muted rounded-xl flex items-center justify-center overflow-hidden relative">
+
+              <div className="h-56 bg-muted flex items-center justify-center overflow-hidden relative">
                 {cover ? (
                   <img src={cover} alt="material cover" className="w-full h-full object-cover" />
                 ) : (
@@ -111,10 +126,17 @@ export default function Register() {
                   </div>
                 )}
               </div>
-              <h3 className="mt-4 text-lg font-bold text-[#0a1628] line-clamp-3">{materialTitle}</h3>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Submit your purpose. An archivist will review and grant access if approved.
-              </p>
+
+              <div className="mt-auto p-5 bg-[#f7f8fc] border-t border-border/60">
+                <h3 className="text-lg font-bold text-[#0a1628] line-clamp-2">{materialTitle}</h3>
+                <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                  <CalendarDays className="w-4 h-4 text-muted-foreground/70" />
+                  <span className="font-medium">{materialDate ?? "—"}</span>
+                </div>
+                <p className="mt-3 text-xs text-muted-foreground/70 leading-relaxed">
+                  Submit your research purpose. An archivist will review your request.
+                </p>
+              </div>
             </div>
 
             <div>

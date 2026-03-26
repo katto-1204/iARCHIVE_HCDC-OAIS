@@ -127,11 +127,16 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           { icon: Database, label: "Browse Collections", href: "/collections" },
         ];
 
+  const roleAsideBg =
+    user.role === "admin" ? "bg-[#0B2D5A]" : user.role === "archivist" ? "bg-[#4169E1]" : "bg-[#960000]";
+  const roleActiveBg =
+    user.role === "admin" ? "bg-[#0B3D91]" : user.role === "archivist" ? "bg-[#4169E1]" : "bg-[#960000]";
+
   return (
     <div className="min-h-screen bg-muted/30 flex">
       {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-40 w-64 bg-primary text-primary-foreground transition-transform duration-300 flex flex-col border-r border-primary/20 shadow-2xl",
+        `fixed inset-y-0 left-0 z-40 w-64 ${roleAsideBg} text-white transition-transform duration-300 flex flex-col border-r border-white/15 shadow-2xl`,
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="h-16 flex items-center px-6 border-b border-white/10 bg-black/10">
@@ -147,7 +152,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               return (
                 <Link key={link.href} href={link.href} className={cn(
                   "flex items-center px-3 py-2.5 rounded-lg transition-colors font-medium text-sm group",
-                  active ? "bg-accent text-white shadow-md shadow-accent/20" : "text-white/70 hover:bg-white/10 hover:text-white"
+                  active ? `${roleActiveBg} text-white shadow-md` : "text-white/70 hover:bg-white/10 hover:text-white"
                 )}>
                   <link.icon className={cn("w-5 h-5 mr-3 transition-transform group-hover:scale-110", active ? "text-white" : "text-white/50")} />
                   {link.label}

@@ -157,14 +157,14 @@ export default function Home() {
       {/* ─── HERO ─── */}
       <section className="relative min-h-[88vh] flex flex-col items-center justify-center overflow-hidden bg-[#0a1628] pt-24">
         <div
-          className="absolute inset-0 bg-cover bg-center scale-105"
+          className="absolute inset-0 bg-cover bg-center scale-105 opacity-55"
           style={{
             backgroundImage: `url(${import.meta.env.BASE_URL}images/hcdchero.png)`,
             transform: `translateY(${Math.min(scrollY * 0.25, 120)}px) scale(1.08)`,
           }}
         />
         <div className="absolute inset-0">
-          <div className="absolute inset-0 bg-gradient-to-br from-[#960000]/80 via-[#7a0000]/55 to-[#0a1628]/75" />
+          <div className="absolute inset-0 bg-gradient-to-br from-[#4a0000]/85 via-[#2f0000]/55 to-[#0a1628]/75" />
           <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-white to-transparent" />
         </div>
         <div className="relative z-10 text-center px-4 max-w-4xl mx-auto reveal-up" data-reveal>

@@ -358,7 +358,7 @@ export default function MaterialDetail() {
                   </button>
                 ) : (
                   <Link
-                    href={`/register?materialId=${encodeURIComponent(material.id)}&title=${encodeURIComponent(material.title)}&cover=${encodeURIComponent(material.thumbnailUrl ?? "")}`}
+                    href={`/register?materialId=${encodeURIComponent(material.id)}&title=${encodeURIComponent(material.title)}&date=${encodeURIComponent(material.date ?? "")}&cover=${encodeURIComponent(material.thumbnailUrl ?? "")}`}
                   >
                     <button className="w-full bg-[#960000] hover:bg-[#7a0000] text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2">
                       <Lock className="w-5 h-5" /> Request Access
