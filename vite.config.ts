@@ -72,16 +72,12 @@ function mockAuthPlugin(): Plugin {
         res.end(JSON.stringify({ message: "Logged out" }));
       });
 
-      server.middlewares.use("/api/auth/register", (req, res) => {
-        if (req.method !== "POST") { res.statusCode = 405; res.end(); return; }
-        res.statusCode = 201;
-        res.setHeader("Content-Type", "application/json");
-        res.end(JSON.stringify({ message: "Registration submitted. Awaiting admin approval." }));
-      });
-
       /* ─── In-memory Data stores ─── */
       let materials: any[] = [];
       let categories: any[] = [];
+      const pendingAccounts: any[] = [];
+      const materialRequests: any[] = [];
+      const users: any[] = [...DEMO_USERS];
       
       try {
         const matPath = path.resolve(import.meta.dirname, "materials.json");
@@ -97,6 +93,28 @@ function mockAuthPlugin(): Plugin {
         }
       } catch (e) { console.error("MockAPI: Failed to load categories", e); }
 
+      server.middlewares.use("/api/auth/register", (req, res) => {
+        if (req.method !== "POST") { res.statusCode = 405; res.end(); return; }
+        let body = ""; req.on("data", (c) => (body += c.toString()));
+        req.on("end", () => {
+          try {
+            const data = JSON.parse(body);
+            const newReq = { 
+              id: `req-${Date.now()}`, 
+              ...data, 
+              status: "pending", 
+              createdAt: new Date().toISOString() 
+            };
+            pendingAccounts.push(newReq);
+            res.statusCode = 201;
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ message: "Registration submitted. Awaiting admin approval." }));
+          } catch {
+            res.statusCode = 400; res.end();
+          }
+        });
+      });
+
       const announcements: Array<{ id: string; title: string; content: string; isActive: boolean; createdAt: string }> = [
         { id: "ann-1", title: "Welcome to iArchive!", content: "HCDC's digital repository is now live. Browse public collections or request access to restricted materials.", isActive: true, createdAt: new Date().toISOString() },
         { id: "ann-2", title: "System Maintenance Notice", content: "Scheduled maintenance this weekend. The archive will be briefly unavailable Saturday 2-4 AM.", isActive: true, createdAt: new Date(Date.now() - 86400000).toISOString() },
@@ -111,6 +129,88 @@ function mockAuthPlugin(): Plugin {
         if (url.startsWith("/auth")) { next(); return; }
 
         res.setHeader("Content-Type", "application/json");
+
+        // User Management (Admin)
+        if (url.startsWith("/users")) {
+          const parsedUrl = new URL(req.url || "", "http://localhost/");
+          const statusFilter = parsedUrl.searchParams.get("status");
+          
+          if (statusFilter === "pending") {
+            res.end(JSON.stringify({ users: pendingAccounts.filter(p => !statusFilter || p.status === statusFilter) }));
+            return;
+          }
+          
+          res.end(JSON.stringify({ users: users.filter(u => !statusFilter || u.status === statusFilter) }));
+          return;
+        }
+
+        // Catch-all for approve/reject user
+        const userActionMatch = url.match(/^\/admin\/(approve|reject)-user/);
+        if (userActionMatch) {
+          let body = ""; req.on("data", (c) => (body += c.toString()));
+          req.on("end", () => {
+            try {
+              const { id } = JSON.parse(body);
+              const action = userActionMatch[1];
+              const idx = pendingAccounts.findIndex(u => u.id === id);
+              if (idx >= 0) {
+                if (action === "approve") {
+                  const u = pendingAccounts.splice(idx, 1)[0];
+                  users.push({ ...u, id: `user-${Date.now()}`, status: "active", role: u.role || "student" });
+                } else {
+                  pendingAccounts[idx].status = "rejected";
+                }
+                res.end(JSON.stringify({ message: "Success" }));
+              } else {
+                res.statusCode = 404; res.end(JSON.stringify({ error: "Not found" }));
+              }
+            } catch { res.statusCode = 400; res.end(); }
+          });
+          return;
+        }
+
+        // Material Requests Management
+        if (url.startsWith("/requests")) {
+          const idActionMatch = url.match(/^\/requests\/([^/]+)\/(approve|reject)/);
+          if (idActionMatch) {
+            const [_, id, action] = idActionMatch;
+            const reqIdx = materialRequests.findIndex(r => r.id === id);
+            if (reqIdx >= 0) {
+              materialRequests[reqIdx].status = action === "approve" ? "approved" : "rejected";
+              res.end(JSON.stringify({ message: "Success" }));
+            } else {
+              res.statusCode = 404; res.end(JSON.stringify({ error: "Not found" }));
+            }
+            return;
+          }
+
+          if (method === "POST") {
+            let body = ""; req.on("data", (c) => (body += c.toString()));
+            req.on("end", () => {
+              try {
+                const data = JSON.parse(body);
+                // Try to find material title for better UI
+                const mat = materials.find(m => m.id === data.materialId);
+                const newReq = { 
+                  id: `req-${Date.now()}`, 
+                  ...data, 
+                  materialTitle: mat?.title || "Unknown Material",
+                  status: "pending", 
+                  createdAt: new Date().toISOString() 
+                };
+                materialRequests.push(newReq);
+                res.statusCode = 201; res.end(JSON.stringify(newReq));
+              } catch { res.statusCode = 400; res.end(); }
+            });
+            return;
+          }
+          
+          const parsedUrl = new URL(req.url || "", "http://localhost/");
+          const status = parsedUrl.searchParams.get("status");
+          const filtered = status ? materialRequests.filter(r => r.status === status) : materialRequests;
+          res.end(JSON.stringify({ requests: filtered }));
+          return;
+        }
 
         // Announcements CRUD
         if (url.startsWith("/announcements")) {
@@ -257,9 +357,7 @@ function mockAuthPlugin(): Plugin {
         }
 
         // Stats Mock
-        if (url.includes("/stats")) { res.end(JSON.stringify({ totalMaterials: materials.length, totalCategories: categories.length, totalUsers: 3, pendingRequests: 0 })); return; }
-        if (url.includes("/requests")) { res.end(JSON.stringify({ requests: [] })); return; }
-        if (url.includes("/users")) { res.end(JSON.stringify(DEMO_USERS.map(u => ({ ...u, createdAt: new Date().toISOString() })))); return; }
+        if (url.includes("/stats")) { res.end(JSON.stringify({ totalMaterials: materials.length, totalCategories: categories.length, totalUsers: users.length, pendingRequests: pendingAccounts.length + materialRequests.length })); return; }
         if (url.includes("/audit")) { res.end(JSON.stringify({ logs: [] })); return; }
         res.end(JSON.stringify([]));
       });

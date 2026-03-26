@@ -22,6 +22,7 @@ import AdminCategories from "./pages/admin/Categories";
 import AdminAnnouncements from "./pages/admin/Announcements";
 import ArchivistDashboard from "./pages/archivist/Dashboard";
 import StudentDashboard from "./pages/student/Dashboard";
+import RequestAccess from "./pages/RequestAccess";
 
 // Intercept global fetch to attach JWT from localStorage for @workspace/api-client-react hooks
 const originalFetch = window.fetch;
@@ -79,6 +80,7 @@ function Router() {
       <Route path="/archivist/categories" component={AdminCategories} />
       <Route path="/archivist/requests" component={AdminRequests} />
       <Route path="/student" component={StudentDashboard} />
+      <Route path="/request-access" component={RequestAccess} />
       
       <Route component={NotFound} />
     </Switch>

@@ -356,7 +356,7 @@ export default function MaterialDetail() {
                   </button>
                 ) : (
                   <Link
-                    href={`/register?materialId=${encodeURIComponent(material.id)}&title=${encodeURIComponent(material.title)}&date=${encodeURIComponent(material.date ?? "")}&cover=${encodeURIComponent(material.thumbnailUrl ?? "")}`}
+                    href={`/request-access?materialId=${encodeURIComponent(material.id)}&title=${encodeURIComponent(material.title)}&date=${encodeURIComponent(material.date ?? "")}&cover=${encodeURIComponent(material.thumbnailUrl ?? "")}`}
                   >
                     <button className="w-full bg-[#960000] hover:bg-[#7a0000] text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2">
                       <Lock className="w-5 h-5" /> Request Access
@@ -383,7 +383,7 @@ export default function MaterialDetail() {
               <button onClick={() => setShowDownloadModal(false)} className="px-4 py-2 rounded-lg border border-border text-sm font-semibold hover:bg-muted/50">
                 Close
               </button>
-              <Link href="/register">
+              <Link href="/request-access">
                 <button onClick={() => setShowDownloadModal(false)} className="px-4 py-2 rounded-lg bg-[#960000] text-white text-sm font-semibold hover:bg-[#7a0000]">
                   Request Access
                 </button>
