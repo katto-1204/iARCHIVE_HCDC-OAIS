@@ -1,18 +1,23 @@
 import { AdminLayout } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui-components";
-import { Database, FolderTree, GitPullRequest, Megaphone, Activity, CheckCircle2, Search } from "lucide-react";
-import { useGetStats, useGetAnnouncements } from "@workspace/api-client-react";
+import { Database, FolderTree, GitPullRequest, Megaphone, Activity, CheckCircle2, Search, ShieldCheck, BarChart3 } from "lucide-react";
+import { useGetAnnouncements } from "@workspace/api-client-react";
 import { format } from "date-fns";
+import { SAMPLE_MATERIALS, SAMPLE_HIERARCHY } from "@/data/sampleData";
+import { computeDashboardStats } from "@/data/metadataUtils";
+import { CompletionRing } from "@/components/CompletionRing";
+import { ArchivalTree } from "@/components/ArchivalTree";
+import { Link } from "wouter";
 
 export default function ArchivistDashboard() {
-  const { data: stats } = useGetStats();
   const { data: announcements } = useGetAnnouncements();
   const activeAnnouncements = (announcements ?? []).filter((a: any) => a.isActive);
+  const stats = computeDashboardStats(SAMPLE_MATERIALS);
 
   const statCards = [
-    { title: "Total Materials", value: stats?.totalMaterials || 0, icon: Database, color: "text-[#0a1628]", bg: "bg-[#0a1628]/10" },
-    { title: "Active Categories", value: stats?.totalCategories || 0, icon: FolderTree, color: "text-[#0a1628]", bg: "bg-[#0a1628]/10" },
-    { title: "Queue / Pending", value: stats?.pendingRequests || 0, icon: GitPullRequest, color: "text-amber-600", bg: "bg-amber-600/10" },
+    { title: "Total Materials", value: stats.totalMaterials, icon: Database, color: "#0a1628" },
+    { title: "Fully Described", value: stats.fullyDescribed, icon: CheckCircle2, color: "#10B981" },
+    { title: "Avg. Completion", value: `${stats.avgCompletion}%`, icon: BarChart3, color: "#F59E0B" },
   ];
 
   return (
@@ -27,18 +32,20 @@ export default function ArchivistDashboard() {
         </div>
         <div className="mt-4 md:mt-0 text-sm font-medium text-muted-foreground bg-muted/50 px-4 py-2 rounded-xl border border-border/50 flex flex-col items-end">
           <span className="text-[#0a1628]">Shift Active</span>
-          <span className="text-xs font-normal">OAIS Compliant Mode</span>
+          <span className="text-xs font-normal flex items-center gap-1">
+            <ShieldCheck className="w-3 h-3 text-emerald-500" /> OAIS Compliant Mode
+          </span>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         {statCards.map((card, i) => (
           <Card key={i} className="border-border/50 shadow-sm hover:shadow-md transition-shadow bg-white relative overflow-hidden group">
-            <div className={`absolute top-0 right-0 w-32 h-32 -mr-8 -mt-8 rounded-full opacity-10 transition-transform group-hover:scale-110 ${card.bg}`} />
+            <div className="absolute top-0 right-0 w-32 h-32 -mr-8 -mt-8 rounded-full opacity-10 transition-transform group-hover:scale-110" style={{ backgroundColor: card.color }} />
             <CardContent className="p-6 relative z-10">
               <div className="flex items-center justify-between mb-4">
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${card.bg} ${card.color}`}>
-                  <card.icon className="w-6 h-6" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: card.color + "15" }}>
+                  <card.icon className="w-6 h-6" style={{ color: card.color }} />
                 </div>
                 <Activity className="w-4 h-4 text-muted-foreground/30" />
               </div>
@@ -51,6 +58,39 @@ export default function ArchivistDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
+          {/* Completion Overview */}
+          <Card className="shadow-sm border-border/50 bg-white">
+            <CardHeader className="border-b border-border/50 pb-4">
+              <CardTitle className="text-lg flex items-center gap-2 text-[#0a1628]">
+                <BarChart3 className="w-5 h-5 text-[#4169E1]" /> Completion Overview
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-center gap-8">
+                <CompletionRing percentage={stats.avgCompletion} size={100} strokeWidth={7} color="#4169E1" label="Overall Average" />
+                <CompletionRing percentage={stats.essentialCompliance} size={100} strokeWidth={7} color="#10B981" label="Essential Fields" />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Archival Hierarchy Browser */}
+          <Card className="shadow-sm border-border/50 bg-white">
+            <CardHeader className="border-b border-border/50 pb-4">
+              <CardTitle className="text-lg flex items-center gap-2 text-[#0a1628]">
+                <FolderTree className="w-5 h-5 text-[#0a1628]" /> Archival Hierarchy
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 max-h-[400px] overflow-y-auto">
+              <ArchivalTree
+                node={SAMPLE_HIERARCHY}
+                onSelectItem={(id) => {
+                  // Navigate to material
+                }}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Tasks */}
           <Card className="shadow-sm border-border/50 bg-white">
             <CardHeader className="border-b border-border/50 pb-4">
               <CardTitle className="text-lg flex items-center gap-2 text-[#0a1628]">
@@ -59,47 +99,52 @@ export default function ArchivistDashboard() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y divide-border/50">
-                <div className="p-6 flex items-center justify-between hover:bg-muted/30 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
-                      <GitPullRequest className="w-5 h-5" />
+                <Link href="/archivist/requests">
+                  <div className="p-6 flex items-center justify-between hover:bg-muted/30 transition-colors cursor-pointer">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
+                        <GitPullRequest className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-sm text-[#0a1628]">Review Pending Access Requests</h4>
+                        <p className="text-xs text-muted-foreground mt-0.5">Review researcher access requests for restricted materials.</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-bold text-sm text-[#0a1628]">Review Pending Access Requests</h4>
-                      <p className="text-xs text-muted-foreground mt-0.5">There are 0 researcher requests waiting to be reviewed.</p>
-                    </div>
+                    <span className="text-[#0a1628] text-sm font-semibold">→</span>
                   </div>
-                  <button className="text-[#0a1628] text-sm font-semibold px-3 py-1.5 rounded-lg hover:bg-[#0a1628]/10 transition-colors">Go to Requests →</button>
-                </div>
-                <div className="p-6 flex items-center justify-between hover:bg-muted/30 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-                      <Database className="w-5 h-5" />
+                </Link>
+                <Link href="/archivist/collections">
+                  <div className="p-6 flex items-center justify-between hover:bg-muted/30 transition-colors cursor-pointer">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                        <Database className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-sm text-[#0a1628]">Catalog New Materials</h4>
+                        <p className="text-xs text-muted-foreground mt-0.5">Upload and apply ISAD(G) metadata to archival items.</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-bold text-sm text-[#0a1628]">Draft SIP Ingestions</h4>
-                      <p className="text-xs text-muted-foreground mt-0.5">Upload new materials to begin metadata cataloging.</p>
-                    </div>
+                    <span className="text-[#0a1628] text-sm font-semibold">→</span>
                   </div>
-                  <button className="text-[#0a1628] text-sm font-semibold px-3 py-1.5 rounded-lg hover:bg-[#0a1628]/10 transition-colors">Upload SIPs →</button>
-                </div>
+                </Link>
                 <div className="p-6 flex items-center justify-between hover:bg-muted/30 transition-colors">
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600">
                       <Search className="w-5 h-5" />
                     </div>
                     <div>
-                      <h4 className="font-bold text-sm text-[#0a1628]">Verify Fixity Status</h4>
-                      <p className="text-xs text-muted-foreground mt-0.5">Run checksum validation on the digital preservation archive.</p>
+                      <h4 className="font-bold text-sm text-[#0a1628]">Verify Metadata Completeness</h4>
+                      <p className="text-xs text-muted-foreground mt-0.5">Check ISAD(G) compliance and fill in missing fields.</p>
                     </div>
                   </div>
-                  <button className="text-[#0a1628] text-sm font-semibold px-3 py-1.5 rounded-lg hover:bg-[#0a1628]/10 transition-colors">Run Scans →</button>
+                  <button className="text-[#0a1628] text-sm font-semibold px-3 py-1.5 rounded-lg hover:bg-[#0a1628]/10 transition-colors">Run Scan →</button>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
+        {/* Sidebar */}
         <div>
           <Card className="shadow-sm border-border/50 bg-white">
             <div className="p-4 border-b border-border/50 bg-muted/20">

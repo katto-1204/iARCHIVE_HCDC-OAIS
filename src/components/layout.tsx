@@ -114,18 +114,18 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
 
   const links = user.role === "admin"
     ? [
-        { icon: LayoutDashboard, label: "Dashboard", href: "/admin" },
-        { icon: Database, label: "Collections", href: "/admin/collections" },
+        { icon: LayoutDashboard, label: "Metadata Dashboard", href: "/admin" },
+        { icon: Database, label: "Archival Materials", href: "/admin/collections" },
         { icon: FileText, label: "Categories", href: "/admin/categories" },
         { icon: GitPullRequest, label: "Requests", href: "/admin/requests" },
-        { icon: Users, label: "Users", href: "/admin/users" },
+        { icon: Users, label: "Admin Accounts", href: "/admin/users" },
         { icon: Bell, label: "Announcements", href: "/admin/announcements" },
         { icon: Search, label: "Audit Logs", href: "/admin/audit" },
       ]
     : user.role === "archivist"
       ? [
           { icon: LayoutDashboard, label: "Dashboard", href: "/archivist" },
-          { icon: Database, label: "Collections", href: "/archivist/collections" },
+          { icon: Database, label: "Archival Materials", href: "/archivist/collections" },
           { icon: FileText, label: "Categories", href: "/archivist/categories" },
           { icon: GitPullRequest, label: "Requests", href: "/archivist/requests" },
         ]
