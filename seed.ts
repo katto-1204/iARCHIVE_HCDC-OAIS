@@ -1,0 +1,92 @@
+import { db, categoriesTable, materialsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
+import crypto from "crypto";
+
+const genId = () => crypto.randomUUID();
+
+const hcdc_id = genId();
+const cjje_id = genId();
+const cet_id = genId();
+const chatme_id = genId();
+const husocom_id = genId();
+const come_id = genId();
+const sbme_id = genId();
+const ste_id = genId();
+
+const newCategories = [
+  { id: hcdc_id, name: "HCDC", description: "Holy Cross of Davao College", categoryNo: 1, level: "fonds", parentId: null },
+  { id: cjje_id, name: "College of Criminal Justice Education (CCJE)", description: "CCJE", categoryNo: 2, level: "subfonds", parentId: hcdc_id },
+  { id: cet_id, name: "College of Engineering and Technology (CET)", description: "CET", categoryNo: 3, level: "subfonds", parentId: hcdc_id },
+  { id: chatme_id, name: "College of Hospitality & Tourism Management (CHATME)", description: "CHATME", categoryNo: 4, level: "subfonds", parentId: hcdc_id },
+  { id: husocom_id, name: "College of Arts & Sciences (HUSOCOM)", description: "HUSOCOM", categoryNo: 5, level: "subfonds", parentId: hcdc_id },
+  { id: come_id, name: "College of Maritime Education (COME)", description: "COME", categoryNo: 6, level: "subfonds", parentId: hcdc_id },
+  { id: sbme_id, name: "School of Business & Management (SBME)", description: "SBME", categoryNo: 7, level: "subfonds", parentId: hcdc_id },
+  { id: ste_id, name: "School of Teacher Education (STE)", description: "STE", categoryNo: 8, level: "subfonds", parentId: hcdc_id },
+
+  // CJJE
+  { id: genId(), name: "Bachelor of Science in Criminology", description: "Program", categoryNo: 9, level: "series", parentId: cjje_id },
+
+  // CET
+  { id: genId(), name: "Bachelor of Science in Computer Engineering (BSCpE)", description: "Program", categoryNo: 10, level: "series", parentId: cet_id },
+  { id: genId(), name: "Bachelor of Science in Electronics Engineering (BSECE)", description: "Program", categoryNo: 11, level: "series", parentId: cet_id },
+  { id: genId(), name: "Bachelor of Science in Information Technology (BSIT)", description: "Program", categoryNo: 12, level: "series", parentId: cet_id },
+  { id: genId(), name: "Bachelor of Library and Information Science (BLIS)", description: "Program", categoryNo: 13, level: "series", parentId: cet_id },
+
+  // CHATME
+  { id: genId(), name: "Bachelor of Science in Hospitality Management (BSHM)", description: "Program", categoryNo: 14, level: "series", parentId: chatme_id },
+  { id: genId(), name: "Bachelor of Science in Tourism Management (BSTM)", description: "Program", categoryNo: 15, level: "series", parentId: chatme_id },
+
+  // HUSOCOM
+  { id: genId(), name: "Bachelor of Arts in Political Science (AB PolSci)", description: "Program", categoryNo: 16, level: "series", parentId: husocom_id },
+  { id: genId(), name: "Bachelor of Arts in Economics (AB Econ)", description: "Program", categoryNo: 17, level: "series", parentId: husocom_id },
+  { id: genId(), name: "Bachelor of Arts in History (AB History)", description: "Program", categoryNo: 18, level: "series", parentId: husocom_id },
+  { id: genId(), name: "Bachelor of Arts in Philosophy (AB Philosophy)", description: "Program", categoryNo: 19, level: "series", parentId: husocom_id },
+  { id: genId(), name: "BA Communication", description: "Program", categoryNo: 20, level: "series", parentId: husocom_id },
+  { id: genId(), name: "Bachelor of Arts in English Language Studies (BA ELS)", description: "Program", categoryNo: 21, level: "series", parentId: husocom_id },
+  { id: genId(), name: "Bachelor of Science in Psychology (BS Psych)", description: "Program", categoryNo: 22, level: "series", parentId: husocom_id },
+  { id: genId(), name: "Bachelor of Science in Social Work (BSSW)", description: "Program", categoryNo: 23, level: "series", parentId: husocom_id },
+
+  // COME
+  { id: genId(), name: "Bachelor of Science in Marine Transportation (BSMT)", description: "Program", categoryNo: 24, level: "series", parentId: come_id },
+
+  // SBME
+  { id: genId(), name: "Bachelor of Science in Accountancy (BSA)", description: "Program", categoryNo: 25, level: "series", parentId: sbme_id },
+  { id: genId(), name: "Bachelor of Science in Business Administration major in Financial Management (BSBA-FM)", description: "Program", categoryNo: 26, level: "series", parentId: sbme_id },
+  { id: genId(), name: "Bachelor of Science in Business Administration major in Human Resource Management (BSBA-HRM)", description: "Program", categoryNo: 27, level: "series", parentId: sbme_id },
+  { id: genId(), name: "Bachelor of Science in Business Administration major in Marketing Management (BSBA-MM)", description: "Program", categoryNo: 28, level: "series", parentId: sbme_id },
+  { id: genId(), name: "Bachelor of Science in Customs Administration (BSCA)", description: "Program", categoryNo: 29, level: "series", parentId: sbme_id },
+  { id: genId(), name: "Bachelor of Science in Management Accounting (BSMA)", description: "Program", categoryNo: 30, level: "series", parentId: sbme_id },
+  { id: genId(), name: "Bachelor of Science in Real Estate Management (BSREM)", description: "Program", categoryNo: 31, level: "series", parentId: sbme_id },
+
+  // STE
+  { id: genId(), name: "Bachelor of Early Childhood Education (BECEd)", description: "Program", categoryNo: 32, level: "series", parentId: ste_id },
+  { id: genId(), name: "Bachelor of Elementary Education (BEEd)", description: "Program", categoryNo: 33, level: "series", parentId: ste_id },
+  { id: genId(), name: "Bachelor of Physical Education (BPEd)", description: "Program", categoryNo: 34, level: "series", parentId: ste_id },
+  { id: genId(), name: "Bachelor of Secondary Education", description: "Program", categoryNo: 35, level: "series", parentId: ste_id },
+  { id: genId(), name: "Bachelor of Special Needs Education – Generalist", description: "Program", categoryNo: 36, level: "series", parentId: ste_id },
+];
+
+async function seed() {
+  console.log("Seeding categories into DB...");
+  try {
+    // We do NOT delete old materials! We just delete old categories and insert new ones
+    // First, let's keep track of existing categories to see if there's any.
+    // If you delete categories and cascade is not set, materials might lose category.
+    // So usually we update them, but since we are redefining the entire structure...
+    
+    // We will just clear categories table and insert anew. 
+    await db.delete(categoriesTable);
+    
+    for (const cat of newCategories) {
+      await db.insert(categoriesTable).values(cat);
+    }
+    
+    console.log("Seeding Complete!");
+    process.exit(0);
+  } catch (err) {
+    console.error("Error seeding:", err);
+    process.exit(1);
+  }
+}
+
+seed();

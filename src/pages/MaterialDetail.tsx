@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import {
   FileText, Download, Lock, ArrowLeft, CheckCircle,
   ZoomIn, ZoomOut, RotateCcw, Maximize2, ExternalLink,
-  Database, HardDrive, Calendar, User, Tag, BookOpen, AlertTriangle
+  Database, HardDrive, Calendar, User, Tag, BookOpen, AlertTriangle, Edit
 } from "lucide-react";
 import { useGetMaterial, useGetMe, useGetAccessRequests } from "@workspace/api-client-react";
 
@@ -104,12 +104,23 @@ export default function MaterialDetail() {
       </header>
 
       {/* ─── BREADCRUMB ─── */}
-      <div className="max-w-7xl mx-auto px-6 py-3 flex items-center gap-2 text-sm text-muted-foreground">
-        <Link href="/" className="hover:text-foreground transition-colors">Home</Link>
-        <span>›</span>
-        <Link href="/collections" className="hover:text-foreground transition-colors">Collections</Link>
-        <span>›</span>
-        <span className="text-foreground font-medium truncate max-w-xs">{material.title}</span>
+      <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Link href="/" className="hover:text-foreground transition-colors">Home</Link>
+          <span>›</span>
+          <Link href="/collections" className="hover:text-foreground transition-colors">Collections</Link>
+          <span>›</span>
+          <span className="text-foreground font-medium truncate max-w-xs">{material.title}</span>
+        </div>
+        
+        {/* Admin Edit Shortcut */}
+        {(user?.role === "admin" || user?.role === "archivist") && (
+          <Link href={`/admin/collections`}>
+            <button className="flex items-center gap-1.5 text-xs font-bold text-[#4169E1] hover:text-[#3558c8] bg-[#4169E1]/10 px-3 py-1.5 rounded-lg border border-[#4169E1]/20 transition-all">
+              <Edit className="w-3.5 h-3.5" /> Edit in Admin
+            </button>
+          </Link>
+        )}
       </div>
 
       {/* ─── MAIN CONTENT ─── */}
@@ -234,6 +245,19 @@ export default function MaterialDetail() {
               </div>
 
               <h1 className="text-2xl font-bold text-[#0a1628] mb-5 leading-snug">{material.title}</h1>
+
+              {/* NEW: TERMS OF USE STICKY VISIBLE */}
+              {(material as any).termsOfUse && (
+                <div className="bg-[#f7f8fc] border border-border/60 rounded-xl p-4 mb-5 shadow-sm">
+                  <div className="flex items-center gap-2 mb-2">
+                    <BookOpen className="w-4 h-4 text-[#4169E1]" />
+                    <h3 className="text-sm font-bold text-[#0a1628] uppercase tracking-wide">Terms of Use</h3>
+                  </div>
+                  <p className="text-sm text-foreground/80 leading-relaxed font-medium whitespace-pre-wrap">
+                    {(material as any).termsOfUse}
+                  </p>
+                </div>
+              )}
 
               {/* Tabs */}
               <div className="border-b border-border/60 mb-5">

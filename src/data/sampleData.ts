@@ -86,7 +86,7 @@ export const DUBLIN_CORE_FIELDS: MetadataFieldDef[] = [
   { code: "DC15", name: "Rights",      standard: "Both", area: 4, areaName: "Conditions of Access & Use", isEssential: false, fieldKey: "rights" },
 ];
 
-// Combined 36 unique fields: 26 ISAD(G) + 10 supplementary Dublin Core (non-duplicate)
+// Combined unique fields: 26 ISAD(G) + supplementary Dublin Core (non-duplicate by fieldKey)
 export const COMBINED_FIELDS: MetadataFieldDef[] = [
   ...ISADG_FIELDS,
   // Only DC fields that are NOT already represented in ISAD(G) — check by fieldKey
@@ -129,42 +129,14 @@ export const LEVEL_LABELS: Record<HierarchyLevel, string> = {
 };
 
 export const SAMPLE_HIERARCHY: HierarchyNode = {
-  id: "h-root",
+  id: "hcdc_root",
   name: "HCDC — Holy Cross of Davao College",
   level: "fonds",
   children: [
-    {
-      id: "h-blis",
-      name: "BLIS — Bachelor of Library and Information Science",
-      level: "subfonds",
-      children: [
-        {
-          id: "h-blis-research",
-          name: "Student Research",
-          level: "series",
-          children: [
-            {
-              id: "h-blis-capstone",
-              name: "Capstone Projects",
-              level: "subseries",
-              children: [
-                {
-                  id: "h-blis-cap-2024",
-                  name: "2024 Capstone Projects",
-                  level: "file",
-                  children: [
-                    { id: "h-item-elearn", name: "Implementing E-Learning in HCDC: A Capstone Study", level: "item", materialId: "26iA040000006" },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    },
+    // --- The ORIGINAL ONES (that have items pointing to them) ---
     {
       id: "h-cet",
-      name: "CET — College of Engineering and Technology",
+      name: "College of Engineering and Technology (CET)",
       level: "subfonds",
       children: [
         {
@@ -189,17 +161,50 @@ export const SAMPLE_HIERARCHY: HierarchyNode = {
             },
           ],
         },
+        // BLIS MOVED HERE
+        {
+          id: "h-blis",
+          name: "BLIS",
+          level: "series",
+          children: [
+            {
+              id: "h-blis-research",
+              name: "Student Research",
+              level: "subseries",
+              children: [
+                {
+                  id: "h-blis-capstone",
+                  name: "Capstone Projects",
+                  level: "file",
+                  children: [
+                    {
+                      id: "h-blis-cap-2024",
+                      name: "2024 Capstone Projects",
+                      level: "item",
+                      children: [
+                        { id: "h-item-elearn", name: "Implementing E-Learning in HCDC: A Capstone Study", level: "item", materialId: "26iA040000006" },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        { id: "s_bscpe", name: "BSCpE", level: "series" },
+        { id: "s_bsece", name: "BSECE", level: "series" },
+        { id: "s_bsit", name: "BSIT", level: "series" }
       ],
     },
     {
       id: "h-admin",
       name: "Administrative Records",
-      level: "series",
+      level: "subfonds",
       children: [
         {
           id: "h-admin-plans",
           name: "Strategic Plans",
-          level: "subseries",
+          level: "series",
           children: [
             {
               id: "h-admin-plans-file",
@@ -214,7 +219,7 @@ export const SAMPLE_HIERARCHY: HierarchyNode = {
         {
           id: "h-admin-minutes",
           name: "Board Minutes",
-          level: "subseries",
+          level: "series",
           children: [
             {
               id: "h-admin-minutes-file",
@@ -231,12 +236,12 @@ export const SAMPLE_HIERARCHY: HierarchyNode = {
     {
       id: "h-publications",
       name: "Publications",
-      level: "series",
+      level: "subfonds",
       children: [
         {
           id: "h-pub-yearbooks",
           name: "Yearbooks",
-          level: "subseries",
+          level: "series",
           children: [
             {
               id: "h-pub-yb-file",
@@ -253,12 +258,12 @@ export const SAMPLE_HIERARCHY: HierarchyNode = {
     {
       id: "h-photos",
       name: "Photographs",
-      level: "series",
+      level: "subfonds",
       children: [
         {
           id: "h-photos-historic",
           name: "Historic Photos",
-          level: "subseries",
+          level: "series",
           children: [
             {
               id: "h-photos-hist-file",
@@ -272,7 +277,75 @@ export const SAMPLE_HIERARCHY: HierarchyNode = {
         },
       ],
     },
-  ],
+
+    // --- The NEWLY APPENDED DEPARTMENTS based on HCDC Course List ---
+    {
+      id: "ccje_sub",
+      name: "College of Criminal Justice Education (CCJE)",
+      level: "subfonds",
+      children: [
+        { id: "s_crim", name: "BS Criminology", level: "series" }
+      ]
+    },
+    {
+      id: "chatme_sub",
+      name: "College of Hospitality & Tourism Management (CHATME)",
+      level: "subfonds",
+      children: [
+        { id: "s_bshm", name: "BSHM", level: "series" },
+        { id: "s_bstm", name: "BSTM", level: "series" }
+      ]
+    },
+    {
+      id: "husocom_sub",
+      name: "College of Arts & Sciences (HUSOCOM)",
+      level: "subfonds",
+      children: [
+        { id: "s_polsci", name: "AB PolSci", level: "series" },
+        { id: "s_econ", name: "AB Econ", level: "series" },
+        { id: "s_history", name: "AB History", level: "series" },
+        { id: "s_phil", name: "AB Philosophy", level: "series" },
+        { id: "s_comm", name: "BA Comm", level: "series" },
+        { id: "s_els", name: "BA ELS", level: "series" },
+        { id: "s_psych", name: "BS Psych", level: "series" },
+        { id: "s_sw", name: "BSSW", level: "series" }
+      ]
+    },
+    {
+      id: "come_sub",
+      name: "College of Maritime Education (COME)",
+      level: "subfonds",
+      children: [
+        { id: "s_bsmt", name: "BSMT", level: "series" }
+      ]
+    },
+    {
+      id: "sbme_sub",
+      name: "School of Business & Management (SBME)",
+      level: "subfonds",
+      children: [
+        { id: "s_bsa", name: "BSA", level: "series" },
+        { id: "s_bsba_fm", name: "BSBA-FM", level: "series" },
+        { id: "s_bsba_hrm", name: "BSBA-HRM", level: "series" },
+        { id: "s_bsba_mm", name: "BSBA-MM", level: "series" },
+        { id: "s_bsca", name: "BSCA", level: "series" },
+        { id: "s_bsma", name: "BSMA", level: "series" },
+        { id: "s_bsrem", name: "BSREM", level: "series" }
+      ]
+    },
+    {
+      id: "ste_sub",
+      name: "School of Teacher Education (STE)",
+      level: "subfonds",
+      children: [
+        { id: "s_beced", name: "BECEd", level: "series" },
+        { id: "s_beed", name: "BEEd", level: "series" },
+        { id: "s_bped", name: "BPEd", level: "series" },
+        { id: "s_bsed", name: "BSEd", level: "series" },
+        { id: "s_bsned", name: "BSNEd", level: "series" }
+      ]
+    }
+  ]
 };
 
 // ─── Sample Materials with all 36 metadata fields ─────────────────────────────
@@ -437,12 +510,12 @@ const material3: ArchivalMaterial = {
   extentAndMedium: "45 pages; application/pdf; 2.4 MB",
   creator: "Dr. Maria Cruz",
   adminBioHistory: null,
-  archivalHistory: null,
+  archivalHistory: "Submitted to HCDC Research Repository, verified by CET Dean's Office.",
   immediateSource: "HCDC Faculty Research Team submission.",
   scopeContent: "Research paper examining quality education standards in Philippine higher education institutions, focusing on CHED compliance frameworks.",
   appraisal: "Retained as faculty scholarly output.",
   accruals: null,
-  arrangement: null,
+  arrangement: "Organized by chapter; follows CHED format for research papers.",
   accessConditions: "Public access; open to all researchers.",
   reproductionConditions: "Educational use permitted with attribution.",
   language: "eng",
@@ -463,10 +536,10 @@ const material3: ArchivalMaterial = {
   type: "Text",
   format: "application/pdf",
   identifier: null,
-  source: null,
+  source: "HCDC College of Engineering and Technology",
   relation: null,
-  coverage: null,
-  rights: null,
+  coverage: "Philippines; Philippine Higher Education; 2023",
+  rights: "Educational use permitted with proper citation.",
   termsOfUse: "Available for educational and research use with proper citation.",
   access: "public",
   hierarchyPath: "HCDC > CET > Faculty Research > Research Papers > 2023 Faculty Publications",
@@ -487,13 +560,13 @@ const material4: ArchivalMaterial = {
   creator: "Ana Maria Reyes",
   adminBioHistory: null,
   archivalHistory: null,
-  immediateSource: null,
+  immediateSource: "Submitted by BLIS graduating student, April 2024.",
   scopeContent: "Capstone research on implementing e-learning platforms in HCDC academic programs.",
   appraisal: null,
   accruals: null,
   arrangement: null,
   accessConditions: "Public access.",
-  reproductionConditions: null,
+  reproductionConditions: "Educational use only. No commercial reproduction.",
   language: "eng",
   physicalCharacteristics: null,
   findingAids: null,
@@ -508,7 +581,7 @@ const material4: ArchivalMaterial = {
   subject: "E-Learning; Educational Technology; HCDC; Capstone",
   description: "Capstone research on implementing e-learning platforms in HCDC academic programs.",
   publisher: "Holy Cross of Davao College",
-  contributor: null,
+  contributor: "BLIS Department Adviser",
   type: "Text",
   format: "application/pdf",
   identifier: null,
@@ -603,7 +676,7 @@ const material6: ArchivalMaterial = {
   archivistNote: null,
   rulesConventions: null,
   dateOfDescription: null,
-  subject: null,
+  subject: "Campus; Historic Photographs; HCDC; Davao",
   description: "Collection of historical photographs documenting HCDC campus life from 1960 to 1990.",
   publisher: null,
   contributor: null,

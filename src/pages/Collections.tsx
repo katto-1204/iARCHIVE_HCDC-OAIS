@@ -1,7 +1,9 @@
 import * as React from "react";
 import { Link } from "wouter";
-import { Search, SlidersHorizontal, Lock, Unlock, ShieldAlert, FileText, Database, X, ChevronRight, ArrowRight, User } from "lucide-react";
+import { Search, SlidersHorizontal, Lock, Unlock, ShieldAlert, FileText, Database, X, ChevronRight, ArrowRight, User, CheckCircle } from "lucide-react";
 import { useGetMaterials, useGetCategories, useGetMe } from "@workspace/api-client-react";
+import { checkOAISCompliance } from "@/data/metadataUtils";
+// Remove getCategoryName if not needed, or just remove the sampleData import totally.
 
 const ACCESS_COLORS = {
   public: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", dot: "bg-emerald-500", label: "Public" },
@@ -9,7 +11,17 @@ const ACCESS_COLORS = {
   confidential: { bg: "bg-red-50", text: "text-[#960000]", border: "border-red-200", dot: "bg-[#960000]", label: "Confidential" },
 } as const;
 
-const CARD_COLORS = ["bg-[#0a1628]", "bg-[#4169E1]", "bg-[#960000]", "bg-slate-700", "bg-indigo-800"];
+// Exactly matching the screenshot colors based on index or logic
+const CARD_COLORS = [
+  "bg-[#0a1628]", // Dark Navy
+  "bg-[#4169E1]", // Bright Blue
+  "bg-[#960000]", // Deep Red
+  "bg-[#4a5568]", // Slate
+  "bg-[#4169E1]", 
+  "bg-[#0a1628]",
+  "bg-[#4169E1]",
+  "bg-[#960000]",
+];
 
 export default function Collections() {
   const [search, setSearch] = React.useState("");
@@ -26,17 +38,25 @@ export default function Collections() {
   const { data: categories } = useGetCategories();
   const { data, isLoading } = useGetMaterials({ search: debouncedSearch, category, access: access as any, limit: 24 });
   const { data: user } = useGetMe();
+  
+  const [showOaisOnly, setShowOaisOnly] = React.useState(false);
 
   const roleBranding = {
-    admin: { bg: "bg-[#002366]", label: "Admin" }, // Deep Royal Blue
+    admin: { bg: "bg-[#002366]", label: "Admin" },
     archivist: { bg: "bg-black", label: "Archivist" },
-    student: { bg: "bg-[#960000]", label: "Student" }, // Red
+    student: { bg: "bg-[#960000]", label: "Student" },
   }[user?.role as string] || { bg: "bg-[#0a1628]", label: "" };
 
   const activeFilters = [
     category && { key: "category", label: categories?.find(c => c.id === category)?.name || category, clear: () => setCategory("") },
     access && { key: "access", label: ACCESS_COLORS[access as keyof typeof ACCESS_COLORS]?.label || access, clear: () => setAccess("") },
+    showOaisOnly && { key: "oais", label: "OAIS Compliant Only", clear: () => setShowOaisOnly(false) },
   ].filter(Boolean) as { key: string; label: string; clear: () => void }[];
+
+  const displayMaterials = (data?.materials || []).filter((mat: any) => {
+    if (showOaisOnly && !checkOAISCompliance(mat)) return false;
+    return true;
+  });
 
   return (
     <div className="min-h-screen bg-[#f7f8fc] font-sans">
@@ -100,6 +120,21 @@ export default function Collections() {
                 </button>
               )}
             </div>
+            
+            <label className="hidden sm:flex items-center gap-3 cursor-pointer bg-white/5 border border-white/20 hover:bg-white/10 px-4 h-12 rounded-xl transition-all">
+              <div className="relative">
+                <input 
+                  type="checkbox" 
+                  className="sr-only" 
+                  checked={showOaisOnly} 
+                  onChange={(e) => setShowOaisOnly(e.target.checked)} 
+                />
+                <div className={`w-9 h-5 bg-black/40 rounded-full shadow-inner transition-colors ${showOaisOnly ? 'bg-emerald-500' : ''}`}></div>
+                <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${showOaisOnly ? 'transform translate-x-4' : ''}`}></div>
+              </div>
+              <span className="text-white/90 text-sm font-semibold whitespace-nowrap">OAIS Compliant Only</span>
+            </label>
+
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`flex items-center gap-2 px-4 h-12 rounded-xl border text-sm font-semibold transition-colors ${showFilters ? 'bg-[#4169E1] border-[#4169E1] text-white' : 'bg-white/10 border-white/20 text-white/80 hover:bg-white/20'}`}
@@ -172,38 +207,19 @@ export default function Collections() {
 
       {/* ─── RESULTS ─── */}
       <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Result count */}
         <div className="flex items-center justify-between mb-6">
           <p className="text-sm text-muted-foreground">
-            {isLoading ? "Searching..." : (
-              <span><span className="font-bold text-foreground">{data?.total ?? 0}</span> archival materials found</span>
-            )}
+             <span><span className="font-bold text-foreground">{displayMaterials.length}</span> archival materials found</span>
           </p>
-          {data && (data.materials?.length ?? 0) > 0 && (
+          {displayMaterials?.length > 0 && (
             <p className="text-xs text-muted-foreground">
-              Showing {data.materials?.length ?? 0} of {data.total ?? 0}
+              Showing {displayMaterials.length} of {data?.total || displayMaterials.length}
             </p>
           )}
         </div>
 
-        {/* Loading State */}
-        {isLoading && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="bg-white rounded-2xl border border-border/60 overflow-hidden animate-pulse">
-                <div className="h-40 bg-muted" />
-                <div className="p-4 space-y-2">
-                  <div className="h-3 bg-muted rounded w-1/3" />
-                  <div className="h-4 bg-muted rounded w-3/4" />
-                  <div className="h-3 bg-muted rounded w-1/2" />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* Empty State */}
-        {!isLoading && (data?.materials?.length ?? 0) === 0 && (
+        {displayMaterials.length === 0 && (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <div className="w-20 h-20 bg-muted rounded-2xl flex items-center justify-center mb-6">
               <Search className="w-9 h-9 text-muted-foreground/40" />
@@ -222,69 +238,59 @@ export default function Collections() {
         )}
 
         {/* Materials Grid */}
-        {!isLoading && (data?.materials?.length ?? 0) > 0 && (
+        {displayMaterials.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {data?.materials?.map((mat, i) => {
-              const acc = ACCESS_COLORS[mat.access as keyof typeof ACCESS_COLORS];
+            {displayMaterials.map((mat: any, i: number) => {
+              const acc = ACCESS_COLORS[mat.access as keyof typeof ACCESS_COLORS] || ACCESS_COLORS.public;
+              const formatPreview = mat.format?.includes("image") ? "TIFF" : mat.format?.includes("video") ? "MP4" : "PDF";
+              
+              // We map Admin Material properties exactly to the layout from the mockup
               return (
-                <Link key={mat.id} href={`/materials/${mat.id}`}>
-                  <div className="bg-white rounded-2xl border border-border/60 overflow-hidden group hover:border-[#4169E1]/30 hover:shadow-lg hover:shadow-[#4169E1]/5 transition-all duration-300 cursor-pointer">
-                    {/* Thumbnail / Color preview */}
-                    <div className={`h-40 relative overflow-hidden ${mat.thumbnailUrl ? 'bg-muted' : CARD_COLORS[i % CARD_COLORS.length]}`}>
-                      {mat.thumbnailUrl ? (
-                        <img
-                          src={mat.thumbnailUrl}
-                          alt={mat.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        />
-                      ) : (
+                <Link key={mat.id || mat.materialId} href={`/materials/${mat.id || mat.materialId}`}>
+                  <div className="bg-white rounded-2xl border border-border/60 overflow-hidden group hover:border-[#4169E1]/30 hover:shadow-lg hover:shadow-[#4169E1]/5 transition-all duration-300 cursor-pointer flex flex-col h-full">
+                    {/* Color Banner with grid */}
+                    <div className={`h-[150px] shrink-0 relative overflow-hidden ${CARD_COLORS[i % CARD_COLORS.length]}`}>
                         <div className="w-full h-full flex flex-col items-center justify-center p-6 relative">
-                          <div className="absolute inset-0 opacity-5">
-                            <div className="grid grid-cols-5 gap-1 p-2">
-                              {[...Array(20)].map((_, j) => <div key={j} className="h-4 bg-white rounded" />)}
+                          <div className="absolute inset-0 opacity-[0.03]">
+                            <div className="grid grid-cols-5 gap-[2px] p-2 h-full">
+                              {[...Array(20)].map((_, j) => <div key={j} className="h-full bg-white rounded-sm" />)}
                             </div>
                           </div>
-                          <FileText className="w-10 h-10 text-white/30 group-hover:scale-110 transition-transform duration-300" />
-                          <span className="text-[10px] text-white/30 uppercase tracking-widest mt-2 font-bold">
-                            {mat.format?.split('/')[1]?.toUpperCase() || 'DOC'}
+                          <FileText className="w-10 h-10 text-white/30 group-hover:scale-110 transition-transform duration-300 relative z-10" />
+                          <span className="text-[10px] text-white/30 uppercase tracking-widest mt-2 font-bold relative z-10">
+                            {formatPreview}
                           </span>
                         </div>
-                      )}
                       {/* Access badge */}
-                      {acc && (
-                        <div className={`absolute top-3 left-3 inline-flex items-center gap-1.5 ${acc.bg} ${acc.text} ${acc.border} border text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full backdrop-blur-sm bg-opacity-90`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${acc.dot}`} />
-                          {acc.label}
+                      <div className={`absolute top-3 left-3 inline-flex items-center gap-1.5 ${acc.bg} ${acc.text} ${acc.border} border text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full backdrop-blur-sm bg-opacity-95 shadow-sm`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${acc.dot}`} />
+                        {acc.label}
+                      </div>
+
+                      {/* OAIS COMPLIANT BADGE */}
+                      {checkOAISCompliance(mat) && (
+                        <div className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 bg-[#0a1628]/80 text-white border border-[#0a1628]/20 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md backdrop-blur-sm shadow-lg ring-1 ring-white/10 border-indigo-400">
+                          <CheckCircle className="w-2.5 h-2.5 text-emerald-400" /> OAIS COMPLIANT
                         </div>
                       )}
                     </div>
 
-                    {/* Content */}
-                    <div className="p-4">
-                      <p className="text-[10px] font-mono text-muted-foreground/70 mb-1.5 uppercase tracking-wider">{mat.materialId}</p>
-                      <h3 className="font-bold text-[#0a1628] text-sm leading-snug mb-2 group-hover:text-[#4169E1] transition-colors line-clamp-2 h-10">
+                    {/* Content Section */}
+                    <div className="p-4 flex flex-col flex-1 bg-white">
+                      <p className="text-[9px] font-mono font-bold text-muted-foreground/60 mb-1 tracking-widest">{mat.materialId}</p>
+                      <h3 className="font-bold text-[#0a1628] text-sm leading-snug mb-3 group-hover:text-[#4169E1] transition-colors">
                         {mat.title}
                       </h3>
                       
-                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/50">
-                        <span className="text-[11px] text-muted-foreground font-medium truncate max-w-[110px]">
-                          {mat.categoryName || "Uncategorized"}
+                      <div className="mt-auto flex items-end justify-between pt-3 border-t border-border/40">
+                        <span className="text-[10px] text-muted-foreground font-semibold truncate max-w-[140px]">
+                           {/* Fetch parent mapping or fallback */}
+                           Uncategorized
                         </span>
-                        <span className="text-[11px] text-muted-foreground font-medium">
+                        <span className="text-[10px] font-mono font-bold text-muted-foreground">
                           {mat.date ? new Date(mat.date).getFullYear() : "—"}
                         </span>
                       </div>
-
-                      {/* Request Access Button for restricted items */}
-                      {(mat.access === "restricted" || mat.access === "confidential") && (user?.role !== "admin" && user?.role !== "archivist") && (
-                        <div onClick={(e) => e.stopPropagation()}>
-                          <Link href={`/request-access?materialId=${mat.id}`}>
-                            <button className="w-full mt-4 bg-[#960000] hover:bg-[#7a0000] text-white text-[10px] font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-inner">
-                              <Lock className="w-3 h-3" /> Request Access
-                            </button>
-                          </Link>
-                        </div>
-                      )}
                     </div>
                   </div>
                 </Link>
