@@ -395,7 +395,14 @@ export interface ArchivalMaterial {
   // System fields
   termsOfUse: string | null;
   access: "public" | "restricted" | "confidential";
-  hierarchyPath: string;       // e.g. "HCDC > BLIS > Student Research > ..."
+  hierarchyPath: string;
+  fileUrl?: string;
+  thumbnailUrl?: string;
+  sha256?: string;
+  sipId?: string;
+  aipId?: string;
+  ingestDate?: string;
+  ingestBy?: string;
   createdAt: string;
   updatedAt: string;
   createdBy: string;
@@ -445,6 +452,8 @@ const material1: ArchivalMaterial = {
   termsOfUse: "This material is available for educational and research purposes. Commercial reproduction requires written permission from HCDC.",
   access: "public",
   hierarchyPath: "HCDC > Publications > Yearbooks > Yearbook Collection",
+  thumbnailUrl: "https://images.unsplash.com/photo-1541339907198-e08756ebafe3?q=80&w=2070&auto=format&fit=crop",
+  fileUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
   createdAt: "2026-01-14T08:00:00.000Z",
   updatedAt: "2026-03-23T17:59:14.566Z",
   createdBy: "M. Santos",
@@ -494,6 +503,8 @@ const material2: ArchivalMaterial = {
   termsOfUse: "This document is restricted to authorized HCDC personnel. Research access requires formal approval.",
   access: "restricted",
   hierarchyPath: "HCDC > Administrative Records > Strategic Plans > Institutional Plans 2020–2025",
+  thumbnailUrl: "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?q=80&w=2070&auto=format&fit=crop",
+  fileUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
   createdAt: "2026-01-18T08:00:00.000Z",
   updatedAt: "2026-03-23T17:59:30.545Z",
   createdBy: "M. Santos",

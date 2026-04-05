@@ -23,6 +23,12 @@ const newCategories = [
   { id: sbme_id, name: "School of Business & Management (SBME)", description: "SBME", categoryNo: 7, level: "subfonds", parentId: hcdc_id },
   { id: ste_id, name: "School of Teacher Education (STE)", description: "STE", categoryNo: 8, level: "subfonds", parentId: hcdc_id },
 
+  { id: "c78816e9-618e-4fcd-9b07-236a8203d9de", name: "Administrative Records", description: "Official administrative documents", categoryNo: 100, level: "subfonds", parentId: hcdc_id },
+  { id: "0fb2a2a2-bbc3-4690-9798-9b9b29e00575", name: "Faculty Publications", description: "Research papers and articles by HCDC faculty", categoryNo: 101, level: "subfonds", parentId: hcdc_id },
+  { id: "e128e40a-58a0-46db-828c-38a80588284d", name: "Yearbooks", description: "Annual HCDC Yearbook publications", categoryNo: 102, level: "subfonds", parentId: hcdc_id },
+  { id: "094a9429-37ad-40aa-a732-9ae3019e628b", name: "Student Research", description: "Student thesis and capstone projects", categoryNo: 103, level: "subfonds", parentId: hcdc_id },
+  { id: "de890044-b7d0-42a3-b3e7-ee4d4da712f0", name: "Photographs", description: "Historical photographic collections", categoryNo: 104, level: "subfonds", parentId: hcdc_id },
+
   // CJJE
   { id: genId(), name: "Bachelor of Science in Criminology", description: "Program", categoryNo: 9, level: "series", parentId: cjje_id },
 

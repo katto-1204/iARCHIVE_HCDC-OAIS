@@ -1,12 +1,15 @@
 import * as React from "react";
 import { COMBINED_FIELDS, ISADG_AREAS, type MetadataFieldDef } from "@/data/sampleData";
 import { CheckCircle2, Circle } from "lucide-react";
+import { Input } from "@/components/ui-components";
 
 interface MetadataChecklistProps {
   selectedFields: Set<string>;
   onToggle: (fieldKey: string) => void;
   onSelectAll: () => void;
   onClearAll: () => void;
+  values?: Record<string, string>;
+  onValueChange?: (fieldKey: string, value: string) => void;
   className?: string;
 }
 
@@ -15,6 +18,8 @@ export function MetadataChecklist({
   onToggle,
   onSelectAll,
   onClearAll,
+  values = {},
+  onValueChange,
   className = "",
 }: MetadataChecklistProps) {
   // Group fields by area
@@ -80,16 +85,16 @@ export function MetadataChecklist({
 
       {/* Grouped checkboxes */}
       {groupedFields.map(group => (
-        <div key={group.areaNumber} className="border border-border/60 rounded-xl overflow-hidden">
+        <div key={group.areaNumber} className="border border-border/60 rounded-xl overflow-hidden shadow-sm bg-white">
           <div
             className="px-4 py-2.5 flex items-center gap-2 border-b"
             style={{ backgroundColor: group.color + "08", borderColor: group.color + "20" }}
           >
             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: group.color }} />
-            <h4 className="text-xs font-bold uppercase tracking-wider" style={{ color: group.color }}>
+            <h4 className="text-[10px] font-bold uppercase tracking-wider" style={{ color: group.color }}>
               {group.areaNumber > 0 ? `Area ${group.areaNumber}: ` : ""}{group.areaName}
             </h4>
-            <span className="text-[10px] text-muted-foreground ml-auto">
+            <span className="text-[10px] text-muted-foreground ml-auto font-mono">
               {group.fields.filter(f => selectedFields.has(f.fieldKey)).length}/{group.fields.length}
             </span>
           </div>
@@ -97,39 +102,43 @@ export function MetadataChecklist({
             {group.fields.map(field => {
               const isSelected = selectedFields.has(field.fieldKey);
               return (
-                <button
-                  key={field.code}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-muted/30 transition-colors ${isSelected ? "bg-primary/3" : ""}`}
-                  onClick={() => onToggle(field.fieldKey)}
-                >
-                  {isSelected ? (
-                    <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
-                  ) : (
-                    <Circle className="w-4 h-4 text-muted-foreground/40 shrink-0" />
+                <div key={field.code} className={`flex flex-col transition-all duration-200 ${isSelected ? "bg-primary/5 shadow-inner" : ""}`}>
+                  <button
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/30 transition-colors`}
+                    onClick={() => onToggle(field.fieldKey)}
+                  >
+                    {isSelected ? (
+                      <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
+                    ) : (
+                      <Circle className="w-4 h-4 text-muted-foreground/40 shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <span className={`text-[13px] ${isSelected ? "font-bold text-foreground" : "text-foreground/70"}`}>
+                        {field.name}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-[9px] font-mono text-muted-foreground/60 bg-muted/60 px-1.5 py-0.5 rounded">
+                        {field.code}
+                      </span>
+                      {field.isEssential && (
+                        <span className="text-[8px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded-full border border-red-100">REQUIRED</span>
+                      )}
+                    </div>
+                  </button>
+                  
+                  {/* Inline Input when selected */}
+                  {isSelected && (
+                    <div className="px-11 pb-3 pr-4 animate-in slide-in-from-top-1 duration-200">
+                      <Input 
+                        placeholder={`Enter ${field.name}...`}
+                        className="h-9 text-xs bg-white border-primary/20 focus-visible:ring-primary/5"
+                        value={values[field.fieldKey] || ""}
+                        onChange={(e) => onValueChange?.(field.fieldKey, e.target.value)}
+                      />
+                    </div>
                   )}
-                  <div className="flex-1 min-w-0">
-                    <span className={`text-sm ${isSelected ? "font-semibold text-foreground" : "text-foreground/70"}`}>
-                      {field.name}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="text-[9px] font-mono text-muted-foreground/60 bg-muted/60 px-1.5 py-0.5 rounded">
-                      {field.code}
-                    </span>
-                    {field.standard === "Both" && (
-                      <span className="text-[8px] font-bold text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded-full">DUAL</span>
-                    )}
-                    {field.standard === "Dublin Core" && (
-                      <span className="text-[8px] font-bold text-sky-600 bg-sky-50 px-1.5 py-0.5 rounded-full">DC</span>
-                    )}
-                    {field.standard === "ISAD(G)" && (
-                      <span className="text-[8px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full">ISAD</span>
-                    )}
-                    {field.isEssential && (
-                      <span className="text-[8px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded-full">REQ</span>
-                    )}
-                  </div>
-                </button>
+                </div>
               );
             })}
           </div>

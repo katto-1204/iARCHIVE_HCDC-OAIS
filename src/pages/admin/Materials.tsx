@@ -23,11 +23,14 @@ declare global {
   interface Window {
     pdfjsLib: any;
     mammoth: any;
+    XLSX: any;
+    ExcelJS: any;
+    saveAs: any;
   }
 }
 import {
   computeCompletion, getCompletionColor, checkOAISCompliance, 
-  getAllFieldValues,
+  getAllFieldValues, downloadMetadataExcel,
 } from "@/data/metadataUtils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -45,6 +48,7 @@ export default function AdminMaterials() {
   const [uploadOpen, setUploadOpen] = React.useState(false);
   const [checklistOpen, setChecklistOpen] = React.useState(false);
   const [selectedChecklistFields, setSelectedChecklistFields] = React.useState<Set<string>>(new Set());
+  const [checklistValues, setChecklistValues] = React.useState<Record<string, string>>({});
 
   // Dynamic Upload Form
   const [mediaCategory, setMediaCategory] = React.useState<"document" | "image" | "video">("document");
@@ -84,6 +88,21 @@ export default function AdminMaterials() {
       script.src = "https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js";
       document.body.appendChild(script);
     }
+    if (!window.XLSX) {
+      const script = document.createElement('script');
+      script.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+      document.body.appendChild(script);
+    }
+    if (!window.ExcelJS) {
+      const script = document.createElement('script');
+      script.src = "https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js";
+      document.body.appendChild(script);
+    }
+    if (!window.saveAs) {
+      const script = document.createElement('script');
+      script.src = "https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js";
+      document.body.appendChild(script);
+    }
   }, []);
 
   const handleMediaUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -113,6 +132,8 @@ export default function AdminMaterials() {
 
     const isPdf = file.type === "application/pdf";
     const isDocx = file.name.toLowerCase().endsWith(".docx");
+    const isCsv = file.name.toLowerCase().endsWith(".csv");
+    const isXlsx = file.name.toLowerCase().endsWith(".xlsx");
     
     setUploadForm(prev => ({
       ...prev,
@@ -137,6 +158,13 @@ export default function AdminMaterials() {
         const arrayBuffer = await file.arrayBuffer();
         const result = await window.mammoth.extractRawText({ arrayBuffer });
         extractedText = result.value;
+      } else if (isCsv) {
+        extractedText = await file.text();
+      } else if (isXlsx && window.XLSX) {
+        const arrayBuffer = await file.arrayBuffer();
+        const wb = window.XLSX.read(arrayBuffer);
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        extractedText = window.XLSX.utils.sheet_to_txt(ws, { sep: " " });
       }
 
       if (extractedText) {
@@ -188,6 +216,15 @@ export default function AdminMaterials() {
             series: serName
           };
         });
+
+        // Also populate checklist values for known fields
+        setChecklistValues(prev => ({
+          ...prev,
+          title: titleMatch ? titleMatch[1].trim() : prev.title,
+          creator: creatorMatch ? creatorMatch[1].trim() : prev.creator,
+          description: previewSnippet,
+          referenceCode: idMatch ? idMatch[0] : "",
+        }));
       }
     } catch (err) {
       console.error("Scan failed", err);
@@ -534,8 +571,24 @@ export default function AdminMaterials() {
                  <h4 className="text-xs font-bold text-emerald-900 uppercase tracking-widest mb-1 flex items-center gap-2">
                    <FileText className="w-4 h-4 text-emerald-500" /> 2. Metadata Document (Scan)
                  </h4>
-                 <p className="text-[10px] text-muted-foreground mb-4 font-medium">Upload descriptive doc/PDF to route to the metadata parsing engine.</p>
-                 <Input type="file" onChange={handleMetadataScanUpload} className="bg-white" accept=".pdf,.doc,.docx,.txt" />
+                  <p className="text-[10px] text-muted-foreground mb-4 font-medium">Upload descriptive doc/PDF/Excel/CSV to route to the metadata parsing engine.</p>
+                  <div className="flex gap-2">
+                    <Input type="file" onChange={handleMetadataScanUpload} className="bg-white flex-1" accept=".pdf,.doc,.docx,.txt,.csv,.xlsx" />
+                    {processingState === "done" && (
+                      <Button 
+                        variant="outline" 
+                        size="icon" 
+                        title="Download Scanned Metadata Excel"
+                        className="h-10 w-10 border-emerald-200 text-emerald-600 hover:bg-emerald-50 shrink-0"
+                        onClick={() => {
+                          const pseudoMaterial = { ...uploadForm, ...checklistValues } as unknown as ArchivalMaterial;
+                          downloadMetadataExcel(pseudoMaterial);
+                        }}
+                      >
+                        <Download className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
                  
                  {processingState === "scanning" && (
                    <div className="mt-3 text-xs text-emerald-700 font-bold flex items-center gap-2">
@@ -568,7 +621,18 @@ export default function AdminMaterials() {
             <DialogTitle className="flex items-center gap-2"><ShieldCheck className="w-6 h-6 text-emerald-500" /> Apply Full Metadata Schema</DialogTitle>
             <DialogDescription>Verify the automatically generated ISAD(G) schema mapping.</DialogDescription>
           </DialogHeader>
-          <MetadataChecklist selectedFields={selectedChecklistFields} onToggle={(fieldKey) => setSelectedChecklistFields(prev => { const n = new Set(prev); n.has(fieldKey)? n.delete(fieldKey) : n.add(fieldKey); return n;})} onSelectAll={() => setSelectedChecklistFields(new Set(COMBINED_FIELDS.map(f => f.fieldKey)))} onClearAll={() => setSelectedChecklistFields(new Set())} />
+          <MetadataChecklist 
+            selectedFields={selectedChecklistFields} 
+            onToggle={(fieldKey) => setSelectedChecklistFields(prev => { 
+              const n = new Set(prev); 
+              n.has(fieldKey)? n.delete(fieldKey) : n.add(fieldKey); 
+              return n;
+            })} 
+            onSelectAll={() => setSelectedChecklistFields(new Set(COMBINED_FIELDS.map(f => f.fieldKey)))} 
+            onClearAll={() => setSelectedChecklistFields(new Set())}
+            values={checklistValues}
+            onValueChange={(fieldKey, value) => setChecklistValues(prev => ({ ...prev, [fieldKey]: value }))}
+          />
           <DialogFooter>
             <Button variant="ghost" onClick={() => setChecklistOpen(false)}>Cancel</Button>
             <Button onClick={() => {toast({ title: "Ingestion Confirmed", description: "Material saved successfully." }); setChecklistOpen(false);}} className="bg-emerald-600 hover:bg-emerald-700">Finalize</Button>
@@ -576,6 +640,79 @@ export default function AdminMaterials() {
         </DialogContent>
       </Dialog>
     </AdminLayout>
+  );
+}
+
+// ═══ Preview Component ══════════════════════════════════════════════════════
+function MediaPreview({ material }: { material: ArchivalMaterial }) {
+  const isOAIS = !!(material.sha256 || material.identifier);
+  
+  return (
+    <div className="bg-white rounded-2xl border border-border/60 overflow-hidden shadow-sm mb-8">
+      {/* Header bar */}
+      <div className="flex items-center justify-between px-5 py-3 border-b border-border/60 bg-muted/10">
+        <div className="flex items-center gap-2">
+          <span className="bg-[#0a1628] text-white text-[9px] font-bold px-2 py-0.5 rounded">OAIS AIP</span>
+          <span className="text-[10px] font-mono text-muted-foreground">{material.identifier || "AIP-PENDING"}</span>
+        </div>
+        {isOAIS && (
+          <div className="flex items-center gap-1.5 text-emerald-600 text-[10px] font-bold uppercase tracking-wider">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            Integrity Verified
+          </div>
+        )}
+      </div>
+
+      {/* Preview area */}
+      <div className="h-80 bg-[#f7f8fc] flex flex-col items-center justify-center relative group">
+        {material.thumbnailUrl ? (
+          <img src={material.thumbnailUrl} alt={material.title || "Preview"} className="max-h-full max-w-full object-contain p-4 transition-transform duration-500 group-hover:scale-[1.02]" />
+        ) : (
+          <div className="text-center p-8">
+            <div className="w-24 h-28 bg-white border-2 border-border/40 rounded-lg shadow-sm flex items-center justify-center mx-auto mb-4 relative overflow-hidden">
+              <FileText className="w-10 h-10 text-primary/20" />
+              <div className="absolute top-2 right-2 w-3 h-3 bg-red-500/10 rounded-sm" />
+              <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-primary/10" />
+            </div>
+            <p className="text-sm font-bold text-[#0a1628]">{material.title}</p>
+            <p className="text-[10px] text-muted-foreground mt-2 font-mono uppercase tracking-widest">{material.format || "DOCUMENT"}</p>
+            <div className="mt-6">
+               <Button variant="outline" size="sm" className="bg-white border-primary/20 text-primary h-8 px-4 text-[10px] font-bold uppercase tracking-widest">
+                 Upload Reference File
+               </Button>
+            </div>
+          </div>
+        )}
+        
+        {/* Floating Toolbar (only on hover) */}
+        {material.thumbnailUrl && (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-[#0a1628]/90 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 shadow-2xl opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0">
+            {[{ icon: ZoomIn, label: "Zoom In" }, { icon: ZoomOut, label: "Zoom Out" }, { icon: RotateCw, label: "Rotate" }, { icon: Maximize2, label: "Fullscreen" }].map(({ icon: Icon, label }, i) => (
+              <button key={i} title={label} className="w-8 h-8 rounded-full hover:bg-white/20 flex items-center justify-center text-white/80 hover:text-white transition-colors">
+                <Icon className="w-4 h-4" />
+              </button>
+            ))}
+            <div className="w-px h-4 bg-white/20 mx-1" />
+            <button title="Download" className="w-8 h-8 rounded-full hover:bg-white/20 flex items-center justify-center text-white/80 hover:text-white transition-colors">
+              <Download className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Footer info */}
+      <div className="border-t border-border/60 px-5 py-3 flex items-center justify-between bg-white text-[10px]">
+        <div className="flex items-center gap-4 text-muted-foreground font-semibold">
+           <span className="flex items-center gap-1.5"><ImageIcon className="w-3.5 h-3.5" /> {material.type || "Unknown"}</span>
+           <span className="flex items-center gap-1.5 uppercase tracking-widest"><FileDigit className="w-3.5 h-3.5" /> {material.extentAndMedium?.split(";")[1]?.trim() || "N/A"}</span>
+        </div>
+        <div className="flex items-center gap-2">
+           <Button variant="ghost" size="sm" className="h-7 px-3 text-[9px] font-bold text-primary hover:bg-primary/5 uppercase tracking-widest flex items-center gap-1">
+             <ExternalLink className="w-3 h-3" /> External Source
+           </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -676,12 +813,12 @@ function MaterialDetailView({ material, onBack }: { material: ArchivalMaterial, 
            </div>
         </div>
       </div>
+      
+      <MediaPreview material={material} />
 
       <div className="flex flex-wrap items-center gap-2 mb-8 text-[11px] text-muted-foreground bg-muted/20 px-4 py-3 rounded-lg border font-mono">
          <FolderTree className="w-3.5 h-3.5 text-primary shrink-0" />
-         <span className="shrink-0 font-sans">HCDC</span>
-         <ChevronRight className="w-3 h-3 text-border shrink-0" />
-         <span className="shrink-0 font-sans">Hierarchy Placement Here</span>
+         <span className="shrink-0 font-sans">{material.hierarchyPath || "HCDC"}</span>
       </div>
 
       {material.termsOfUse && (
@@ -694,9 +831,22 @@ function MaterialDetailView({ material, onBack }: { material: ArchivalMaterial, 
 
       {/* Full Metadata Card - Long Vertical List w/ Inline Editing */}
       <Card className="shadow-none border-border rounded-xl overflow-hidden">
-        <div className="p-4 border-b bg-muted/10 font-bold text-[#0a1628] flex items-center gap-2 text-sm tracking-wide justify-between">
-          <div className="flex items-center gap-2"><Layers className="w-5 h-5 text-primary" /> FULL METADATA ({allFields.filter(f => f.filled).length}/{allFields.length})</div>
-          {editingFieldCode && <Badge variant="outline" className="text-xs bg-white text-muted-foreground border-border/50">Edit Mode Active</Badge>}
+        <div className="p-4 border-b bg-muted/10 font-bold text-[#0a1628] flex items-center justify-between text-sm tracking-wide">
+          <div className="flex items-center gap-2">
+            <Layers className="w-5 h-5 text-primary" /> 
+            FULL METADATA ({allFields.filter(f => f.filled).length}/{allFields.length})
+          </div>
+          <div className="flex items-center gap-2">
+            {editingFieldCode && <Badge variant="outline" className="text-xs bg-white text-muted-foreground border-border/50">Edit Mode Active</Badge>}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-8 px-3 text-[10px] bg-white border-border/60 hover:bg-muted text-primary flex items-center gap-1.5 font-bold uppercase tracking-wider shadow-sm"
+              onClick={() => downloadMetadataExcel(material)}
+            >
+              <Download className="w-3.5 h-3.5" /> Export to Excel
+            </Button>
+          </div>
         </div>
         <div className="divide-y divide-border/50 bg-white">
            {allFields.map(({ field, value, filled }) => {

@@ -93,6 +93,7 @@ function mockAuthPlugin(): Plugin {
         }
       } catch (e) { console.error("MockAPI: Failed to load categories", e); }
 
+      // Vite will restart when this file is changed, loading the updated JSON files!!
       server.middlewares.use("/api/auth/register", (req, res) => {
         if (req.method !== "POST") { res.statusCode = 405; res.end(); return; }
         let body = ""; req.on("data", (c) => (body += c.toString()));

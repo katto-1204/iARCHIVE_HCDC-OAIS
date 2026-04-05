@@ -194,3 +194,148 @@ export function computeDashboardStats(materials: ArchivalMaterial[]) {
     avgCompletion,
   };
 }
+
+/** Download metadata as a clean and organized Excel file */
+export function downloadMetadataExcel(material: ArchivalMaterial) {
+  const ExcelJS = (window as any).ExcelJS;
+  const saveAs = (window as any).saveAs;
+  
+  if (!ExcelJS || !saveAs) {
+    // Fallback to simple CSV if script not loaded
+    return downloadMetadataCSV(material);
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Archival Metadata', {
+    views: [{ state: 'frozen', xSplit: 0, ySplit: 2, activePane: 'bottomLeft' }]
+  });
+
+  // 0. Column Definitions (Widths)
+  worksheet.columns = [
+    { header: 'FIELD CODE', key: 'code', width: 15 },
+    { header: 'FIELD NAME', key: 'name', width: 35 },
+    { header: 'STANDARD', key: 'standard', width: 15 },
+    { header: 'CONTENT', key: 'content', width: 90 }
+  ];
+
+  // 1. Title Banner (Row 1)
+  const titleRow = worksheet.getRow(1);
+  titleRow.height = 30;
+  worksheet.mergeCells('A1:D1');
+  titleRow.getCell(1).value = `iArchive Digital Archival Record | ${material.title}`;
+  titleRow.getCell(1).font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 12, name: 'Calibri' };
+  titleRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0A1628' } };
+  titleRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
+
+  // 2. Column Headers (Row 2) - overwrite headers added by columns def
+  const headerRow = worksheet.getRow(2);
+  headerRow.height = 20;
+  ['FIELD CODE', 'FIELD NAME', 'STANDARD', 'CONTENT'].forEach((h, i) => {
+    const cell = headerRow.getCell(i + 1);
+    cell.value = h;
+    cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 10, name: 'Calibri' };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4682B4' } }; // Steel Blue
+    cell.alignment = { vertical: 'middle', horizontal: h === 'CONTENT' ? 'left' : 'center' };
+  });
+
+  // 3. Organization Helper Functions
+  let currentRowIndex = 3;
+  const addDivider = (text: string) => {
+    const row = worksheet.getRow(currentRowIndex++);
+    worksheet.mergeCells(`A${row.number}:D${row.number}`);
+    const cell = row.getCell(1);
+    cell.value = text;
+    cell.font = { bold: true, size: 10, name: 'Calibri' };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFD700' } }; // Warm Gold
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    row.height = 22;
+  };
+
+  const addDataRow = (fieldDef: any, value: string, rowIndex: number) => {
+    const row = worksheet.getRow(currentRowIndex++);
+    const isEven = rowIndex % 2 === 0;
+    const bgColor = isEven ? 'FFF0F8FF' : 'FFFFFFFF'; // Soft Pale Blue vs White
+    
+    // Field Code (Col A)
+    const cellA = row.getCell(1);
+    cellA.value = fieldDef.code;
+    cellA.font = { bold: true, color: { argb: 'FF0A1628' }, name: 'Calibri', size: 10 };
+    cellA.alignment = { vertical: 'middle', horizontal: 'center' };
+    cellA.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+
+    // Field Name (Col B)
+    const cellB = row.getCell(2);
+    cellB.value = fieldDef.name;
+    cellB.font = { name: 'Calibri', size: 10 };
+    cellB.alignment = { vertical: 'middle' };
+    cellB.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+
+    // Standard (Col C)
+    const cellC = row.getCell(3);
+    cellC.value = fieldDef.standard === 'Both' ? 'Mixed' : fieldDef.standard === 'Dublin Core' ? 'DC' : fieldDef.standard;
+    cellC.font = { italic: true, color: { argb: 'FF5F9EA0' }, name: 'Calibri', size: 10 };
+    cellC.alignment = { vertical: 'middle', horizontal: 'center' };
+    cellC.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+
+    // Content (Col D)
+    const cellD = row.getCell(4);
+    cellD.value = value;
+    cellD.font = { name: 'Calibri', size: 10 };
+    cellD.alignment = { vertical: 'middle', wrapText: true };
+    cellD.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+  };
+
+  // 4. Populate ISAD(G) Section
+  addDivider('--- ISAD(G) ARCHIVAL DESCRIPTION STANDARDS ---');
+  let counter = 0;
+  COMBINED_FIELDS.filter(f => f.standard === "ISAD(G)" || f.standard === "Both").forEach(f => {
+    addDataRow(f, (material as any)[f.fieldKey] || "-", counter++);
+  });
+
+  // 5. Populate Dublin Core Section
+  addDivider('--- DUBLIN CORE METADATA STANDARDS ---');
+  counter = 0;
+  COMBINED_FIELDS.filter(f => f.standard === "Dublin Core").forEach(f => {
+    addDataRow(f, (material as any)[f.fieldKey] || "-", counter++);
+  });
+
+  // 6. Footer Layout
+  const footerRow = worksheet.getRow(currentRowIndex++);
+  worksheet.mergeCells(`A${footerRow.number}:D${footerRow.number}`);
+  const footerCell = footerRow.getCell(1);
+  footerCell.value = `© HOLY CROSS OF DAVAO COLLEGE ARCHIVES | GENERATED BY iARCHIVE SYSTEM ON ${new Date().toLocaleDateString()}`;
+  footerCell.font = { size: 9, bold: true, color: { argb: 'FF0A1628' }, italic: true, name: 'Calibri' };
+  footerCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFADD8E6' } }; // Light Blue
+  footerCell.alignment = { vertical: 'middle', horizontal: 'center' };
+  footerRow.height = 20;
+
+  // 7. Generate & Save
+  workbook.xlsx.writeBuffer().then((buffer: any) => {
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    saveAs(blob, `metadata_${material.uniqueId || "record"}.xlsx`);
+  });
+}
+
+/** Download metadata as a CSV file */
+export function downloadMetadataCSV(material: ArchivalMaterial) {
+  const headers = ["Field Code", "Field Name", "Standard", "Value"];
+  
+  const rows = COMBINED_FIELDS.map(f => {
+    const value = (material as any)[f.fieldKey] || "";
+    // Basic CSV escaping: quote values and escape existing quotes
+    const escapedValue = `"${String(value).replace(/"/g, '""')}"`;
+    return [f.code, f.name, f.standard, escapedValue].join(",");
+  });
+
+  const csvContent = [headers.join(","), ...rows].join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", `metadata_${material.uniqueId || material.id}.csv`);
+  link.style.visibility = "hidden";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
