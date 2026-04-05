@@ -1,9 +1,12 @@
 import * as React from "react";
-import { COMBINED_FIELDS, ISADG_AREAS, type MetadataFieldDef } from "@/data/sampleData";
-import { CheckCircle2, Circle } from "lucide-react";
+import { COMBINED_FIELDS } from "@/data/sampleData";
+import { CheckCircle2, FileText, X } from "lucide-react";
 import { Input } from "@/components/ui-components";
+import { cn } from "@/lib/utils";
 
 interface MetadataChecklistProps {
+  // `selectedFields` and related props are no longer strictly needed for toggling rows,
+  // but we keep the props signature to avoid breaking parent components.
   selectedFields: Set<string>;
   onToggle: (fieldKey: string) => void;
   onSelectAll: () => void;
@@ -14,136 +17,85 @@ interface MetadataChecklistProps {
 }
 
 export function MetadataChecklist({
-  selectedFields,
-  onToggle,
-  onSelectAll,
-  onClearAll,
   values = {},
   onValueChange,
   className = "",
 }: MetadataChecklistProps) {
-  // Group fields by area
-  const groupedFields = React.useMemo(() => {
-    const groups: Array<{
-      areaNumber: number;
-      areaName: string;
-      color: string;
-      fields: MetadataFieldDef[];
-    }> = [];
-
-    // ISAD(G) areas 1-7
-    for (const area of ISADG_AREAS) {
-      const fields = COMBINED_FIELDS.filter(f => f.area === area.number);
-      if (fields.length > 0) {
-        groups.push({
-          areaNumber: area.number,
-          areaName: area.name,
-          color: area.color,
-          fields,
-        });
-      }
-    }
-
-    // Dublin Core supplementary (area 0)
-    const dcOnly = COMBINED_FIELDS.filter(f => f.area === 0);
-    if (dcOnly.length > 0) {
-      groups.push({
-        areaNumber: 0,
-        areaName: "Dublin Core Supplement",
-        color: "#0EA5E9",
-        fields: dcOnly,
-      });
-    }
-
-    return groups;
-  }, []);
+  
+  const totalFields = COMBINED_FIELDS.length;
+  const filledFieldsCount = Object.values(values).filter(v => !!v).length;
 
   return (
-    <div className={`space-y-5 ${className}`}>
-      {/* Toolbar */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="text-sm text-muted-foreground">
-          <span className="font-bold text-foreground">{selectedFields.size}</span> of{" "}
-          <span className="font-bold text-foreground">{COMBINED_FIELDS.length}</span> fields selected
+    <div className={cn("w-full bg-[#fafbfc] rounded-2xl", className)}>
+      {/* ═══ FULL METADATA ONE COLUMN ═══ */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-6 h-6 bg-slate-100 rounded flex items-center justify-center">
+            <FileText className="w-4 h-4 text-[#0a1628]" />
+          </div>
+          <h3 className="text-sm font-black uppercase tracking-widest text-[#0a1628]">
+            FULL METADATA ({filledFieldsCount}/{totalFields} FIELDS)
+          </h3>
         </div>
-        <div className="flex gap-2">
-          <button
-            className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
-            onClick={onSelectAll}
-          >
-            Select All
-          </button>
-          <span className="text-muted-foreground/30">·</span>
-          <button
-            className="text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
-            onClick={onClearAll}
-          >
-            Clear All
-          </button>
+
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+          <div className="overflow-x-auto custom-scrollbar">
+            <div className="min-w-[600px]">
+              {/* Table Header */}
+              <div className="grid grid-cols-[80px_1.2fr_90px_2fr_60px] gap-4 px-6 py-3 border-b bg-slate-50 text-[11px] font-black uppercase tracking-widest text-slate-500">
+                <span>Code</span>
+                <span>Field</span>
+                <span className="text-center">Standard</span>
+                <span>Value</span>
+                <span className="text-center">Status</span>
+              </div>
+              
+              {/* Table Body (No Scrollbar, fit content) */}
+              <div className="divide-y divide-slate-100">
+                {COMBINED_FIELDS.map(field => {
+                  const val = values[field.fieldKey] || "";
+                  return (
+                    <div 
+                      key={field.code} 
+                      className="grid grid-cols-[80px_1.2fr_90px_2fr_60px] gap-4 px-6 py-3 items-center transition-colors hover:bg-slate-50"
+                    >
+                      <span className="text-xs font-mono font-bold text-slate-400">{field.code}</span>
+                      
+                      <span className="text-sm font-bold text-[#0a1628] leading-tight flex items-center gap-1">
+                        {field.name} {field.isEssential && <span className="text-red-500">*</span>}
+                      </span>
+                      
+                      <div className="flex justify-center">
+                        <span className="text-[10px] font-bold text-blue-600/60 bg-blue-50 px-2 py-0.5 rounded-full uppercase tracking-tighter italic whitespace-nowrap">
+                           {field.standard === "Both" ? "ISAD/DC" : field.standard}
+                        </span>
+                      </div>
+                      
+                      {/* EDITABLE VALUE */}
+                      <div className="pr-4">
+                         <Input 
+                          className="h-9 text-sm bg-transparent border-transparent hover:border-slate-200 focus:bg-white focus:border-blue-500 transition-all font-medium text-slate-700 w-full" 
+                          value={val} 
+                          onChange={(e) => onValueChange?.(field.fieldKey, e.target.value)} 
+                          placeholder="Enter value..." 
+                         />
+                      </div>
+                      
+                      <div className="flex justify-center">
+                        {val ? (
+                           <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                        ) : (
+                           <X className="w-5 h-5 text-slate-300" />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-
-      {/* Grouped checkboxes */}
-      {groupedFields.map(group => (
-        <div key={group.areaNumber} className="border border-border/60 rounded-xl overflow-hidden shadow-sm bg-white">
-          <div
-            className="px-4 py-2.5 flex items-center gap-2 border-b"
-            style={{ backgroundColor: group.color + "08", borderColor: group.color + "20" }}
-          >
-            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: group.color }} />
-            <h4 className="text-[10px] font-bold uppercase tracking-wider" style={{ color: group.color }}>
-              {group.areaNumber > 0 ? `Area ${group.areaNumber}: ` : ""}{group.areaName}
-            </h4>
-            <span className="text-[10px] text-muted-foreground ml-auto font-mono">
-              {group.fields.filter(f => selectedFields.has(f.fieldKey)).length}/{group.fields.length}
-            </span>
-          </div>
-          <div className="divide-y divide-border/30">
-            {group.fields.map(field => {
-              const isSelected = selectedFields.has(field.fieldKey);
-              return (
-                <div key={field.code} className={`flex flex-col transition-all duration-200 ${isSelected ? "bg-primary/5 shadow-inner" : ""}`}>
-                  <button
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/30 transition-colors`}
-                    onClick={() => onToggle(field.fieldKey)}
-                  >
-                    {isSelected ? (
-                      <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
-                    ) : (
-                      <Circle className="w-4 h-4 text-muted-foreground/40 shrink-0" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <span className={`text-[13px] ${isSelected ? "font-bold text-foreground" : "text-foreground/70"}`}>
-                        {field.name}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="text-[9px] font-mono text-muted-foreground/60 bg-muted/60 px-1.5 py-0.5 rounded">
-                        {field.code}
-                      </span>
-                      {field.isEssential && (
-                        <span className="text-[8px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded-full border border-red-100">REQUIRED</span>
-                      )}
-                    </div>
-                  </button>
-                  
-                  {/* Inline Input when selected */}
-                  {isSelected && (
-                    <div className="px-11 pb-3 pr-4 animate-in slide-in-from-top-1 duration-200">
-                      <Input 
-                        placeholder={`Enter ${field.name}...`}
-                        className="h-9 text-xs bg-white border-primary/20 focus-visible:ring-primary/5"
-                        value={values[field.fieldKey] || ""}
-                        onChange={(e) => onValueChange?.(field.fieldKey, e.target.value)}
-                      />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ))}
     </div>
   );
 }

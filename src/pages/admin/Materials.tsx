@@ -18,6 +18,9 @@ import {
   SAMPLE_MATERIALS, SAMPLE_HIERARCHY, COMBINED_FIELDS, LEVEL_LABELS,
   type ArchivalMaterial
 } from "@/data/sampleData";
+import { 
+  getMaterials, saveMaterial, deleteMaterial, addActivity 
+} from "@/data/storage";
 
 declare global {
   interface Window {
@@ -39,10 +42,23 @@ type ViewMode = "table" | "detail";
 export default function AdminMaterials() {
   const [search, setSearch] = React.useState("");
   const [selectedHierarchyItem, setSelectedHierarchyItem] = React.useState<string | null>(null);
-  const [viewMode, setViewMode] = React.useState<ViewMode>("table");
+  const [materials, setMaterials] = React.useState<ArchivalMaterial[]>([]);
 
-  // Material detail
+  // Pagination
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const itemsPerPage = 8;
+
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [search, selectedHierarchyItem]);
+
+  React.useEffect(() => {
+    setMaterials(getMaterials());
+  }, []);
+
+  // Material detail expansion
   const [selectedMaterial, setSelectedMaterial] = React.useState<ArchivalMaterial | null>(null);
+  const [editingMaterialId, setEditingMaterialId] = React.useState<string | null>(null);
 
   // Upload dialog state
   const [uploadOpen, setUploadOpen] = React.useState(false);
@@ -168,16 +184,33 @@ export default function AdminMaterials() {
       }
 
       if (extractedText) {
+        // Normalize any kind of whitespace sequence (including newlines) into a single space
+        const cleanText = extractedText.replace(/\s+/g, ' '); 
         const previewSnippet = extractedText.substring(0, 150).trim();
         
+        // Accurate pattern boundary extractor
+        const extractField = (fieldName: string, alternateNames: string[] = []) => {
+           const labels = [fieldName, ...alternateNames].map(l => l.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')).join("|");
+           const nextLabels = [
+             "Reference Code", "Unique ID", "Title", "Creator", "Author", "Date", 
+             "Level of Description", "Extent and Medium", "Fonds", "Sub-fonds", "Series",
+             "Reference", "Access", "Conditions"
+           ].join("|");
+           
+           const regex = new RegExp(`(?:^|\\s)(?:${labels})\\s*:?\\s*(.*?)(?=\\s*(?:(?:${nextLabels})\\s*:?\\s*)|$)`, "i");
+           const match = cleanText.match(regex);
+           return match ? match[1].trim() : "";
+        };
+        
         // Scan for Unique Identifier pattern e.g. 26iA010000001
-        const idMatch = extractedText.match(/(2\d)iA(\d{2})(\d{7})/);
-        // Regex field matchers
-        const titleMatch = extractedText.match(/Title:\s*(.+)/i);
-        const creatorMatch = extractedText.match(/Creator:\s*(.+)/i) || extractedText.match(/Author:\s*(.+)/i);
-        const fondsMatch = extractedText.match(/Fonds:\s*(.+)/i);
-        const subfondsMatch = extractedText.match(/Sub-fonds:\s*(.+)/i);
-        const seriesMatch = extractedText.match(/Series:\s*(.+)/i);
+        const idMatch = cleanText.match(/(2\d)iA(\d{2})(\d{7})/i);
+        
+        // Better Regex field matchers using boundary extraction
+        const parsedTitle = extractField("Title");
+        const parsedCreator = extractField("Creator", ["Author"]);
+        const parsedFonds = extractField("Fonds");
+        const parsedSubfonds = extractField("Sub-fonds", ["Subfonds", "Sub fonds"]);
+        const parsedSeries = extractField("Series");
         
         setUploadForm((prev: any) => {
           // Map extracted hierarchy names to their respective IDs natively locally in state
@@ -186,16 +219,16 @@ export default function AdminMaterials() {
           let sName = prev.subfonds;
           let serName = prev.series;
           
-          if (fondsMatch && fondsList) {
-             const foundF = fondsList.find((f: any) => f.name.toLowerCase().includes(fondsMatch[1].trim().toLowerCase()));
+          if (parsedFonds && fondsList) {
+             const foundF = fondsList.find((f: any) => f.name.toLowerCase().includes(parsedFonds.toLowerCase()));
              if (foundF) {
                fName = foundF.name;
-               if (subfondsMatch && foundF.children) {
-                 const foundS = foundF.children.find((s: any) => s.name.toLowerCase().includes(subfondsMatch[1].trim().toLowerCase()));
+               if (parsedSubfonds && foundF.children) {
+                 const foundS = foundF.children.find((s: any) => s.name.toLowerCase().includes(parsedSubfonds.toLowerCase()));
                  if (foundS) {
                    sName = foundS.name;
-                   if (seriesMatch && foundS.children) {
-                      const foundSer = foundS.children.find((ser: any) => ser.name.toLowerCase().includes(seriesMatch[1].trim().toLowerCase()));
+                   if (parsedSeries && foundS.children) {
+                      const foundSer = foundS.children.find((ser: any) => ser.name.toLowerCase().includes(parsedSeries.toLowerCase()));
                       if (foundSer) serName = foundSer.name;
                    }
                  }
@@ -209,8 +242,8 @@ export default function AdminMaterials() {
             year: idMatch ? idMatch[1] : prev.year,
             catNo: idMatch ? idMatch[2] : prev.catNo,
             matNo: idMatch ? idMatch[3] : prev.matNo,
-            title: titleMatch ? titleMatch[1].trim() : prev.title,
-            creator: creatorMatch ? creatorMatch[1].trim() : prev.creator,
+            title: parsedTitle || prev.title,
+            creator: parsedCreator || prev.creator,
             fonds: fName,
             subfonds: sName,
             series: serName
@@ -220,8 +253,8 @@ export default function AdminMaterials() {
         // Also populate checklist values for known fields
         setChecklistValues(prev => ({
           ...prev,
-          title: titleMatch ? titleMatch[1].trim() : prev.title,
-          creator: creatorMatch ? creatorMatch[1].trim() : prev.creator,
+          title: parsedTitle || prev.title,
+          creator: parsedCreator || prev.creator,
           description: previewSnippet,
           referenceCode: idMatch ? idMatch[0] : "",
         }));
@@ -234,7 +267,7 @@ export default function AdminMaterials() {
   };
 
   const filteredMaterials = React.useMemo(() => {
-    let result = [...SAMPLE_MATERIALS];
+    let result = [...materials];
     if (search) {
       const s = search.toLowerCase();
       result = result.filter(m =>
@@ -242,15 +275,16 @@ export default function AdminMaterials() {
       );
     }
     if (selectedHierarchyItem) {
-      result = result.filter(m => m.uniqueId === selectedHierarchyItem);
+      result = result.filter(m => m.hierarchyPath?.includes(selectedHierarchyItem) || m.uniqueId === selectedHierarchyItem);
     }
     return result;
-  }, [search, selectedHierarchyItem]);
+  }, [materials, search, selectedHierarchyItem]);
 
-  const openMaterialDetail = (mat: ArchivalMaterial) => {
-    setSelectedMaterial(mat);
-    setViewMode("detail");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  const totalPages = Math.ceil(filteredMaterials.length / itemsPerPage);
+  const paginatedMaterials = filteredMaterials.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const toggleMaterialDetail = (mat: ArchivalMaterial) => {
+    setSelectedMaterial(prev => prev?.uniqueId === mat.uniqueId ? null : mat);
   };
 
   const submitIngest = () => {
@@ -268,17 +302,49 @@ export default function AdminMaterials() {
       return;
     }
     
-    setValidationErrors([]);
-    // Pre-seed the checklist
-    const initialChecklist = new Set<string>();
-    initialChecklist.add("title"); initialChecklist.add("referenceCode");
-    initialChecklist.add("date"); initialChecklist.add("levelOfDescription");
-    initialChecklist.add("creator");
-    setSelectedChecklistFields(initialChecklist);
-
     toast({ title: "Material Ready", description: `Opening checklist...` });
     setUploadOpen(false);
     setChecklistOpen(true);
+  };
+
+  const handleDeleteMaterial = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirm("Are you sure you want to delete this material? This action cannot be undone.")) {
+      const updated = deleteMaterial(id);
+      setMaterials(updated);
+      addActivity({
+        user: "Admin",
+        actionType: "delete",
+        description: `Deleted material: ${id}`
+      });
+      toast({ title: "Deleted", description: "Material removed from repository." });
+    }
+  };
+
+  const handleEditMaterial = (mat: ArchivalMaterial, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setUploadForm({
+      title: mat.title || "",
+      creator: mat.creator || "",
+      dateOfDescription: mat.dateOfDescription || "",
+      format: mat.format || "",
+      description: mat.description || "",
+      levelOfDescription: mat.levelOfDescription || "Item",
+      extentAndMedium: mat.extentAndMedium || "",
+      access: mat.access as any,
+      videoUrl: mat.fileUrl || "",
+      hierarchyPath: mat.hierarchyPath || "",
+      termsOfUse: mat.termsOfUse || "",
+      referenceCode: mat.referenceCode || "",
+      year: mat.uniqueId?.substring(0, 2) || "26",
+      catNo: mat.uniqueId?.substring(4, 6) || "01",
+      matNo: mat.uniqueId?.substring(6) || "0000001",
+      fonds: mat.hierarchyPath?.split(" > ")[1] || "",
+      subfonds: mat.hierarchyPath?.split(" > ")[2] || "",
+      series: mat.hierarchyPath?.split(" > ")[3] || ""
+    });
+    setChecklistValues(mat as any);
+    setUploadOpen(true);
   };
 
   // Hierarchy Helpers
@@ -302,6 +368,15 @@ export default function AdminMaterials() {
               setFileDetails(null);
               setNeedsManualInput(true);
               setValidationErrors([]);
+              setEditingMaterialId(null);
+              setUploadForm({
+                title: "", creator: "", dateOfDescription: "", format: "", description: "",
+                levelOfDescription: "Item", extentAndMedium: "", access: "public",
+                videoUrl: "", hierarchyPath: "", termsOfUse: "", referenceCode: "",
+                year: "26", catNo: "01", matNo: "0000001",
+                fonds: "", subfonds: "", series: ""
+              });
+              setChecklistValues({});
               setUploadOpen(true);
            }}>
               <Plus className="w-4 h-4 text-white" /> Ingest Material
@@ -321,56 +396,55 @@ export default function AdminMaterials() {
             <CardContent className="p-2 max-h-[700px] overflow-y-auto custom-scrollbar">
               <ArchivalTree node={SAMPLE_HIERARCHY} selectedId={selectedHierarchyItem} onSelectItem={(id) => {
                 setSelectedHierarchyItem(prev => prev === id ? null : id);
-                if (viewMode === "detail") setViewMode("table");
+                setSelectedMaterial(null);
               }} />
             </CardContent>
           </Card>
         </div>
 
-        {/* ═══ Right: Materials List OR Detailed List View ═══ */}
+        {/* ═══ Right: Materials List & Inline Details ═══ */}
         <div className="lg:col-span-3">
-          {viewMode === "detail" && selectedMaterial ? (
-             <MaterialDetailView material={selectedMaterial} onBack={() => { setViewMode("table"); setSelectedMaterial(null); }} />
-          ) : (
-            <Card className="shadow-sm border-border/50 bg-white">
-              <div className="p-4 border-b flex flex-col items-center gap-4 bg-muted/5 border-dashed border-2 rounded-t-xl text-center cursor-pointer m-4 py-8 hover:bg-muted/10 transition-colors" onClick={() => {
-                  setProcessingState("idle"); setFileDetails(null); setNeedsManualInput(true); setValidationErrors([]); setUploadOpen(true);
-              }}>
-                 <Upload className="w-8 h-8 text-muted-foreground opacity-40 mb-2" />
-                 <div className="text-sm font-semibold text-primary/80">Ingest New Accession</div>
-                 <div className="text-xs text-muted-foreground">Drop media and metadata files here</div>
-              </div>
+          <Card className="shadow-sm border-border/50 bg-white">
+            <div className="p-4 border-b flex flex-col items-center gap-4 bg-muted/5 border-dashed border-2 rounded-t-xl text-center cursor-pointer m-4 py-8 hover:bg-muted/10 transition-colors" onClick={() => {
+                setProcessingState("idle"); setFileDetails(null); setNeedsManualInput(true); setValidationErrors([]); setUploadOpen(true);
+            }}>
+               <Upload className="w-8 h-8 text-muted-foreground opacity-40 mb-2" />
+               <div className="text-sm font-semibold text-primary/80">Ingest New Accession</div>
+               <div className="text-xs text-muted-foreground">Drop media and metadata files here</div>
+            </div>
 
-              <div className="p-4 border-b flex flex-col sm:flex-row gap-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                  <Input className="pl-9 bg-muted/50" placeholder="Search item title or ID..." value={search} onChange={(e) => setSearch(e.target.value)} />
-                </div>
-                <div className="text-sm text-muted-foreground flex items-center gap-2 shrink-0">
-                  <Layers className="w-4 h-4" /> {filteredMaterials.length} items
-                </div>
+            <div className="p-4 border-b flex flex-col sm:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input className="pl-9 bg-muted/50" placeholder="Search item title or ID..." value={search} onChange={(e) => setSearch(e.target.value)} />
               </div>
+              <div className="text-sm text-muted-foreground flex items-center gap-2 shrink-0">
+                <Layers className="w-4 h-4" /> {filteredMaterials.length} items
+              </div>
+            </div>
 
-              <div className="overflow-x-auto">
-                <div className="min-w-[800px] divide-y divide-border/40 pb-6">
-                  <div className="grid grid-cols-[120px_60px_1fr_100px_70px_80px_60px] gap-2 px-4 py-2.5 bg-muted/30 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                    <span>Unique ID</span><span>Barcode</span><span>Title</span><span>Progress</span><span className="text-right">%</span><span className="text-center">Status</span><span></span>
+            <div className="overflow-x-auto">
+              <div className="min-w-[800px] divide-y divide-border/40">
+                <div className="grid grid-cols-[120px_60px_1fr_100px_70px_80px_60px] gap-2 px-4 py-2.5 bg-muted/30 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                  <span>Unique ID</span><span>Barcode</span><span>Title</span><span>Progress</span><span className="text-right">%</span><span className="text-center">Status</span><span></span>
+                </div>
+
+                {filteredMaterials.length === 0 ? (
+                  <div className="py-16 text-center text-muted-foreground">
+                    <FileText className="w-10 h-10 mx-auto mb-3 opacity-20" />
+                    <p className="font-semibold">No materials found.</p>
+                    <p className="text-sm mt-1">Try adjusting your search or hierarchy selection.</p>
                   </div>
+                ) : (
+                  paginatedMaterials.map(mat => {
+                    const pct = computeCompletion(mat);
+                    const color = getCompletionColor(pct);
+                    const isOAIS = checkOAISCompliance(mat);
+                    const isExpanded = selectedMaterial?.uniqueId === mat.uniqueId;
 
-                  {filteredMaterials.length === 0 ? (
-                    <div className="py-16 text-center text-muted-foreground">
-                      <FileText className="w-10 h-10 mx-auto mb-3 opacity-20" />
-                      <p className="font-semibold">No materials found.</p>
-                      <p className="text-sm mt-1">Try adjusting your search or hierarchy selection.</p>
-                    </div>
-                  ) : (
-                    filteredMaterials.map(mat => {
-                      const pct = computeCompletion(mat);
-                      const color = getCompletionColor(pct);
-                      const isOAIS = checkOAISCompliance(mat);
-
-                      return (
-                        <div key={mat.uniqueId} className="grid grid-cols-[120px_60px_1fr_100px_70px_80px_60px] gap-2 px-4 py-3 items-center hover:bg-muted/10 transition-colors group cursor-pointer" onClick={() => openMaterialDetail(mat)}>
+                    return (
+                      <React.Fragment key={mat.uniqueId}>
+                        <div className={cn("grid grid-cols-[120px_60px_1fr_100px_70px_80px_60px] gap-2 px-4 py-3 items-center hover:bg-muted/10 transition-colors group cursor-pointer", isExpanded && "bg-muted/5")} onClick={() => toggleMaterialDetail(mat)}>
                           <div className="flex items-center gap-1.5">
                             <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
                             <span className="font-mono text-[11px] font-bold text-[#0a1628]">{mat.uniqueId}</span>
@@ -397,18 +471,74 @@ export default function AdminMaterials() {
                             <Badge variant={pct >= 100 ? "success" : pct >= 50 ? "accent" : "default"} className="text-[9px] capitalize">{pct >= 100 ? "Complete" : pct >= 50 ? "Partial" : "Incomplete"}</Badge>
                           </div>
                           <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={(e) => handleEditMaterial(mat, e)}>
+                              <Edit className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-red-600" onClick={(e) => handleDeleteMaterial(mat.id, e)}>
+                              <X className="w-3.5 h-3.5" />
+                            </Button>
                             <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary">
                               <ExternalLink className="w-3.5 h-3.5" />
                             </Button>
                           </div>
                         </div>
-                      );
-                    })
-                  )}
+
+                        {/* EXPANDED ACCORDION VIEW */}
+                        {isExpanded && (
+                          <div className="col-span-full border-b bg-white animate-in slide-in-from-top-1 px-4 py-8 relative">
+                             <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: color }} />
+                             
+                             <div className="flex items-center justify-between mb-8">
+                               <div>
+                                 <h2 className="text-2xl font-bold text-[#0a1628] leading-tight pr-4">{mat.title}</h2>
+                                 <div className="flex items-center gap-2 mt-2">
+                                     <span className="font-mono text-xs font-bold text-muted-foreground">{mat.uniqueId}</span>
+                                     <Badge variant="outline" className="text-[9px] bg-emerald-50 text-emerald-700 border-emerald-200 uppercase font-bold px-1.5 py-0.5">Item Level Record</Badge>
+                                 </div>
+                               </div>
+                               <Button variant="outline" size="sm" onClick={() => downloadMetadataExcel(mat)} className="h-8 shadow-sm">
+                                  <Download className="w-3.5 h-3.5 mr-2" /> Export Metadata
+                               </Button>
+                             </div>
+                             
+                             {/* Re-use MetadataChecklist layout directly! */}
+                             <MetadataChecklist 
+                                values={mat as any}
+                                selectedFields={new Set()}
+                                onToggle={() => {}}
+                                onSelectAll={() => {}}
+                                onClearAll={() => {}}
+                                onValueChange={(fieldKey, value) => {
+                                  // Inline edit propagation for CRUD saving
+                                  const updatedMat = { ...mat, [fieldKey]: value };
+                                  saveMaterial(updatedMat as any);
+                                  setMaterials(prev => prev.map(m => m.id === mat.id ? (updatedMat as any) : m));
+                                }}
+                                className="shadow-none border border-border/60"
+                             />
+                          </div>
+                        )}
+                      </React.Fragment>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between p-4 border-t border-border/40 bg-muted/5">
+                <span className="text-xs text-muted-foreground font-medium">
+                   Showing {(currentPage - 1) * itemsPerPage + 1} to Math.min(currentPage * itemsPerPage, filteredMaterials.length) of {filteredMaterials.length} materials
+                </span>
+                <div className="flex gap-1.5">
+                   <Button variant="outline" size="sm" className="h-8" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>Previous</Button>
+                   <div className="flex items-center px-3 text-xs font-bold text-[#0a1628]">{currentPage} / {totalPages}</div>
+                   <Button variant="outline" size="sm" className="h-8" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)}>Next</Button>
                 </div>
               </div>
-            </Card>
-          )}
+            )}
+          </Card>
         </div>
       </div>
 
@@ -635,7 +765,39 @@ export default function AdminMaterials() {
           />
           <DialogFooter>
             <Button variant="ghost" onClick={() => setChecklistOpen(false)}>Cancel</Button>
-            <Button onClick={() => {toast({ title: "Ingestion Confirmed", description: "Material saved successfully." }); setChecklistOpen(false);}} className="bg-emerald-600 hover:bg-emerald-700">Finalize</Button>
+            <Button onClick={() => {
+              const hierarchyPath = `HCDC > ${uploadForm.fonds}${uploadForm.subfonds ? ' > ' + uploadForm.subfonds : ''}${uploadForm.series ? ' > ' + uploadForm.series : ''}`;
+              const newMaterial: ArchivalMaterial = {
+                 ...selectedMaterial, // if editing
+                 id: editingMaterialId || crypto.randomUUID(),
+                 uniqueId: generatedRefCode,
+                 createdAt: selectedMaterial?.createdAt || new Date().toISOString(),
+                 updatedAt: new Date().toISOString(),
+                 createdBy: selectedMaterial?.createdBy || "Admin",
+                 ...uploadForm,
+                 ...checklistValues,
+                 hierarchyPath,
+                 access: uploadForm.access,
+                 title: uploadForm.title,
+                 creator: uploadForm.creator,
+              } as ArchivalMaterial;
+
+              const updated = saveMaterial(newMaterial);
+              setMaterials(updated);
+              
+              addActivity({
+                user: "Admin",
+                actionType: editingMaterialId ? "edit" : "upload",
+                description: `${editingMaterialId ? 'Updated' : 'Ingested'} material: ${newMaterial.title}`,
+                materialId: newMaterial.uniqueId
+              });
+
+              toast({ title: editingMaterialId ? "Updated" : "Ingestion Confirmed", description: "Material saved successfully." }); 
+              setChecklistOpen(false);
+              setEditingMaterialId(null);
+            }} className="bg-emerald-600 hover:bg-emerald-700">
+              {editingMaterialId ? "Update Item" : "Finalize Ingest"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

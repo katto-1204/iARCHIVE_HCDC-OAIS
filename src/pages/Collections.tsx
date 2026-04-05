@@ -1,8 +1,9 @@
 import * as React from "react";
 import { Link } from "wouter";
 import { Search, SlidersHorizontal, Lock, Unlock, ShieldAlert, FileText, Database, X, ChevronRight, ArrowRight, User, CheckCircle } from "lucide-react";
-import { useGetMaterials, useGetCategories, useGetMe } from "@workspace/api-client-react";
+import { useGetCategories, useGetMe } from "@workspace/api-client-react";
 import { checkOAISCompliance } from "@/data/metadataUtils";
+import { getMaterials } from "@/data/storage";
 // Remove getCategoryName if not needed, or just remove the sampleData import totally.
 
 const ACCESS_COLORS = {
@@ -36,7 +37,14 @@ export default function Collections() {
   }, [search]);
 
   const { data: categories } = useGetCategories();
-  const { data, isLoading } = useGetMaterials({ search: debouncedSearch, category, access: access as any, limit: 24 });
+  const [localMaterials, setLocalMaterials] = React.useState<any[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    setLocalMaterials(getMaterials());
+    setIsLoading(false);
+  }, []);
+
   const { data: user } = useGetMe();
   
   const [showOaisOnly, setShowOaisOnly] = React.useState(false);
@@ -53,8 +61,13 @@ export default function Collections() {
     showOaisOnly && { key: "oais", label: "OAIS Compliant Only", clear: () => setShowOaisOnly(false) },
   ].filter(Boolean) as { key: string; label: string; clear: () => void }[];
 
-  const displayMaterials = (data?.materials || []).filter((mat: any) => {
+  const displayMaterials = localMaterials.filter((mat: any) => {
     if (showOaisOnly && !checkOAISCompliance(mat)) return false;
+    if (access && mat.access !== access) return false;
+    if (debouncedSearch) {
+      const s = debouncedSearch.toLowerCase();
+      return mat.title?.toLowerCase().includes(s) || mat.uniqueId?.toLowerCase().includes(s) || mat.creator?.toLowerCase().includes(s);
+    }
     return true;
   });
 
@@ -213,7 +226,7 @@ export default function Collections() {
           </p>
           {displayMaterials?.length > 0 && (
             <p className="text-xs text-muted-foreground">
-              Showing {displayMaterials.length} of {data?.total || displayMaterials.length}
+              Showing {displayMaterials.length} archival materials
             </p>
           )}
         </div>

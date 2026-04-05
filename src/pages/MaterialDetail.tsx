@@ -6,7 +6,8 @@ import {
   ZoomIn, ZoomOut, RotateCcw, Maximize2, ExternalLink,
   Database, HardDrive, Calendar, User, Tag, BookOpen, AlertTriangle, Edit
 } from "lucide-react";
-import { useGetMaterial, useGetMe, useGetAccessRequests } from "@workspace/api-client-react";
+import { useGetMe, useGetAccessRequests } from "@workspace/api-client-react";
+import { getMaterialById } from "@/data/storage";
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   if (!value) return null;
@@ -34,7 +35,16 @@ function IsadSection({ num, title, children }: { num: number; title: string; chi
 
 export default function MaterialDetail() {
   const [, params] = useRoute("/materials/:id");
-  const { data: material, isLoading } = useGetMaterial(params?.id || "");
+  const [material, setMaterial] = React.useState<any>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    if (params?.id) {
+      setMaterial(getMaterialById(params.id));
+    }
+    setIsLoading(false);
+  }, [params?.id]);
+
   const { data: user } = useGetMe();
   const { data: requests } = useGetAccessRequests({ status: "approved" });
   const [activeTab, setActiveTab] = React.useState<"details" | "dc" | "related">("details");
@@ -79,7 +89,7 @@ export default function MaterialDetail() {
     public: { label: "PUBLIC", className: "bg-[#4169E1]/10 text-[#4169E1] border border-[#4169E1]/20" },
     restricted: { label: "RESTRICTED", className: "bg-amber-50 text-amber-700 border border-amber-200" },
     confidential: { label: "CONFIDENTIAL", className: "bg-[#960000]/10 text-[#960000] border border-[#960000]/20" },
-  }[material.access] ?? { label: material.access.toUpperCase(), className: "bg-muted text-muted-foreground border border-border" };
+  }[material.access as "public" | "restricted" | "confidential"] ?? { label: material.access?.toUpperCase() || "", className: "bg-muted text-muted-foreground border border-border" };
 
   const fixityVerified = material.fixityStatus === "verified" || material.sha256;
   const canDownload = material.access === "public" || user?.role === "admin" || user?.role === "archivist" || isApproved;
@@ -208,7 +218,7 @@ export default function MaterialDetail() {
               <div className="bg-white rounded-2xl border border-border/60 shadow-sm p-6">
                 <h3 className="text-base font-bold text-foreground mb-4">Related Items</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {material.relatedItems.map((rel) => (
+                  {material.relatedItems.map((rel: any) => (
                     <Link key={rel.id} href={`/materials/${rel.id}`}>
                       <div className="flex items-center gap-3 p-4 border border-border/60 rounded-xl hover:border-[#4169E1]/30 hover:bg-[#4169E1]/5 transition-all cursor-pointer group">
                         <div className="w-9 h-9 bg-muted rounded-lg flex items-center justify-center shrink-0">
@@ -354,7 +364,7 @@ export default function MaterialDetail() {
                       <p className="text-sm text-muted-foreground">No related items found.</p>
                     </div>
                   ) : (
-                    material.relatedItems?.map((rel) => (
+                    material.relatedItems?.map((rel: any) => (
                       <Link key={rel.id} href={`/materials/${rel.id}`}>
                         <div className="flex items-center gap-3 p-3.5 border border-border/60 rounded-xl hover:border-[#4169E1]/40 hover:bg-[#4169E1]/5 transition-all cursor-pointer group">
                           <div className="w-9 h-9 bg-muted rounded-lg flex items-center justify-center shrink-0">
