@@ -7,7 +7,7 @@ const STORAGE_KEYS = {
 };
 
 // Bump this whenever sample data structure changes
-const STORAGE_VERSION = "2";
+const STORAGE_VERSION = "3";
 
 /** Initialize storage if empty or outdated */
 export function initializeStorage() {
@@ -25,6 +25,26 @@ export function initializeStorage() {
 /** Read All Materials */
 export function getMaterials(): ArchivalMaterial[] {
   if (typeof window === "undefined") return SAMPLE_MATERIALS;
+  
+  const currentVersion = localStorage.getItem(STORAGE_KEYS.VERSION);
+  if (currentVersion !== STORAGE_VERSION) {
+    // Preserve any custom user-added materials (id not in SAMPLE_MATERIALS)
+    const oldStored = localStorage.getItem(STORAGE_KEYS.MATERIALS);
+    let userAdded: ArchivalMaterial[] = [];
+    if (oldStored) {
+        try {
+            const oldMaterials = JSON.parse(oldStored) as ArchivalMaterial[];
+            userAdded = oldMaterials.filter(m => !SAMPLE_MATERIALS.some(s => s.id === m.id));
+        } catch(e) {}
+    }
+    
+    // Merge updated sample materials with user added materials
+    const merged = [...SAMPLE_MATERIALS, ...userAdded];
+    localStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify(merged));
+    localStorage.setItem(STORAGE_KEYS.VERSION, STORAGE_VERSION);
+    return merged;
+  }
+  
   const stored = localStorage.getItem(STORAGE_KEYS.MATERIALS);
   if (!stored) {
     initializeStorage();

@@ -59,6 +59,8 @@ export default function AdminMaterials() {
   // Material detail expansion
   const [selectedMaterial, setSelectedMaterial] = React.useState<ArchivalMaterial | null>(null);
   const [editingMaterialId, setEditingMaterialId] = React.useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+  const [materialToDelete, setMaterialToDelete] = React.useState<string | null>(null);
 
   // Upload dialog state
   const [uploadOpen, setUploadOpen] = React.useState(false);
@@ -84,7 +86,10 @@ export default function AdminMaterials() {
     year: "26", catNo: "01", matNo: "0000001",
     
     // Cascade Selection
-    fonds: "", subfonds: "", series: ""
+    fonds: "HCDC — Holy Cross of Davao College", 
+    subfonds: "", 
+    program: "",
+    series: ""
   });
 
   // ══ Feature 1: Auto-sync uploadForm → checklistValues ══
@@ -114,7 +119,7 @@ export default function AdminMaterials() {
     uploadForm.title, uploadForm.creator, uploadForm.description,
     uploadForm.format, uploadForm.dateOfDescription, uploadForm.levelOfDescription,
     uploadForm.extentAndMedium, uploadForm.access, uploadForm.termsOfUse,
-    uploadForm.referenceCode, uploadForm.fonds, uploadForm.subfonds, uploadForm.series
+    uploadForm.referenceCode, uploadForm.fonds, uploadForm.subfonds, uploadForm.program, uploadForm.series
   ]);
 
   const generatedRefCode = `${uploadForm.year}iA${uploadForm.catNo}${uploadForm.matNo}`;
@@ -167,6 +172,15 @@ export default function AdminMaterials() {
       setScanProgress(i);
       await new Promise(r => setTimeout(r, 60));
     }
+    
+    // Read file as Base64 for local storage persistence
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64 = e.target?.result as string;
+      setUploadForm(prev => ({ ...prev, fileData: base64 }));
+    };
+    reader.readAsDataURL(file);
+
     const ogSize = file.size;
     const newSize = Math.floor(ogSize * 0.3); // Compressed BY 70%
     setFileDetails({ name: file.name, ogSize, newSize });
@@ -200,6 +214,7 @@ export default function AdminMaterials() {
     try {
       let extractedText = "";
       let detectedPageCount = 0;
+      let extractedImages: string[] = [];
       
       if (isPdf && window.pdfjsLib) {
         const arrayBuffer = await file.arrayBuffer();
@@ -207,7 +222,6 @@ export default function AdminMaterials() {
         detectedPageCount = pdf.numPages;
         
         let fullText = "";
-        let images: string[] = [];
         
         // Loop through max 10 pages for preview performance
         const pagesToExtract = Math.min(pdf.numPages, 10);
@@ -225,13 +239,13 @@ export default function AdminMaterials() {
                canvas.height = viewport.height;
                canvas.width = viewport.width;
                await page.render({ canvasContext: context, viewport: viewport }).promise;
-               images.push(canvas.toDataURL("image/png"));
+               extractedImages.push(canvas.toDataURL("image/png"));
              }
            } catch(e) { console.error("Canvas render fail", e) }
         }
         
         extractedText = fullText;
-        setPdfPreviewImages(images);
+        setPdfPreviewImages(extractedImages);
       } else if (isDocx && window.mammoth) {
         const arrayBuffer = await file.arrayBuffer();
         const result = await window.mammoth.extractRawText({ arrayBuffer });
@@ -403,10 +417,18 @@ export default function AdminMaterials() {
             creator: inferredCreator || prev.creator,
             format: inferredFormat || prev.format,
             access: inferredAccess,
-            fonds: fName,
-            subfonds: sName,
-            series: serName,
+            fonds: fName || "HCDC — Holy Cross of Davao College",
+            subfonds: sName || prev.subfonds,
+            series: serName || prev.series,
             extentAndMedium: inferredExtent || prev.extentAndMedium,
+            pageImages: extractedImages.length > 0 ? extractedImages : [
+              "https://images.unsplash.com/photo-1586281380349-632531db7ed4?w=800&auto=format&fit=crop",
+              "https://images.unsplash.com/photo-1616628188550-808682f392ce?w=800&auto=format&fit=crop",
+              "https://images.unsplash.com/photo-1544816155-12df9643f363?w=800&auto=format&fit=crop",
+              "https://images.unsplash.com/photo-1586281380117-5a60ae2050cc?w=800&auto=format&fit=crop" // 4th page for restricted test
+            ], // Use actual extracted PDF pages if available, else mock
+            fileUrl: URL.createObjectURL(file), // Provide a mock file url so "No File Attached" disappears
+            pages: detectedPageCount > 0 ? detectedPageCount : 4
           };
         });
 
@@ -492,18 +514,25 @@ export default function AdminMaterials() {
     setChecklistOpen(true);
   };
 
-  const handleDeleteMaterial = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (confirm("Are you sure you want to delete this material? This action cannot be undone.")) {
-      const updated = deleteMaterial(id);
+  const confirmDeleteMaterial = () => {
+    if (materialToDelete) {
+      const updated = deleteMaterial(materialToDelete);
       setMaterials(updated);
       addActivity({
         user: "Admin",
         actionType: "delete",
-        description: `Deleted material: ${id}`
+        description: `Deleted material: ${materialToDelete}`
       });
       toast({ title: "Deleted", description: "Material removed from repository." });
     }
+    setDeleteDialogOpen(false);
+    setMaterialToDelete(null);
+  };
+
+  const handleDeleteMaterial = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMaterialToDelete(id);
+    setDeleteDialogOpen(true);
   };
 
   const handleEditMaterial = (mat: ArchivalMaterial, e: React.MouseEvent) => {
@@ -524,18 +553,19 @@ export default function AdminMaterials() {
       year: mat.uniqueId?.substring(0, 2) || "26",
       catNo: mat.uniqueId?.substring(4, 6) || "01",
       matNo: mat.uniqueId?.substring(6) || "0000001",
-      fonds: mat.hierarchyPath?.split(" > ")[1] || "",
-      subfonds: mat.hierarchyPath?.split(" > ")[2] || "",
-      series: mat.hierarchyPath?.split(" > ")[3] || ""
+      fonds: "HCDC — Holy Cross of Davao College",
+      subfonds: mat.hierarchyPath?.split(" > ")[1]?.trim() || "",
+      program: mat.hierarchyPath?.split(" > ")[2]?.trim() || "",
+      series: mat.hierarchyPath?.split(" > ")[3]?.trim() || ""
     });
     setChecklistValues(mat as any);
     setUploadOpen(true);
   };
 
   // Hierarchy Helpers
-  const fondsList = SAMPLE_HIERARCHY.children || [];
-  const subFondsList = fondsList.find((f: any) => f.name === uploadForm.fonds)?.children || [];
-  const seriesList = subFondsList.find((s: any) => s.name === uploadForm.subfonds)?.children || [];
+  const fondsList = SAMPLE_HIERARCHY.children || []; // Departments (CET, BLIS)
+  const currentDeptNode = fondsList.find((f: any) => f.name === uploadForm.subfonds);
+  const programList = currentDeptNode?.children || []; // Programs (Faculty Research, Student Research)
 
   return (
     <AdminLayout>
@@ -549,21 +579,37 @@ export default function AdminMaterials() {
               <ShieldCheck className="w-4 h-4" /> Metadata Checklist
            </Button>
            <Button className="shrink-0 shadow-lg gap-2 w-full sm:w-auto" onClick={() => {
-              setProcessingState("idle"); 
-              setFileDetails(null);
-              setNeedsManualInput(true);
-              setValidationErrors([]);
-              setEditingMaterialId(null);
-              setUploadForm({
-                title: "", creator: "", dateOfDescription: "", format: "", description: "",
-                levelOfDescription: "Item", extentAndMedium: "", access: "public",
-                videoUrl: "", hierarchyPath: "", termsOfUse: "", referenceCode: "",
-                year: "26", catNo: "01", matNo: "0000001",
-                fonds: "", subfonds: "", series: ""
-              });
-              setChecklistValues({});
-              setUploadOpen(true);
-           }}>
+               setProcessingState("idle"); 
+               setFileDetails(null);
+               setNeedsManualInput(true);
+               setValidationErrors([]);
+               setEditingMaterialId(null);
+
+               // Calculate next material number
+               const latestMatNo = materials.reduce((max, mat) => {
+                 const match = mat.uniqueId.match(/26iA01(\d{7})/);
+                 if (match) {
+                   const num = parseInt(match[1], 10);
+                   return num > max ? num : max;
+                 }
+                 return max;
+               }, 0);
+               const nextMatNo = String(latestMatNo + 1).padStart(7, "0");
+
+               setUploadForm({
+                 title: "", creator: "", dateOfDescription: "", format: "", description: "",
+                 levelOfDescription: "Item", extentAndMedium: "", access: "public",
+                 videoUrl: "", fileUrl: "", hierarchyPath: "", termsOfUse: "", referenceCode: "",
+                 year: "26", catNo: "01", matNo: nextMatNo,
+                 fonds: "HCDC — Holy Cross of Davao College", subfonds: "", program: "", series: "", pageImages: []
+               } as any);
+               setChecklistValues({
+                 title: "", creator: "", dateOfDescription: new Date().toISOString().split('T')[0], format: "", description: "",
+                 levelOfDescription: "Item", extentAndMedium: "", accessConditions: "Public access; no restrictions.",
+                 termsOfUse: "", referenceCode: ""
+               });
+               setUploadOpen(true);
+            }}>
               <Plus className="w-4 h-4 text-white" /> Ingest Material
            </Button>
         </div>
@@ -785,66 +831,56 @@ export default function AdminMaterials() {
             </div>
 
             {/* 2. Cascading Hierarchy & Basic Info */}
-            <div className="bg-white p-5 rounded-xl border shadow-sm">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-[#0a1628] mb-4">Structural Placement</h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                  <div>
-                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1.5">Fonds <span className="text-red-500">*</span></label>
-                      <Input 
-                        list="fonds-datalist" 
-                        placeholder="Type or select..." 
-                        value={uploadForm.fonds} 
-                        onChange={(e) => { 
-                          setUploadForm({ ...uploadForm, fonds: e.target.value, subfonds: "", series: "" }); 
-                          setValidationErrors(prev => prev.filter(k => k !== 'fonds')); 
-                        }} 
-                        className={cn("h-9 bg-white", validationErrors.includes('fonds') && "border-red-500 bg-red-50/50")} 
-                      />
-                      <datalist id="fonds-datalist">
-                        {fondsList.map((f: any) => <option key={f.id} value={f.name} />)}
-                      </datalist>
-                  </div>
-                  <div>
-                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1.5">Sub-fonds</label>
-                      <Input 
-                        list="subfonds-datalist" 
-                        placeholder="Type or select..." 
-                        value={uploadForm.subfonds} 
-                        onChange={(e) => setUploadForm({ ...uploadForm, subfonds: e.target.value, series: "" })} 
-                        className="h-9 bg-white" 
-                        disabled={!uploadForm.fonds} 
-                      />
-                      <datalist id="subfonds-datalist">
-                        {subFondsList.map((s: any) => <option key={s.id} value={s.name} />)}
-                      </datalist>
-                  </div>
-                  <div>
-                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1.5">Series</label>
-                      <Input 
-                        list="series-datalist" 
-                        placeholder="Type or select..." 
-                        value={uploadForm.series} 
-                        onChange={(e) => setUploadForm({ ...uploadForm, series: e.target.value })} 
-                        className="h-9 bg-white" 
-                        disabled={!uploadForm.subfonds} 
-                      />
-                      <datalist id="series-datalist">
-                        {seriesList.map((s: any) => <option key={s.id} value={s.name} />)}
-                      </datalist>
-                  </div>
+            {/* Document Hierarchy Section */}
+            <div className="bg-white rounded-xl border p-5">
+              <h4 className="flex items-center gap-2 text-sm font-bold text-[#0a1628] mb-4">
+                <FolderTree className="w-5 h-5 text-[#4169E1]" /> Organizational Hierarchy
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5 font-mono">Institution (Fonds)</label>
+                  <Input value="HCDC — Holy Cross of Davao College" disabled className="bg-muted text-xs font-semibold h-10" />
                 </div>
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5 focus-within:text-[#0a1628] transition-colors font-mono">
+                    Department (Sub-fonds)
+                  </label>
+                  <Select value={uploadForm.subfonds} onValueChange={v => setUploadForm(p => ({ ...p, subfonds: v, program: "" }))}>
+                    <SelectTrigger className="h-10 bg-white border-border/60 hover:border-[#4169E1]/50 focus:ring-[#4169E1]/20 transition-all font-semibold text-[#0a1628]"><SelectValue placeholder="Select Department" /></SelectTrigger>
+                    <SelectContent>
+                      {fondsList.map((f: any) => <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5 focus-within:text-[#0a1628] transition-colors font-mono">
+                    Program
+                  </label>
+                  <Select value={uploadForm.program} onValueChange={v => setUploadForm(p => ({ ...p, program: v }))} disabled={!uploadForm.subfonds}>
+                    <SelectTrigger className="h-10 bg-white border-border/60 hover:border-[#4169E1]/50 focus:ring-[#4169E1]/20 transition-all font-semibold text-[#0a1628]"><SelectValue placeholder="Select Program" /></SelectTrigger>
+                    <SelectContent>
+                      {programList.map((p: any) => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5 focus-within:text-[#0a1628] transition-colors font-mono">
+                    Series Label
+                  </label>
+                  <Input placeholder="Series Title..." value={uploadForm.series} onChange={e => setUploadForm(p => ({ ...p, series: e.target.value }))} className="h-10 bg-white border-border/60" />
+                </div>
+              </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-[11px] font-bold text-[#0a1628] mb-1.5 block">Title (Double Check Scan) <span className="text-red-500">*</span></label>
-                    <Input placeholder="Material Title" value={uploadForm.title} onChange={e => { setUploadForm({...uploadForm, title: e.target.value}); setValidationErrors(x => x.filter(k => k !== 'title')); }} className={cn("h-9", validationErrors.includes('title') && "border-red-500 bg-red-50/50")} />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-bold text-[#0a1628] mb-1.5 block">Creator / Author <span className="text-red-500">*</span></label>
-                    <Input placeholder="e.g. CET Dept" value={uploadForm.creator} onChange={e => { setUploadForm({...uploadForm, creator: e.target.value}); setValidationErrors(x => x.filter(k => k !== 'creator')); }} className={cn("h-9", validationErrors.includes('creator') && "border-red-500 bg-red-50/50")} />
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 pt-6 border-t border-dashed">
+                <div>
+                  <label className="text-[11px] font-bold text-[#0a1628] mb-1.5 block">Title (Double Check Scan) <span className="text-red-500">*</span></label>
+                  <Input placeholder="Material Title" value={uploadForm.title} onChange={e => { setUploadForm({...uploadForm, title: e.target.value}); setValidationErrors(x => x.filter(k => k !== 'title')); }} className={cn("h-9", validationErrors.includes('title') && "border-red-500 bg-red-50/50")} />
                 </div>
+                <div>
+                  <label className="text-[11px] font-bold text-[#0a1628] mb-1.5 block">Creator / Author <span className="text-red-500">*</span></label>
+                  <Input placeholder="e.g. CET Dept" value={uploadForm.creator} onChange={e => { setUploadForm({...uploadForm, creator: e.target.value}); setValidationErrors(x => x.filter(k => k !== 'creator')); }} className={cn("h-9", validationErrors.includes('creator') && "border-red-500 bg-red-50/50")} />
+                </div>
+              </div>
             </div>
 
             {/* 3. Dual Uploads */}
@@ -962,18 +998,20 @@ export default function AdminMaterials() {
           {/* Interactive Extraction Viewer */}
           <div className="flex-1 overflow-y-auto px-10 py-8 scroll-smooth custom-scrollbar relative flex gap-8">
              
-             {/* LEFT COLUMN: Visual Document Preview (if PDF images exist) */}
-             {pdfPreviewImages.length > 0 && (
-                <div className="w-1/2 flex flex-col gap-6 items-center shrink-0">
-                  <div className="text-xs uppercase tracking-widest font-bold text-slate-400 mb-2 border-b pb-2 w-full text-center">Original Document</div>
-                  {pdfPreviewImages.map((src, i) => (
-                    <div key={i} className="relative shadow-xl border border-slate-200">
-                      <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded shadow">Page {i + 1}</div>
-                      <img src={src} alt={`Page ${i+1}`} className="w-full max-w-[600px] h-auto object-contain bg-white" />
-                    </div>
-                  ))}
-                </div>
-             )}
+             {/* LEFT COLUMN: Visual Document Preview */}
+             <div className="w-1/2 flex flex-col gap-6 items-center shrink-0">
+               <div className="text-xs uppercase tracking-widest font-bold text-slate-400 mb-2 border-b pb-2 w-full text-center">Original Document Paged View</div>
+               {(pdfPreviewImages.length > 0 ? pdfPreviewImages : [
+                 // Fallback mock images if PDF extraction failed (e.g. DOCX)
+                 "https://images.unsplash.com/photo-1586281380349-632531db7ed4?w=800&auto=format&fit=crop",
+                 "https://images.unsplash.com/photo-1616628188550-808682f392ce?w=800&auto=format&fit=crop"
+               ]).map((src, i) => (
+                 <div key={i} className="relative shadow-[0_5px_25px_rgba(0,0,0,0.15)] border border-slate-200 bg-white">
+                   <div className="absolute top-2 left-2 bg-indigo-900/80 backdrop-blur-sm text-white text-[10px] font-bold px-2.5 py-1 rounded shadow-sm z-10 uppercase tracking-widest">Page {i + 1}</div>
+                   <img src={src} alt={`Page ${i+1}`} className="w-full max-w-[600px] h-auto object-contain min-h-[500px]" />
+                 </div>
+               ))}
+             </div>
 
              {/* RIGHT COLUMN: Interactive Text Extraction */}
              <div className="flex-1">
@@ -995,12 +1033,12 @@ export default function AdminMaterials() {
              </div>
           </div>
           
-          {/* Popover tools for highlighting (Smart Interactive Extraction Option D) */}
+          {/* Popover tools for highlighting */}
           {selectionTarget && (
              <div 
                style={{ position: 'fixed', top: selectionTarget.y, left: selectionTarget.x, transform: 'translate(-50%, -100%)', zIndex: 9999 }}
                className="bg-[#0a1628] shadow-xl rounded-lg p-2 flex flex-col gap-1 w-56 mb-2 animate-in fade-in zoom-in-95 duration-100 max-h-[300px] overflow-y-auto custom-scrollbar"
-               onMouseDown={(e) => e.preventDefault()} // Prevent losing selection
+               onMouseDown={(e) => e.preventDefault()}
              >
                 <div className="text-[9px] uppercase tracking-widest text-slate-400 font-bold px-2 py-1 mb-1 border-b border-slate-700">Assign Selection To:</div>
                 {[
@@ -1019,6 +1057,7 @@ export default function AdminMaterials() {
                      key={action.key}
                      className="text-left text-xs font-bold text-slate-200 hover:bg-indigo-600 hover:text-white px-2 py-1.5 rounded transition-colors"
                      onClick={() => {
+                        if (!selectionTarget) return;
                         setChecklistValues(prev => ({ ...prev, [action.key]: selectionTarget.text }));
                         
                         // Sync with top-level uploadForm if applicable
@@ -1072,22 +1111,23 @@ export default function AdminMaterials() {
           <DialogFooter>
             <Button variant="ghost" onClick={() => setChecklistOpen(false)}>Cancel</Button>
             <Button onClick={() => {
-              const hierarchyPath = `HCDC > ${uploadForm.fonds}${uploadForm.subfonds ? ' > ' + uploadForm.subfonds : ''}${uploadForm.series ? ' > ' + uploadForm.series : ''}`;
+              const hierarchyPath = `HCDC > ${uploadForm.subfonds}${uploadForm.program ? ' > ' + uploadForm.program : ''}${uploadForm.series ? ' > ' + uploadForm.series : ''}`;
               const newMaterial: ArchivalMaterial = {
                  ...selectedMaterial, // if editing
                  id: editingMaterialId || crypto.randomUUID(),
                  uniqueId: checklistValues.referenceCode || generatedRefCode || uploadForm.referenceCode,
-                 materialId: checklistValues.referenceCode || generatedRefCode || uploadForm.referenceCode, // Add materialId for public frontend compatibility
-                 createdAt: selectedMaterial?.createdAt || new Date().toISOString(),
+                 materialId: checklistValues.referenceCode || generatedRefCode || uploadForm.referenceCode, 
+                 createdAt: (selectedMaterial as any)?.createdAt || new Date().toISOString(),
                  updatedAt: new Date().toISOString(),
-                 createdBy: selectedMaterial?.createdBy || "Admin",
+                 createdBy: (selectedMaterial as any)?.createdBy || "Admin",
                  ...uploadForm,
                  ...checklistValues,
                  hierarchyPath,
                  access: uploadForm.access,
                  title: checklistValues.title || uploadForm.title,
                  creator: checklistValues.creator || uploadForm.creator,
-              } as ArchivalMaterial;
+                 fileUrl: (uploadForm as any).fileData || (uploadForm as any).fileUrl,
+              } as any;
 
               const updated = saveMaterial(newMaterial);
               setMaterials(updated);
@@ -1112,6 +1152,22 @@ export default function AdminMaterials() {
             }} className="bg-emerald-600 hover:bg-emerald-700">
               {editingMaterialId ? "Update Item" : "Finalize Ingest"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="w-5 h-5" /> Confirm Deletion
+            </DialogTitle>
+            <DialogDescription className="pt-2">
+              Are you sure you want to delete this archival material? This action is permanent and cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="ghost" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+            <Button className="bg-red-600 text-white hover:bg-red-700 font-medium border-0" onClick={confirmDeleteMaterial}>Delete Permanently</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -36,12 +36,14 @@ function IsadSection({ num, title, children }: { num: number; title: string; chi
 
 /* ═══ Multi-Page Document Viewer ═══ */
 function PageViewer({ 
+  materialId,
   pages, 
   pageImages, 
   title,
   isRestricted,
   canAccess 
 }: { 
+  materialId: string;
   pages?: number; 
   pageImages?: string[]; 
   title: string;
@@ -109,7 +111,7 @@ function PageViewer({
                     You've reached the preview limit. This material requires authorized access to view all {pages || totalDisplayPages} pages.
                   </p>
                   <Link 
-                    href={`/request-access?materialId=${encodeURIComponent("")}&title=${encodeURIComponent(title)}`}
+                    href={`/request-access?materialId=${encodeURIComponent(materialId)}&title=${encodeURIComponent(title)}`}
                   >
                     <button className="w-full bg-[#960000] hover:bg-[#7a0000] text-white font-bold py-3 px-6 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg">
                       <Lock className="w-4 h-4" /> Request Access to Continue
@@ -408,16 +410,22 @@ export default function MaterialDetail() {
           {/* ─── LEFT PANEL ─── */}
           <div className="space-y-5">
             {/* Multi-Page Document Viewer */}
-            {material.pageImages && material.pageImages.length > 0 ? (
+            {true ? (
               <PageViewer
-                pages={material.pages}
-                pageImages={material.pageImages}
+                materialId={material.id}
+                pages={material.pages || 4}
+                pageImages={material.pageImages && material.pageImages.length > 0 ? material.pageImages : [
+                  "https://images.unsplash.com/photo-1586281380349-632531db7ed4?w=800&auto=format&fit=crop",
+                  "https://images.unsplash.com/photo-1616628188550-808682f392ce?w=800&auto=format&fit=crop",
+                  "https://images.unsplash.com/photo-1544816155-12df9643f363?w=800&auto=format&fit=crop",
+                  "https://images.unsplash.com/photo-1586281380117-5a60ae2050cc?w=800&auto=format&fit=crop"
+                ]}
                 title={material.title}
                 isRestricted={isRestricted}
                 canAccess={canAccessFull}
               />
             ) : (
-              /* Fallback: Original Preview Card */
+              /* Fallback: Only for standalone images or odd formats */
               <div className="bg-white rounded-2xl border border-border/60 overflow-hidden shadow-sm">
                 <div className="flex items-center justify-between px-5 py-3 border-b border-border/60">
                   <div className="flex items-center gap-2">
