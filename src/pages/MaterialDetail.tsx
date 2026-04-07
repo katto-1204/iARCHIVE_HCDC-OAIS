@@ -4,7 +4,8 @@ import { format } from "date-fns";
 import {
   FileText, Download, Lock, ArrowLeft, CheckCircle,
   ZoomIn, ZoomOut, RotateCcw, Maximize2, ExternalLink,
-  Database, HardDrive, Calendar, User, Tag, BookOpen, AlertTriangle, Edit
+  Database, HardDrive, Calendar, User, Tag, BookOpen, AlertTriangle, Edit,
+  ChevronLeft, ChevronRight, X
 } from "lucide-react";
 import { useGetMe, useGetAccessRequests } from "@workspace/api-client-react";
 import { getMaterialById } from "@/data/storage";
@@ -33,6 +34,270 @@ function IsadSection({ num, title, children }: { num: number; title: string; chi
   );
 }
 
+/* ═══ Multi-Page Document Viewer ═══ */
+function PageViewer({ 
+  pages, 
+  pageImages, 
+  title,
+  isRestricted,
+  canAccess 
+}: { 
+  pages?: number; 
+  pageImages?: string[]; 
+  title: string;
+  isRestricted: boolean;
+  canAccess: boolean;
+}) {
+  const [currentPage, setCurrentPage] = React.useState(0);
+  const [showFullscreen, setShowFullscreen] = React.useState(false);
+  const images = pageImages || [];
+  const totalDisplayPages = images.length;
+  
+  // Restricted: only allow 3 pages if user can't access
+  const maxVisiblePages = (!canAccess && isRestricted) ? Math.min(3, totalDisplayPages) : totalDisplayPages;
+  const visibleImages = images.slice(0, maxVisiblePages);
+  
+  const goTo = (idx: number) => {
+    if (idx >= 0 && idx < maxVisiblePages) setCurrentPage(idx);
+  };
+
+  if (totalDisplayPages === 0) return null;
+
+  return (
+    <>
+      <div className="bg-white rounded-2xl border border-border/60 overflow-hidden shadow-sm">
+        {/* Viewer Header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-border/60 bg-muted/10">
+          <div className="flex items-center gap-3">
+            <span className="bg-[#0a1628] text-white text-xs font-bold px-2.5 py-1 rounded">Document Viewer</span>
+            <span className="text-xs text-muted-foreground font-medium">
+              Page {currentPage + 1} of {maxVisiblePages}{pages ? ` (${pages} total)` : ''}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowFullscreen(true)} className="w-8 h-8 rounded-lg border border-border hover:bg-muted/50 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
+              <Maximize2 className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Main Page Display */}
+        <div className="relative bg-[#f0f0f4]">
+          {/* Cover Page (page 0) = larger */}
+          <div className="relative flex items-center justify-center min-h-[420px] max-h-[600px] overflow-hidden">
+            <img 
+              src={visibleImages[currentPage]} 
+              alt={`${title} - Page ${currentPage + 1}`} 
+              className="max-h-[580px] w-full object-cover transition-all duration-500"
+              style={{ objectPosition: 'top' }}
+            />
+            
+            {/* Page label */}
+            <div className="absolute top-3 left-3 bg-black/60 text-white text-[10px] px-3 py-1 rounded-lg font-bold backdrop-blur-sm">
+              {currentPage === 0 ? "Cover Page" : `Page ${currentPage + 1}`}
+            </div>
+
+            {/* Restricted overlay on last visible page */}
+            {!canAccess && isRestricted && currentPage === maxVisiblePages - 1 && (
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/60 to-white flex flex-col items-center justify-end pb-10 z-10">
+                <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-border/60 p-8 max-w-md text-center mx-4 animate-fade-in-up">
+                  <div className="w-14 h-14 rounded-full bg-[#960000]/10 flex items-center justify-center mx-auto mb-4">
+                    <Lock className="w-7 h-7 text-[#960000]" />
+                  </div>
+                  <h3 className="text-lg font-bold text-[#0a1628] mb-2">Restricted Content</h3>
+                  <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
+                    You've reached the preview limit. This material requires authorized access to view all {pages || totalDisplayPages} pages.
+                  </p>
+                  <Link 
+                    href={`/request-access?materialId=${encodeURIComponent("")}&title=${encodeURIComponent(title)}`}
+                  >
+                    <button className="w-full bg-[#960000] hover:bg-[#7a0000] text-white font-bold py-3 px-6 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg">
+                      <Lock className="w-4 h-4" /> Request Access to Continue
+                    </button>
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            {/* Navigation Arrows */}
+            {currentPage > 0 && (
+              <button 
+                onClick={() => goTo(currentPage - 1)}
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 shadow-lg border border-border/60 flex items-center justify-center hover:bg-white transition-all z-20 group"
+              >
+                <ChevronLeft className="w-5 h-5 text-[#0a1628] group-hover:text-[#4169E1]" />
+              </button>
+            )}
+            {currentPage < maxVisiblePages - 1 && (
+              <button 
+                onClick={() => goTo(currentPage + 1)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 shadow-lg border border-border/60 flex items-center justify-center hover:bg-white transition-all z-20 group"
+              >
+                <ChevronRight className="w-5 h-5 text-[#0a1628] group-hover:text-[#4169E1]" />
+              </button>
+            )}
+          </div>
+
+          {/* Thumbnail Strip */}
+          <div className="border-t border-border/60 bg-white px-4 py-3">
+            <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-1">
+              {visibleImages.map((img, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => goTo(idx)}
+                  className={`relative shrink-0 w-16 h-20 rounded-lg overflow-hidden border-2 transition-all ${
+                    currentPage === idx 
+                      ? 'border-[#4169E1] shadow-md ring-2 ring-[#4169E1]/20' 
+                      : 'border-border/40 hover:border-[#4169E1]/40 opacity-70 hover:opacity-100'
+                  }`}
+                >
+                  <img src={img} alt={`Thumbnail ${idx + 1}`} className="w-full h-full object-cover" />
+                  <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[8px] font-bold text-center py-0.5">
+                    {idx === 0 ? 'Cover' : idx + 1}
+                  </div>
+                  {/* Locked indicator for restricted pages beyond limit */}
+                  {!canAccess && isRestricted && idx === maxVisiblePages - 1 && idx < totalDisplayPages - 1 && (
+                    <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
+                      <Lock className="w-3 h-3 text-[#960000]" />
+                    </div>
+                  )}
+                </button>
+              ))}
+              {/* Show locked placeholder thumbnails for restricted content */}
+              {!canAccess && isRestricted && totalDisplayPages > maxVisiblePages && (
+                <>
+                  {Array.from({ length: Math.min(3, totalDisplayPages - maxVisiblePages) }).map((_, idx) => (
+                    <div
+                      key={`locked-${idx}`}
+                      className="shrink-0 w-16 h-20 rounded-lg border-2 border-dashed border-[#960000]/30 bg-[#960000]/5 flex flex-col items-center justify-center gap-1"
+                    >
+                      <Lock className="w-3 h-3 text-[#960000]/50" />
+                      <span className="text-[7px] font-bold text-[#960000]/50 uppercase">Locked</span>
+                    </div>
+                  ))}
+                  {totalDisplayPages - maxVisiblePages > 3 && (
+                    <div className="shrink-0 w-16 h-20 rounded-lg border-2 border-dashed border-muted-foreground/20 bg-muted/20 flex items-center justify-center">
+                      <span className="text-[9px] font-bold text-muted-foreground/50">+{totalDisplayPages - maxVisiblePages - 3}</span>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Fullscreen Modal */}
+      {showFullscreen && (
+        <div className="fixed inset-0 z-50 bg-black/95 flex flex-col">
+          <div className="flex items-center justify-between px-6 py-4">
+            <span className="text-white/80 text-sm font-medium">
+              {title} — Page {currentPage + 1} of {maxVisiblePages}
+            </span>
+            <button onClick={() => setShowFullscreen(false)} className="text-white/60 hover:text-white transition-colors">
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+          <div className="flex-1 flex items-center justify-center relative px-16">
+            <img 
+              src={visibleImages[currentPage]} 
+              alt={`${title} - Page ${currentPage + 1}`} 
+              className="max-h-[85vh] max-w-full object-contain"
+            />
+            {currentPage > 0 && (
+              <button onClick={() => goTo(currentPage - 1)} className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
+                <ChevronLeft className="w-6 h-6 text-white" />
+              </button>
+            )}
+            {currentPage < maxVisiblePages - 1 && (
+              <button onClick={() => goTo(currentPage + 1)} className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
+                <ChevronRight className="w-6 h-6 text-white" />
+              </button>
+            )}
+          </div>
+          <div className="flex justify-center gap-2 px-6 py-4 overflow-x-auto">
+            {visibleImages.map((img, idx) => (
+              <button key={idx} onClick={() => goTo(idx)} className={`shrink-0 w-14 h-18 rounded-md overflow-hidden border-2 transition-all ${currentPage === idx ? 'border-white shadow-lg' : 'border-white/20 opacity-50 hover:opacity-80'}`}>
+                <img src={img} alt="" className="w-full h-full object-cover" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ═══ Request Access Modal (inline) ═══ */
+function RestrictedAccessModal({ 
+  isOpen, 
+  onClose, 
+  material 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  material: any 
+}) {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-fade-in">
+      <div className="w-full max-w-lg bg-white rounded-2xl border border-border shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="bg-[#960000] p-6 text-white relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-40 h-40 -mr-10 -mt-10 rounded-full bg-white/10 blur-3xl" />
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                <Lock className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg">Access Required</h3>
+                <p className="text-white/70 text-xs">This material is restricted</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Body */}
+        <div className="p-6">
+          <h4 className="font-bold text-[#0a1628] mb-1">{material.title}</h4>
+          <p className="text-sm text-muted-foreground mb-4">{material.uniqueId}</p>
+          
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm text-amber-800 font-semibold mb-1">Preview Limit Reached</p>
+                <p className="text-xs text-amber-700/80 leading-relaxed">
+                  You've viewed the maximum number of preview pages for this restricted material. 
+                  To view all {material.pages || 'remaining'} pages, please submit an access request for archivist review.
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex gap-3">
+            <button 
+              onClick={onClose} 
+              className="flex-1 px-4 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-muted/50 transition-colors"
+            >
+              Close
+            </button>
+            <Link 
+              href={`/request-access?materialId=${encodeURIComponent(material.id)}&title=${encodeURIComponent(material.title)}&date=${encodeURIComponent(material.date ?? "")}&cover=${encodeURIComponent(material.thumbnailUrl ?? "")}`}
+              className="flex-1"
+            >
+              <button className="w-full px-4 py-2.5 rounded-xl bg-[#960000] text-white text-sm font-semibold hover:bg-[#7a0000] transition-colors flex items-center justify-center gap-2">
+                <Lock className="w-4 h-4" /> Request Access
+              </button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function MaterialDetail() {
   const [, params] = useRoute("/materials/:id");
   const [material, setMaterial] = React.useState<any>(null);
@@ -49,6 +314,7 @@ export default function MaterialDetail() {
   const { data: requests } = useGetAccessRequests({ status: "approved" });
   const [activeTab, setActiveTab] = React.useState<"details" | "dc" | "related">("details");
   const [showDownloadModal, setShowDownloadModal] = React.useState(false);
+  const [showAccessModal, setShowAccessModal] = React.useState(false);
 
   const isApproved = requests?.requests?.some((r: any) => r.materialId === params?.id);
 
@@ -92,7 +358,9 @@ export default function MaterialDetail() {
   }[material.access as "public" | "restricted" | "confidential"] ?? { label: material.access?.toUpperCase() || "", className: "bg-muted text-muted-foreground border border-border" };
 
   const fixityVerified = material.fixityStatus === "verified" || material.sha256;
-  const canDownload = material.access === "public" || user?.role === "admin" || user?.role === "archivist" || isApproved;
+  const canDownload = material.access === "public" || user?.role === "admin" || user?.role === "archivist" || !!isApproved;
+  const isRestricted = material.access === "restricted" || material.access === "confidential";
+  const canAccessFull = material.access === "public" || user?.role === "admin" || user?.role === "archivist" || !!isApproved;
 
   return (
     <div className="min-h-screen bg-[#f7f8fc] font-sans">
@@ -139,53 +407,59 @@ export default function MaterialDetail() {
 
           {/* ─── LEFT PANEL ─── */}
           <div className="space-y-5">
-            {/* Preview Card */}
-            <div className="bg-white rounded-2xl border border-border/60 overflow-hidden shadow-sm">
-              {/* Header bar */}
-              <div className="flex items-center justify-between px-5 py-3 border-b border-border/60">
-                <div className="flex items-center gap-2">
-                  <span className="bg-[#0a1628] text-white text-xs font-bold px-2.5 py-1 rounded">OAIS AIP</span>
-                  <span className="text-xs font-mono text-muted-foreground">{material.aipId || "AIP-0000-0001"}</span>
-                </div>
-                {fixityVerified && (
-                  <div className="flex items-center gap-1.5 text-emerald-600 text-xs font-semibold">
-                    <CheckCircle className="w-3.5 h-3.5" />
-                    Checksum Verified
+            {/* Multi-Page Document Viewer */}
+            {material.pageImages && material.pageImages.length > 0 ? (
+              <PageViewer
+                pages={material.pages}
+                pageImages={material.pageImages}
+                title={material.title}
+                isRestricted={isRestricted}
+                canAccess={canAccessFull}
+              />
+            ) : (
+              /* Fallback: Original Preview Card */
+              <div className="bg-white rounded-2xl border border-border/60 overflow-hidden shadow-sm">
+                <div className="flex items-center justify-between px-5 py-3 border-b border-border/60">
+                  <div className="flex items-center gap-2">
+                    <span className="bg-[#0a1628] text-white text-xs font-bold px-2.5 py-1 rounded">OAIS AIP</span>
+                    <span className="text-xs font-mono text-muted-foreground">{material.aipId || "AIP-0000-0001"}</span>
                   </div>
-                )}
-              </div>
-
-              {/* Preview area */}
-              <div className="h-72 bg-[#f7f8fc] flex flex-col items-center justify-center relative">
-                {material.thumbnailUrl ? (
-                  <img src={material.thumbnailUrl} alt={material.title} className="max-h-full max-w-full object-contain" />
-                ) : (
-                  <div className="text-center">
-                    <div className="w-24 h-28 bg-white border-2 border-border rounded-lg shadow-md flex items-center justify-center mx-auto mb-4 relative">
-                      <FileText className="w-10 h-10 text-[#4169E1]/30" />
-                      <div className="absolute top-2 right-2 w-3 h-3 bg-[#960000]/20 rounded-sm" />
-                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#4169E1]/20 rounded-b" />
+                  {fixityVerified && (
+                    <div className="flex items-center gap-1.5 text-emerald-600 text-xs font-semibold">
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      Checksum Verified
                     </div>
-                    <p className="text-sm font-semibold text-foreground">{material.title}</p>
-                    <p className="text-xs text-muted-foreground mt-1 font-mono">{material.format || "application/pdf"}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* View controls */}
-              <div className="border-t border-border/60 px-5 py-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {[{ icon: ZoomIn }, { icon: ZoomOut }, { icon: RotateCcw }, { icon: Maximize2 }].map(({ icon: Icon }, i) => (
-                    <button key={i} className="w-9 h-9 rounded-lg border border-border hover:bg-muted/50 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
-                      <Icon className="w-4 h-4" />
-                    </button>
-                  ))}
+                  )}
                 </div>
-                {material.pages && (
-                  <span className="text-sm text-muted-foreground font-medium">{material.pages} pages</span>
-                )}
+                <div className="h-72 bg-[#f7f8fc] flex flex-col items-center justify-center relative">
+                  {material.thumbnailUrl ? (
+                    <img src={material.thumbnailUrl} alt={material.title} className="max-h-full max-w-full object-contain" />
+                  ) : (
+                    <div className="text-center">
+                      <div className="w-24 h-28 bg-white border-2 border-border rounded-lg shadow-md flex items-center justify-center mx-auto mb-4 relative">
+                        <FileText className="w-10 h-10 text-[#4169E1]/30" />
+                        <div className="absolute top-2 right-2 w-3 h-3 bg-[#960000]/20 rounded-sm" />
+                        <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#4169E1]/20 rounded-b" />
+                      </div>
+                      <p className="text-sm font-semibold text-foreground">{material.title}</p>
+                      <p className="text-xs text-muted-foreground mt-1 font-mono">{material.format || "application/pdf"}</p>
+                    </div>
+                  )}
+                </div>
+                <div className="border-t border-border/60 px-5 py-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {[{ icon: ZoomIn }, { icon: ZoomOut }, { icon: RotateCcw }, { icon: Maximize2 }].map(({ icon: Icon }, i) => (
+                      <button key={i} className="w-9 h-9 rounded-lg border border-border hover:bg-muted/50 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
+                        <Icon className="w-4 h-4" />
+                      </button>
+                    ))}
+                  </div>
+                  {material.pages && (
+                    <span className="text-sm text-muted-foreground font-medium">{material.pages} pages</span>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* OAIS Preservation Info */}
             <div className="bg-white rounded-2xl border border-border/60 shadow-sm overflow-hidden">
@@ -429,6 +703,13 @@ export default function MaterialDetail() {
           </div>
         </div>
       )}
+
+      {/* Restricted Access Modal */}
+      <RestrictedAccessModal 
+        isOpen={showAccessModal} 
+        onClose={() => setShowAccessModal(false)} 
+        material={material} 
+      />
     </div>
   );
 }

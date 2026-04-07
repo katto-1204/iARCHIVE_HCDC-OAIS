@@ -3,13 +3,19 @@ import { SAMPLE_MATERIALS, ACTIVITY_FEED, type ArchivalMaterial, type ActivityEn
 const STORAGE_KEYS = {
   MATERIALS: "iarchive_materials",
   ACTIVITY: "iarchive_activity",
+  VERSION: "iarchive_version",
 };
 
-/** Initialize storage if empty */
+// Bump this whenever sample data structure changes
+const STORAGE_VERSION = "2";
+
+/** Initialize storage if empty or outdated */
 export function initializeStorage() {
   if (typeof window === "undefined") return;
-  if (!localStorage.getItem(STORAGE_KEYS.MATERIALS)) {
+  const currentVersion = localStorage.getItem(STORAGE_KEYS.VERSION);
+  if (!localStorage.getItem(STORAGE_KEYS.MATERIALS) || currentVersion !== STORAGE_VERSION) {
     localStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify(SAMPLE_MATERIALS));
+    localStorage.setItem(STORAGE_KEYS.VERSION, STORAGE_VERSION);
   }
   if (!localStorage.getItem(STORAGE_KEYS.ACTIVITY)) {
     localStorage.setItem(STORAGE_KEYS.ACTIVITY, JSON.stringify(ACTIVITY_FEED));
