@@ -62,6 +62,11 @@ export default function AdminMaterials() {
 
   // Upload dialog state
   const [uploadOpen, setUploadOpen] = React.useState(false);
+  const [previewOpen, setPreviewOpen] = React.useState(false);
+  const [rawExtractionText, setRawExtractionText] = React.useState("");
+  const [pdfPreviewImages, setPdfPreviewImages] = React.useState<string[]>([]);
+  const [selectionTarget, setSelectionTarget] = React.useState<{text: string, x: number, y: number} | null>(null);
+  
   const [checklistOpen, setChecklistOpen] = React.useState(false);
   const [selectedChecklistFields, setSelectedChecklistFields] = React.useState<Set<string>>(new Set());
   const [checklistValues, setChecklistValues] = React.useState<Record<string, string>>({});
@@ -167,9 +172,33 @@ export default function AdminMaterials() {
       if (isPdf && window.pdfjsLib) {
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        const page = await pdf.getPage(1);
-        const textContent = await page.getTextContent();
-        extractedText = textContent.items.map((item: any) => item.str).join(" ") + " ";
+        
+        let fullText = "";
+        let images: string[] = [];
+        
+        // Loop through max 10 pages for preview performance
+        const pagesToExtract = Math.min(pdf.numPages, 10);
+        for (let i = 1; i <= pagesToExtract; i++) {
+           const page = await pdf.getPage(i);
+           const textContent = await page.getTextContent();
+           fullText += textContent.items.map((item: any) => item.str).join(" ") + "\n\n";
+           
+           // Render to canvas for visual preview!
+           try {
+             const viewport = page.getViewport({ scale: 1.0 });
+             const canvas = document.createElement('canvas');
+             const context = canvas.getContext('2d');
+             if (context) {
+               canvas.height = viewport.height;
+               canvas.width = viewport.width;
+               await page.render({ canvasContext: context, viewport: viewport }).promise;
+               images.push(canvas.toDataURL("image/png"));
+             }
+           } catch(e) { console.error("Canvas render fail", e) }
+        }
+        
+        extractedText = fullText;
+        setPdfPreviewImages(images);
       } else if (isDocx && window.mammoth) {
         const arrayBuffer = await file.arrayBuffer();
         const result = await window.mammoth.extractRawText({ arrayBuffer });
@@ -184,6 +213,9 @@ export default function AdminMaterials() {
       }
 
       if (extractedText) {
+        // Option C + native structure parsing
+        setRawExtractionText(extractedText);
+        
         // Normalize any kind of whitespace sequence (including newlines) into a single space
         const cleanText = extractedText.replace(/\s+/g, ' '); 
         const previewSnippet = extractedText.substring(0, 150).trim();
@@ -194,7 +226,7 @@ export default function AdminMaterials() {
            const nextLabels = [
              "Reference Code", "Unique ID", "Title", "Creator", "Author", "Date", 
              "Level of Description", "Extent and Medium", "Fonds", "Sub-fonds", "Series",
-             "Reference", "Access", "Conditions"
+             "Reference", "Access", "Conditions", "Abstract"
            ].join("|");
            
            const regex = new RegExp(`(?:^|\\s)(?:${labels})\\s*:?\\s*(.*?)(?=\\s*(?:(?:${nextLabels})\\s*:?\\s*)|$)`, "i");
@@ -202,19 +234,19 @@ export default function AdminMaterials() {
            return match ? match[1].trim() : "";
         };
         
-        // Scan for Unique Identifier pattern e.g. 26iA010000001
+        // Extended parsing for extra smart offline capability
         const idMatch = cleanText.match(/(2\d)iA(\d{2})(\d{7})/i);
-        
-        // Better Regex field matchers using boundary extraction
         const parsedTitle = extractField("Title");
-        const parsedCreator = extractField("Creator", ["Author"]);
+        const parsedCreator = extractField("Creator", ["Author", "Created By"]);
+        const parsedDate = extractField("Date", ["Dates", "Year"]);
+        const parsedLevel = extractField("Level of Description", ["Level"]);
+        const parsedExtent = extractField("Extent and Medium", ["Format", "Extent"]);
         const parsedFonds = extractField("Fonds");
         const parsedSubfonds = extractField("Sub-fonds", ["Subfonds", "Sub fonds"]);
         const parsedSeries = extractField("Series");
+        const parsedAbstract = extractField("Abstract", ["Summary", "Description", "Scope and Content"]);
         
         setUploadForm((prev: any) => {
-          // Map extracted hierarchy names to their respective IDs natively locally in state
-          // e.g. "Holy Cross of Davao College" -> fondsList.find => its ID
           let fName = prev.fonds;
           let sName = prev.subfonds;
           let serName = prev.series;
@@ -238,7 +270,7 @@ export default function AdminMaterials() {
           
           return {
             ...prev, 
-            description: prev.description || previewSnippet,
+            description: parsedAbstract || prev.description || previewSnippet,
             year: idMatch ? idMatch[1] : prev.year,
             catNo: idMatch ? idMatch[2] : prev.catNo,
             matNo: idMatch ? idMatch[3] : prev.matNo,
@@ -255,7 +287,10 @@ export default function AdminMaterials() {
           ...prev,
           title: parsedTitle || prev.title,
           creator: parsedCreator || prev.creator,
-          description: previewSnippet,
+          date: parsedDate || prev.date,
+          levelOfDescription: parsedLevel || prev.levelOfDescription,
+          extentAndMedium: parsedExtent || prev.extentAndMedium,
+          description: parsedAbstract || previewSnippet,
           referenceCode: idMatch ? idMatch[0] : "",
         }));
       }
@@ -264,6 +299,12 @@ export default function AdminMaterials() {
     }
 
     setProcessingState("done");
+    
+    // Automatically jump to the preview modal to verify pages/text.
+    setTimeout(() => {
+       setUploadOpen(false);
+       setPreviewOpen(true);
+    }, 600);
   };
 
   const filteredMaterials = React.useMemo(() => {
@@ -735,12 +776,133 @@ export default function AdminMaterials() {
 
           </div>
 
-          <DialogFooter className="mt-2 border-t pt-4">
+          <DialogFooter className="mt-2 border-t pt-4 flex gap-2">
             <Button variant="ghost" onClick={() => setUploadOpen(false)}>Cancel Ingest</Button>
-            <Button onClick={submitIngest} className="gap-2 bg-[#0a1628] hover:bg-[#1a2b4b]">
-              Continue to Metadata Checklist <ChevronRight className="w-4 h-4 ml-2" />
-            </Button>
+            {processingState === "done" && rawExtractionText ? (
+                <Button onClick={() => { setUploadOpen(false); setPreviewOpen(true); }} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+                   Review Scanned Document <FileText className="w-4 h-4 ml-2" />
+                </Button>
+            ) : (
+                <Button onClick={submitIngest} className="gap-2 bg-[#0a1628] hover:bg-[#1a2b4b]">
+                  Skip to Metadata Checklist <ChevronRight className="w-4 h-4 ml-2" />
+                </Button>
+            )}
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* ═══ Smart Document Interactive Pre-viewer ═══ */}
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent 
+           className="max-w-5xl w-[95vw] h-[90vh] flex flex-col p-0 overflow-hidden bg-slate-50"
+           onMouseUp={() => {
+              const selection = window.getSelection();
+              if (selection && selection.toString().trim().length > 0) {
+                 const rect = selection.getRangeAt(0).getBoundingClientRect();
+                 setSelectionTarget({ text: selection.toString().trim(), x: rect.left + rect.width / 2, y: rect.top - 10 });
+              } else {
+                 setSelectionTarget(null);
+              }
+           }}
+        >
+          <DialogHeader className="p-6 border-b bg-white shrink-0">
+            <DialogTitle className="flex items-center gap-2 text-xl text-[#0a1628]">
+              <Search className="w-5 h-5 text-indigo-500" /> Interactive Page Preview
+            </DialogTitle>
+            <DialogDescription>
+              We've automatically sniffed out several metadata fields! 
+              Not completely accurate? **Highlight any text below** to manually extract and assign it to a specific ISAD(G) field.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {/* Interactive Extraction Viewer */}
+          <div className="flex-1 overflow-y-auto px-10 py-8 scroll-smooth custom-scrollbar relative flex gap-8">
+             
+             {/* LEFT COLUMN: Visual Document Preview (if PDF images exist) */}
+             {pdfPreviewImages.length > 0 && (
+                <div className="w-1/2 flex flex-col gap-6 items-center shrink-0">
+                  <div className="text-xs uppercase tracking-widest font-bold text-slate-400 mb-2 border-b pb-2 w-full text-center">Original Document</div>
+                  {pdfPreviewImages.map((src, i) => (
+                    <div key={i} className="relative shadow-xl border border-slate-200">
+                      <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded shadow">Page {i + 1}</div>
+                      <img src={src} alt={`Page ${i+1}`} className="w-full max-w-[600px] h-auto object-contain bg-white" />
+                    </div>
+                  ))}
+                </div>
+             )}
+
+             {/* RIGHT COLUMN: Interactive Text Extraction */}
+             <div className="flex-1">
+               <div className="text-xs uppercase tracking-widest font-bold text-slate-400 mb-2 border-b pb-2 w-full text-center">Auto-Extracted Text</div>
+               {rawExtractionText ? (
+                  <div className="bg-white p-8 shadow-sm border border-slate-200 rounded-lg">
+                     {rawExtractionText.split(/(?:\r?\n){2,}/).map((paragraph: string, idx: number) => (
+                        <p key={idx} className="mb-4 text-slate-800 font-serif leading-relaxed text-[15px] selection:bg-indigo-200 selection:text-indigo-900 leading-8">
+                           {paragraph}
+                        </p>
+                     ))}
+                  </div>
+               ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-slate-400 min-h-[400px]">
+                    <FileText className="w-12 h-12 mb-4 opacity-20" />
+                    <p>No previewable text available for this format.</p>
+                  </div>
+               )}
+             </div>
+          </div>
+          
+          {/* Popover tools for highlighting (Smart Interactive Extraction Option D) */}
+          {selectionTarget && (
+             <div 
+               style={{ position: 'fixed', top: selectionTarget.y, left: selectionTarget.x, transform: 'translate(-50%, -100%)', zIndex: 9999 }}
+               className="bg-[#0a1628] shadow-xl rounded-lg p-2 flex flex-col gap-1 w-56 mb-2 animate-in fade-in zoom-in-95 duration-100 max-h-[300px] overflow-y-auto custom-scrollbar"
+               onMouseDown={(e) => e.preventDefault()} // Prevent losing selection
+             >
+                <div className="text-[9px] uppercase tracking-widest text-slate-400 font-bold px-2 py-1 mb-1 border-b border-slate-700">Assign Selection To:</div>
+                {[
+                  { label: "Reference Code", key: "referenceCode" },
+                  { label: "Title", key: "title" },
+                  { label: "Creator / Author", key: "creator" },
+                  { label: "Dates", key: "date" },
+                  { label: "Level of Description", key: "levelOfDescription" },
+                  { label: "Extent & Medium", key: "extentAndMedium" },
+                  { label: "Description / Content", key: "description" },
+                  { label: "Fonds", key: "fonds" },
+                  { label: "Sub-fonds", key: "subfonds" },
+                  { label: "Series", key: "series" }
+                ].map((action) => (
+                   <button 
+                     key={action.key}
+                     className="text-left text-xs font-bold text-slate-200 hover:bg-indigo-600 hover:text-white px-2 py-1.5 rounded transition-colors"
+                     onClick={() => {
+                        setChecklistValues(prev => ({ ...prev, [action.key]: selectionTarget.text }));
+                        
+                        // Sync with top-level uploadForm if applicable
+                        if (action.key === "title") setUploadForm(p => ({...p, title: selectionTarget.text}));
+                        if (action.key === "creator") setUploadForm(p => ({...p, creator: selectionTarget.text}));
+                        if (action.key === "fonds") setUploadForm(p => ({...p, fonds: selectionTarget.text}));
+                        if (action.key === "subfonds") setUploadForm(p => ({...p, subfonds: selectionTarget.text}));
+                        if (action.key === "series") setUploadForm(p => ({...p, series: selectionTarget.text}));
+                        
+                        setSelectionTarget(null);
+                        window.getSelection()?.removeAllRanges();
+                     }}
+                   >
+                     {action.label}
+                   </button>
+                ))}
+             </div>
+          )}
+
+          <div className="p-4 border-t bg-white flex justify-between shrink-0 shadow-[0_-10px_20px_rgba(0,0,0,0.02)] z-10">
+            <Button variant="outline" onClick={() => setPreviewOpen(false)} className="text-slate-500">Back</Button>
+            <div className="flex gap-4 items-center">
+              <span className="text-xs text-indigo-600 font-bold bg-indigo-50 px-3 py-1 rounded-full"><span className="animate-pulse">✨</span> Auto-extraction complete</span>
+              <Button onClick={() => { setPreviewOpen(false); submitIngest(); }} className="gap-2 bg-[#0a1628] hover:bg-[#1a2b4b] shadow-lg">
+                Proceed to Checklist <ChevronRight className="w-4 h-4 ml-2" />
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -770,7 +932,8 @@ export default function AdminMaterials() {
               const newMaterial: ArchivalMaterial = {
                  ...selectedMaterial, // if editing
                  id: editingMaterialId || crypto.randomUUID(),
-                 uniqueId: generatedRefCode,
+                 uniqueId: checklistValues.referenceCode || generatedRefCode || uploadForm.referenceCode,
+                 materialId: checklistValues.referenceCode || generatedRefCode || uploadForm.referenceCode, // Add materialId for public frontend compatibility
                  createdAt: selectedMaterial?.createdAt || new Date().toISOString(),
                  updatedAt: new Date().toISOString(),
                  createdBy: selectedMaterial?.createdBy || "Admin",
@@ -778,12 +941,19 @@ export default function AdminMaterials() {
                  ...checklistValues,
                  hierarchyPath,
                  access: uploadForm.access,
-                 title: uploadForm.title,
-                 creator: uploadForm.creator,
+                 title: checklistValues.title || uploadForm.title,
+                 creator: checklistValues.creator || uploadForm.creator,
               } as ArchivalMaterial;
 
               const updated = saveMaterial(newMaterial);
               setMaterials(updated);
+              
+              // Clear filters after successful ingest to make it visible
+              if (!editingMaterialId) {
+                setSelectedHierarchyItem(null);
+                setSearch("");
+                setCurrentPage(1);
+              }
               
               addActivity({
                 user: "Admin",

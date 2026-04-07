@@ -259,7 +259,7 @@ export default function Collections() {
               
               // We map Admin Material properties exactly to the layout from the mockup
               return (
-                <Link key={mat.id || mat.materialId} href={`/materials/${mat.id || mat.materialId}`}>
+                <Link key={mat.id || mat.uniqueId} href={`/materials/${mat.id || mat.uniqueId}`}>
                   <div className="bg-white rounded-2xl border border-border/60 overflow-hidden group hover:border-[#4169E1]/30 hover:shadow-lg hover:shadow-[#4169E1]/5 transition-all duration-300 cursor-pointer flex flex-col h-full">
                     {/* Color Banner with grid */}
                     <div className={`h-[150px] shrink-0 relative overflow-hidden ${CARD_COLORS[i % CARD_COLORS.length]}`}>
@@ -290,7 +290,7 @@ export default function Collections() {
 
                     {/* Content Section */}
                     <div className="p-4 flex flex-col flex-1 bg-white">
-                      <p className="text-[9px] font-mono font-bold text-muted-foreground/60 mb-1 tracking-widest">{mat.materialId}</p>
+                      <p className="text-[9px] font-mono font-bold text-muted-foreground/60 mb-1 tracking-widest">{mat.uniqueId || mat.materialId}</p>
                       <h3 className="font-bold text-[#0a1628] text-sm leading-snug mb-3 group-hover:text-[#4169E1] transition-colors">
                         {mat.title}
                       </h3>
@@ -298,7 +298,7 @@ export default function Collections() {
                       <div className="mt-auto flex items-end justify-between pt-3 border-t border-border/40">
                         <span className="text-[10px] text-muted-foreground font-semibold truncate max-w-[140px]">
                            {/* Fetch parent mapping or fallback */}
-                           Uncategorized
+                           {mat.hierarchyPath?.split(" > ")[1] || "General Collection"}
                         </span>
                         <span className="text-[10px] font-mono font-bold text-muted-foreground">
                           {mat.date ? new Date(mat.date).getFullYear() : "—"}
