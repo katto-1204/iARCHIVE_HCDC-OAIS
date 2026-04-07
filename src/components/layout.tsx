@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Link, useLocation } from "wouter";
 import { Library, LayoutDashboard, Database, Users, GitPullRequest, Search, FileText, Settings, LogOut, Menu, X, Bell, Loader2 } from "lucide-react";
-import { useGetMe, useLogout } from "@workspace/api-client-react";
+import { useGetMe, useLogout, useGetAccessRequests, useGetAuditLogs } from "@workspace/api-client-react";
 import { Button } from "./ui-components";
 import { cn } from "@/lib/utils";
 
@@ -44,10 +44,10 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
             <Link href="/terms" className="text-foreground/80 hover:text-accent transition-colors">Terms</Link>
             {user ? (
               <div className="flex items-center gap-4">
-                <Link href={user.role === 'admin' ? '/admin' : '/collections'} className="text-sm font-semibold text-primary">
+                <Link href={user.role === 'admin' ? '/admin' : user.role === 'archivist' ? '/archivist' : '/student'} className="text-sm font-semibold text-primary">
                   Welcome, {user.name}
                 </Link>
-                <Button variant="outline" size="sm" onClick={() => setLocation(user.role === 'admin' ? '/admin' : '/collections')}>Dashboard</Button>
+                <Button variant="outline" size="sm" onClick={() => setLocation(user.role === 'admin' ? '/admin' : user.role === 'archivist' ? '/archivist' : '/student')}>Dashboard</Button>
               </div>
             ) : (
               <Button variant="accent" size="sm" onClick={() => setLocation('/login')}>Sign In / Register</Button>
@@ -95,6 +95,10 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
 export function AdminLayout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const { data: user, isLoading } = useGetMe();
+  const { data: reqData } = useGetAccessRequests({ status: 'pending' });
+  const pendingCount = reqData?.requests?.length || 0;
+  const { data: auditData } = useGetAuditLogs({ limit: 5 });
+  const auditBadge = auditData?.logs?.length ? "New" : undefined;
   const { mutate: logoutMutate } = useLogout();
   const [sidebarOpen, setSidebarOpen] = React.useState(true);
 
@@ -117,17 +121,17 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         { icon: LayoutDashboard, label: "Metadata Dashboard", href: "/admin" },
         { icon: Database, label: "Archival Materials", href: "/admin/collections" },
         { icon: FileText, label: "Categories", href: "/admin/categories" },
-        { icon: GitPullRequest, label: "Requests", href: "/admin/requests" },
+        { icon: GitPullRequest, label: "Requests", href: "/admin/requests", badge: pendingCount },
         { icon: Users, label: "Admin Accounts", href: "/admin/users" },
         { icon: Bell, label: "Announcements", href: "/admin/announcements" },
-        { icon: Search, label: "Audit Logs", href: "/admin/audit" },
+        { icon: Search, label: "Audit Logs", href: "/admin/audit", badge: auditBadge },
       ]
     : user.role === "archivist"
       ? [
           { icon: LayoutDashboard, label: "Dashboard", href: "/archivist" },
           { icon: Database, label: "Archival Materials", href: "/archivist/collections" },
           { icon: FileText, label: "Categories", href: "/archivist/categories" },
-          { icon: GitPullRequest, label: "Requests", href: "/archivist/requests" },
+          { icon: GitPullRequest, label: "Requests", href: "/archivist/requests", badge: pendingCount },
         ]
       : [
           { icon: LayoutDashboard, label: "Dashboard", href: "/student" },
@@ -162,7 +166,10 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                   active ? `${roleActiveBg} text-white shadow-md` : "text-white/70 hover:bg-white/10 hover:text-white"
                 )}>
                   <link.icon className={cn("w-5 h-5 mr-3 transition-transform group-hover:scale-110", active ? "text-white" : "text-white/50")} />
-                  {link.label}
+                  <span className="flex-1">{link.label}</span>
+                  {link.badge ? (
+                     <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">{link.badge}</span>
+                  ) : null}
                 </Link>
               );
             })}

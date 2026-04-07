@@ -55,8 +55,8 @@ function PageViewer({
   const images = pageImages || [];
   const totalDisplayPages = images.length;
   
-  // Restricted: only allow 3 pages if user can't access
-  const maxVisiblePages = (!canAccess && isRestricted) ? Math.min(3, totalDisplayPages) : totalDisplayPages;
+  // Restricted: preview 3 pages, then on the 4th blur and show request access
+  const maxVisiblePages = (!canAccess && isRestricted) ? Math.min(4, totalDisplayPages) : totalDisplayPages;
   const visibleImages = images.slice(0, maxVisiblePages);
   
   const goTo = (idx: number) => {
@@ -90,7 +90,7 @@ function PageViewer({
             <img 
               src={visibleImages[currentPage]} 
               alt={`${title} - Page ${currentPage + 1}`} 
-              className="max-h-[580px] w-full object-cover transition-all duration-500"
+              className={`max-h-[580px] w-full object-cover transition-all duration-500 ${!canAccess && isRestricted && currentPage === 3 ? 'blur-md opacity-70' : ''}`}
               style={{ objectPosition: 'top' }}
             />
             
@@ -99,8 +99,8 @@ function PageViewer({
               {currentPage === 0 ? "Cover Page" : `Page ${currentPage + 1}`}
             </div>
 
-            {/* Restricted overlay on last visible page */}
-            {!canAccess && isRestricted && currentPage === maxVisiblePages - 1 && (
+            {/* Restricted overlay on 4th page (index 3) */}
+            {!canAccess && isRestricted && currentPage === 3 && (
               <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/60 to-white flex flex-col items-center justify-end pb-10 z-10">
                 <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-border/60 p-8 max-w-md text-center mx-4 animate-fade-in-up">
                   <div className="w-14 h-14 rounded-full bg-[#960000]/10 flex items-center justify-center mx-auto mb-4">
@@ -130,7 +130,7 @@ function PageViewer({
                 <ChevronLeft className="w-5 h-5 text-[#0a1628] group-hover:text-[#4169E1]" />
               </button>
             )}
-            {currentPage < maxVisiblePages - 1 && (
+            {currentPage < maxVisiblePages - 1 && (!isRestricted || canAccess || currentPage < 3) && (
               <button 
                 onClick={() => goTo(currentPage + 1)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 shadow-lg border border-border/60 flex items-center justify-center hover:bg-white transition-all z-20 group"
@@ -211,7 +211,7 @@ function PageViewer({
                 <ChevronLeft className="w-6 h-6 text-white" />
               </button>
             )}
-            {currentPage < maxVisiblePages - 1 && (
+            {currentPage < maxVisiblePages - 1 && (!isRestricted || canAccess || currentPage < 3) && (
               <button onClick={() => goTo(currentPage + 1)} className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
                 <ChevronRight className="w-6 h-6 text-white" />
               </button>

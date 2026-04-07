@@ -8,7 +8,7 @@ import {
 import { motion, useScroll, useTransform, useSpring } from "framer-motion";
 import { PublicLayout } from "@/components/layout";
 import { Button } from "@/components/ui-components";
-import { useGetStats, useGetCategories, useGetMaterials } from "@workspace/api-client-react";
+import { useGetStats, useGetCategories, useGetMaterials, useGetMe } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Home() {
@@ -26,6 +26,7 @@ export default function Home() {
   const { data: stats, isError: statsError } = useGetStats();
   const { data: categories, isError: categoriesError } = useGetCategories();
   const { data: materials, isError: materialsError } = useGetMaterials({ limit: 3 });
+  const { data: user } = useGetMe();
   const [scrollY, setScrollY] = React.useState(0);
   const { toast } = useToast();
 
@@ -193,11 +194,19 @@ export default function Home() {
               <button className="hover:text-white hover:bg-white/10 px-3.5 py-1.5 rounded-full transition-all cursor-pointer">Terms</button>
             </Link>
           </nav>
-          <Link href="/login">
-            <button className="flex items-center gap-2 bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white text-sm font-semibold px-4 py-1.5 rounded-full transition-all border border-white/10 hover:border-white/20 cursor-pointer">
-              <LogIn className="w-3.5 h-3.5" /> Login
-            </button>
-          </Link>
+          {user ? (
+            <Link href={user.role === 'admin' ? "/admin" : user.role === 'archivist' ? "/archivist" : "/student"}>
+              <button className="flex items-center gap-2 bg-[#4169E1] hover:bg-[#3558c8] text-white text-sm font-semibold px-4 py-1.5 rounded-full transition-all border border-[#4169E1] hover:border-white/20 cursor-pointer shadow-lg shadow-black/20">
+                <LayoutDashboard className="w-3.5 h-3.5" /> Dashboard
+              </button>
+            </Link>
+          ) : (
+            <Link href="/login">
+              <button className="flex items-center gap-2 bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white text-sm font-semibold px-4 py-1.5 rounded-full transition-all border border-white/10 hover:border-white/20 cursor-pointer">
+                <LogIn className="w-3.5 h-3.5" /> Login
+              </button>
+            </Link>
+          )}
           </div>
         </div>
       </header>

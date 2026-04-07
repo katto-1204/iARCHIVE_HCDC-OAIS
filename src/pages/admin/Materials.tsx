@@ -9,7 +9,7 @@ import {
   Search, Plus, Edit, ExternalLink, Layers, Settings2,
   Upload, FolderTree, ShieldCheck, CheckCircle2, FileText,
   FileDigit, Link as LinkIcon, Loader2, Video, Image as ImageIcon,
-  ZoomIn, ZoomOut, RotateCw, Maximize2, Download, AlertTriangle, ChevronRight, X, Save
+  ZoomIn, ZoomOut, RotateCw, Maximize2, Download, AlertTriangle, ChevronRight, X, Save, FolderOpen, ChevronLeft
 } from "lucide-react";
 import { ArchivalTree } from "@/components/ArchivalTree";
 import { MetadataChecklist } from "@/components/MetadataChecklist";
@@ -129,6 +129,33 @@ export default function AdminMaterials() {
   const [fileDetails, setFileDetails] = React.useState<{ name: string; ogSize: number; newSize: number } | null>(null);
   const [needsManualInput, setNeedsManualInput] = React.useState(true); // Default show for new modal layout
   const [validationErrors, setValidationErrors] = React.useState<string[]>([]);
+  const [showExtractedText, setShowExtractedText] = React.useState(true);
+
+  // ══ Feature: Auto-increment Material Number ══
+  React.useEffect(() => {
+    if (materials.length > 0) {
+      const matNumbers = materials.map(m => {
+        // Extract the last 7 digits from the material ID if it follows the 26iA010000001 pattern
+        // Or if it has a separate matNo field
+        const match = m.uniqueId?.match(/\d{7}$/);
+        return match ? parseInt(match[0], 10) : 0;
+      });
+      const nextNum = Math.max(...matNumbers, 0) + 1;
+      const formattedNum = String(nextNum).padStart(7, '0');
+      setUploadForm(prev => ({ ...prev, matNo: formattedNum }));
+    }
+  }, [materials.length]);
+
+  const movePdfImage = (idx: number, dir: 'left' | 'right') => {
+    setPdfPreviewImages(prev => {
+      const newArr = [...prev];
+      const targetIdx = dir === 'left' ? idx - 1 : idx + 1;
+      if (targetIdx >= 0 && targetIdx < newArr.length) {
+        [newArr[idx], newArr[targetIdx]] = [newArr[targetIdx], newArr[idx]];
+      }
+      return newArr;
+    });
+  };
 
   const { toast } = useToast();
 
@@ -189,12 +216,44 @@ export default function AdminMaterials() {
   };
 
   const handleMetadataScanUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
 
     setProcessingState("scanning");
     setScanProgress(0);
 
+    // Identify if folder/multiple images were uploaded
+    if (files.length > 1) {
+       const imageFiles = Array.from(files)
+         .filter(f => f.type.startsWith('image/'))
+         .sort((a,b) => a.name.localeCompare(b.name));
+       
+       setUploadForm(prev => ({
+          ...prev,
+          title: prev.title || "Batch Folder Upload",
+          format: "multipart/folder",
+       }));
+       
+       let extractedImages: string[] = [];
+       for (let i = 0; i < imageFiles.length; i++) {
+          const file = imageFiles[i];
+          const base64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = e => resolve(e.target?.result as string);
+            reader.readAsDataURL(file);
+          });
+          extractedImages.push(base64);
+          setScanProgress(Math.round(((i + 1) / imageFiles.length) * 100));
+       }
+       setPdfPreviewImages(extractedImages);
+       setUploadForm(prev => ({ ...prev, pages: extractedImages.length }));
+       setProcessingState("done");
+       setUploadOpen(false);
+       setPreviewOpen(true);
+       return;
+    }
+
+    const file = files[0];
     const isPdf = file.type === "application/pdf";
     const isDocx = file.name.toLowerCase().endsWith(".docx");
     const isCsv = file.name.toLowerCase().endsWith(".csv");
@@ -223,8 +282,8 @@ export default function AdminMaterials() {
         
         let fullText = "";
         
-        // Loop through max 10 pages for preview performance
-        const pagesToExtract = Math.min(pdf.numPages, 10);
+        // Loop through all pages so NO PDF gets skipped!
+        const pagesToExtract = pdf.numPages;
         for (let i = 1; i <= pagesToExtract; i++) {
            const page = await pdf.getPage(i);
            const textContent = await page.getTextContent();
@@ -922,9 +981,14 @@ export default function AdminMaterials() {
                  <h4 className="text-xs font-bold text-emerald-900 uppercase tracking-widest mb-1 flex items-center gap-2">
                    <FileText className="w-4 h-4 text-emerald-500" /> 2. Metadata Document (Scan)
                  </h4>
-                  <p className="text-[10px] text-muted-foreground mb-4 font-medium">Upload descriptive doc/PDF/Excel/CSV to route to the metadata parsing engine.</p>
+                  <p className="text-[10px] text-muted-foreground mb-4 font-medium">Upload descriptive doc/PDF/Excel/CSV to route to the metadata parsing engine, or a folder of images.</p>
                   <div className="flex gap-2">
-                    <Input type="file" onChange={handleMetadataScanUpload} className="bg-white flex-1" accept=".pdf,.doc,.docx,.txt,.csv,.xlsx" />
+                    <Input type="file" onChange={handleMetadataScanUpload} className="bg-white flex-1" accept=".pdf,.doc,.docx,.txt,.csv,.xlsx,image/*" multiple />
+                    {/* @ts-ignore */}
+                    <input type="file" onChange={handleMetadataScanUpload} className="hidden" id="folderUploadInput" webkitdirectory="true" multiple />
+                    <Button variant="outline" onClick={() => document.getElementById('folderUploadInput')?.click()} className="whitespace-nowrap h-10 px-3 bg-white hover:bg-emerald-50 text-emerald-700 border-emerald-200">
+                      <FolderOpen className="w-4 h-4 mr-1.5" /> Folder
+                    </Button>
                     {processingState === "done" && (
                       <Button 
                         variant="outline" 
@@ -999,38 +1063,54 @@ export default function AdminMaterials() {
           <div className="flex-1 overflow-y-auto px-10 py-8 scroll-smooth custom-scrollbar relative flex gap-8">
              
              {/* LEFT COLUMN: Visual Document Preview */}
-             <div className="w-1/2 flex flex-col gap-6 items-center shrink-0">
-               <div className="text-xs uppercase tracking-widest font-bold text-slate-400 mb-2 border-b pb-2 w-full text-center">Original Document Paged View</div>
+             <div className={cn("flex flex-col gap-6 items-center shrink-0 transition-all", showExtractedText ? "w-1/2" : "w-full mx-auto max-w-4xl")}>
+               <div className="text-xs uppercase tracking-widest font-bold text-slate-400 mb-2 border-b pb-2 w-full text-center flex justify-between px-4 items-center">
+                 <span className="flex-1 text-center">Original Document Paged View</span>
+                 <Button variant="ghost" size="sm" onClick={() => setShowExtractedText(!showExtractedText)} className="text-[10px] uppercase font-bold tracking-widest opacity-80 hover:opacity-100">
+                   {showExtractedText ? "Hide Text" : "Show Text"}
+                 </Button>
+               </div>
                {(pdfPreviewImages.length > 0 ? pdfPreviewImages : [
                  // Fallback mock images if PDF extraction failed (e.g. DOCX)
                  "https://images.unsplash.com/photo-1586281380349-632531db7ed4?w=800&auto=format&fit=crop",
                  "https://images.unsplash.com/photo-1616628188550-808682f392ce?w=800&auto=format&fit=crop"
                ]).map((src, i) => (
-                 <div key={i} className="relative shadow-[0_5px_25px_rgba(0,0,0,0.15)] border border-slate-200 bg-white">
+                 <div key={i} className="relative shadow-[0_5px_25px_rgba(0,0,0,0.15)] border border-slate-200 bg-white group">
                    <div className="absolute top-2 left-2 bg-indigo-900/80 backdrop-blur-sm text-white text-[10px] font-bold px-2.5 py-1 rounded shadow-sm z-10 uppercase tracking-widest">Page {i + 1}</div>
-                   <img src={src} alt={`Page ${i+1}`} className="w-full max-w-[600px] h-auto object-contain min-h-[500px]" />
+                   
+                   {/* Reorder Controls */}
+                   {pdfPreviewImages.length > 0 && (
+                     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10 bg-black/60 p-1 rounded backdrop-blur-sm">
+                        <button onClick={(e) => {e.stopPropagation(); movePdfImage(i, 'left')}} disabled={i===0} className="w-7 h-7 flex items-center justify-center text-white disabled:opacity-30 hover:bg-white/20 rounded cursor-pointer transition-colors"><ChevronLeft className="w-5 h-5"/></button>
+                        <button onClick={(e) => {e.stopPropagation(); movePdfImage(i, 'right')}} disabled={i===pdfPreviewImages.length-1} className="w-7 h-7 flex items-center justify-center text-white disabled:opacity-30 hover:bg-white/20 rounded cursor-pointer transition-colors"><ChevronRight className="w-5 h-5"/></button>
+                     </div>
+                   )}
+                   
+                   <img src={src} alt={`Page ${i+1}`} className={cn("h-auto object-contain min-h-[500px]", showExtractedText ? "w-full max-w-[600px]" : "w-[900px] max-w-full")} />
                  </div>
                ))}
              </div>
 
              {/* RIGHT COLUMN: Interactive Text Extraction */}
-             <div className="flex-1">
-               <div className="text-xs uppercase tracking-widest font-bold text-slate-400 mb-2 border-b pb-2 w-full text-center">Auto-Extracted Text</div>
-               {rawExtractionText ? (
-                  <div className="bg-white p-8 shadow-sm border border-slate-200 rounded-lg">
-                     {rawExtractionText.split(/(?:\r?\n){2,}/).map((paragraph: string, idx: number) => (
-                        <p key={idx} className="mb-4 text-slate-800 font-serif leading-relaxed text-[15px] selection:bg-indigo-200 selection:text-indigo-900 leading-8">
-                           {paragraph}
-                        </p>
-                     ))}
-                  </div>
-               ) : (
-                  <div className="flex flex-col items-center justify-center h-full text-slate-400 min-h-[400px]">
-                    <FileText className="w-12 h-12 mb-4 opacity-20" />
-                    <p>No previewable text available for this format.</p>
-                  </div>
-               )}
-             </div>
+             {showExtractedText && (
+               <div className="flex-1">
+                 <div className="text-xs uppercase tracking-widest font-bold text-slate-400 mb-2 border-b pb-2 w-full text-center">Auto-Extracted Text</div>
+                 {rawExtractionText ? (
+                    <div className="bg-white p-8 shadow-sm border border-slate-200 rounded-lg">
+                       {rawExtractionText.split(/(?:\r?\n){2,}/).map((paragraph: string, idx: number) => (
+                          <p key={idx} className="mb-4 text-slate-800 font-serif leading-relaxed text-[15px] selection:bg-indigo-200 selection:text-indigo-900 leading-8">
+                             {paragraph}
+                          </p>
+                       ))}
+                    </div>
+                 ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-slate-400 min-h-[400px]">
+                      <FileText className="w-12 h-12 mb-4 opacity-20" />
+                      <p>No previewable text available for this format.</p>
+                    </div>
+                 )}
+               </div>
+             )}
           </div>
           
           {/* Popover tools for highlighting */}
@@ -1077,14 +1157,50 @@ export default function AdminMaterials() {
              </div>
           )}
 
-          <div className="p-4 border-t bg-white flex justify-between shrink-0 shadow-[0_-10px_20px_rgba(0,0,0,0.02)] z-10">
-            <Button variant="outline" onClick={() => setPreviewOpen(false)} className="text-slate-500">Back</Button>
-            <div className="flex gap-4 items-center">
-              <span className="text-xs text-indigo-600 font-bold bg-indigo-50 px-3 py-1 rounded-full"><span className="animate-pulse">✨</span> Auto-extraction complete</span>
-              <Button onClick={() => { setPreviewOpen(false); submitIngest(); }} className="gap-2 bg-[#0a1628] hover:bg-[#1a2b4b] shadow-lg">
-                Proceed to Checklist <ChevronRight className="w-4 h-4 ml-2" />
-              </Button>
-            </div>
+          <div className="p-6 border-t bg-white shrink-0 shadow-[0_-10px_20px_rgba(0,0,0,0.02)] z-10 flex flex-col gap-6">
+             {/* OAIS Scanner and Access Control Section */}
+             <div className="flex gap-6 items-start bg-slate-50 border border-slate-200 p-4 rounded-xl">
+               <div className="flex-1">
+                 <label className="text-xs font-bold text-[#0a1628] uppercase tracking-widest block mb-2">Access Level Definition</label>
+                 <select 
+                   value={uploadForm.access} 
+                   onChange={e => setUploadForm(p => ({ ...p, access: e.target.value as any }))}
+                   className="w-full bg-white border border-slate-300 rounded-md text-sm px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all font-medium"
+                 >
+                   <option value="public">Public</option>
+                   <option value="restricted">Restricted</option>
+                   <option value="confidential">Confidential</option>
+                 </select>
+                 
+                 <div className="mt-4 flex items-center gap-2 text-[11px] font-bold text-emerald-700 bg-emerald-100/50 px-3 py-2 rounded-md border border-emerald-200 shadow-sm w-full">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" /> OAIS Compliance Scan: 
+                    {Object.values(checklistValues).filter(Boolean).length > 20 ? ' Level A (Strong)' : ' Level C (Basic)'}
+                 </div>
+               </div>
+               
+               <div className="flex-1 flex flex-col">
+                 <label className="text-xs font-bold text-[#0a1628] uppercase tracking-widest block mb-2">Author's Terms of Use</label>
+                 <textarea 
+                   placeholder="Enter any specific terms, copyright, or usage restrictions..." 
+                   value={uploadForm.termsOfUse || ""}
+                   onChange={e => setUploadForm(p => ({...p, termsOfUse: e.target.value}))}
+                   className="min-h-[90px] w-full bg-white border border-slate-300 rounded-md text-sm p-3 text-slate-800 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                 />
+               </div>
+             </div>
+             
+             {/* Footer Actions */}
+             <div className="flex justify-between items-center">
+               <Button variant="outline" onClick={() => setPreviewOpen(false)} className="text-slate-500">Back to Upload</Button>
+               <div className="flex gap-4 items-center">
+                 <span className="text-xs text-indigo-600 font-bold bg-indigo-50 px-3 py-1.5 rounded-full flex items-center gap-1.5 border border-indigo-100">
+                   <span className="animate-pulse flex items-center">✨</span> Auto-extraction complete
+                 </span>
+                 <Button onClick={() => { setPreviewOpen(false); submitIngest(); }} className="gap-2 bg-[#0a1628] hover:bg-[#1a2b4b] shadow-lg">
+                   Proceed to Checklist <ChevronRight className="w-4 h-4 ml-2" />
+                 </Button>
+               </div>
+             </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -1122,6 +1238,7 @@ export default function AdminMaterials() {
                  createdBy: (selectedMaterial as any)?.createdBy || "Admin",
                  ...uploadForm,
                  ...checklistValues,
+                 pageImages: pdfPreviewImages,
                  hierarchyPath,
                  access: uploadForm.access,
                  title: checklistValues.title || uploadForm.title,

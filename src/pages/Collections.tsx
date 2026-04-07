@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import {
   Search, SlidersHorizontal, Lock, ShieldAlert, FileText, Database, X,
   User, CheckCircle, BookOpen, Calendar, Layers, Eye, Grid3X3, List,
-  ArrowUpRight, Clock, Tag, Filter, Sparkles
+  ArrowUpRight, Clock, Tag, Filter, Sparkles, LayoutDashboard
 } from "lucide-react";
 import { useGetCategories, useGetMe } from "@workspace/api-client-react";
 import { checkOAISCompliance } from "@/data/metadataUtils";
@@ -122,13 +122,20 @@ export default function Collections() {
             <span className="text-white font-bold tracking-wide">Collections</span>
           </nav>
           {user ? (
-            <div className="flex items-center gap-4">
-              <div className="flex flex-col items-end">
-                <span className="text-xs font-bold text-white/40 uppercase tracking-tighter">{roleBranding.label}</span>
-                <span className="text-sm font-semibold text-white">{user.name}</span>
-              </div>
-              <div className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center">
-                <User className="w-5 h-5 text-white/70" />
+            <div className="flex items-center gap-6">
+              <Link href={user.role === 'admin' ? "/admin" : user.role === 'archivist' ? "/archivist" : "/student"}>
+                <button className="flex items-center gap-2.5 bg-white/10 hover:bg-white/20 text-white text-sm font-bold px-4 py-2 rounded-lg transition-all border border-white/20 hover:border-white/40 shadow-sm shadow-black/10">
+                  <LayoutDashboard className="w-4 h-4" /> Dashboard
+                </button>
+              </Link>
+              <div className="flex items-center gap-4 border-l border-white/10 pl-6">
+                <div className="flex flex-col items-end">
+                  <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">{roleBranding.label}</span>
+                  <span className="text-sm font-bold text-white">{user.name}</span>
+                </div>
+                <div className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center shadow-lg shadow-black/20">
+                  <User className="w-5 h-5 text-white/70" />
+                </div>
               </div>
             </div>
           ) : (
@@ -496,9 +503,30 @@ export default function Collections() {
               return (
                 <Link key={mat.id || mat.uniqueId} href={`/materials/${mat.id || mat.uniqueId}`}>
                   <div className="bg-white rounded-2xl border border-border/60 overflow-hidden group hover:border-[#4169E1]/40 hover:shadow-xl hover:shadow-[#4169E1]/5 transition-all duration-300 cursor-pointer flex">
-                    {/* Thumbnail */}
-                    <div className="w-[160px] shrink-0 relative overflow-hidden">
-                      {coverImg ? (
+                    <div className="w-[180px] shrink-0 relative overflow-hidden bg-slate-100 flex flex-col group border-r border-border/40">
+                      {mat.pageImages && mat.pageImages.length > 0 ? (
+                        <>
+                           <div className="flex-1 relative overflow-hidden">
+                             <img src={mat.pageImages[0]} alt={mat.title} className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105" />
+                             <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-2">
+                               <span className="text-[9px] font-bold text-white uppercase tracking-widest">{mat.pageImages.length} Pages</span>
+                             </div>
+                           </div>
+                           {/* Mini horizontal strip below main cover */}
+                           <div className="h-10 bg-white border-t border-border/50 flex gap-1 p-1 overflow-x-auto invisible group-hover:visible bg-slate-50 shadow-inner custom-scrollbar-mini">
+                              {mat.pageImages.slice(1, 10).map((img: string, idx: number) => (
+                                <div key={idx} className="w-8 h-full shrink-0 border border-slate-200 rounded overflow-hidden">
+                                   <img src={img} alt={`Page ${idx+2}`} className="w-full h-full object-cover" />
+                                </div>
+                              ))}
+                              {mat.pageImages.length > 10 && (
+                                <div className="w-8 h-full shrink-0 border border-slate-200 rounded bg-slate-200 flex items-center justify-center text-[8px] font-bold text-slate-500">
+                                  +{mat.pageImages.length - 10}
+                                </div>
+                              )}
+                           </div>
+                        </>
+                      ) : coverImg ? (
                         <>
                           <img src={coverImg} alt={mat.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                           <div className="absolute inset-0 bg-gradient-to-r from-transparent to-black/10" />

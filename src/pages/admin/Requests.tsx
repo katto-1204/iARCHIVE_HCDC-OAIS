@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Link } from "wouter";
 import { format } from "date-fns";
 import { AdminLayout } from "@/components/layout";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Badge, Button } from "@/components/ui-components";
@@ -84,7 +85,10 @@ export default function AdminRequests() {
                     <Badge variant={req.status === 'approved' ? 'success' : req.status === 'rejected' ? 'accent' : 'default'} className="capitalize">{req.status}</Badge>
                   </TableCell>
                   {tab === 'pending' && (
-                    <TableCell className="text-right space-x-2">
+                    <TableCell className="text-right space-x-2 flex justify-end">
+                      <Link href={"/collections/" + req.materialId}>
+                         <Button size="sm" variant="outline" className="text-[#4169E1] border-[#4169E1]/30 hover:bg-[#4169E1]/10">Preview Item</Button>
+                      </Link>
                       <Button size="sm" variant="outline" className="text-emerald-600 border-emerald-200 hover:bg-emerald-50" onClick={() => handleApprove(req.id)}>Approve</Button>
                       <Button size="sm" variant="outline" className="text-destructive border-destructive/20 hover:bg-destructive/10" onClick={() => handleReject(req.id)}>Reject</Button>
                     </TableCell>
