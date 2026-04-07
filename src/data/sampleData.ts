@@ -403,6 +403,8 @@ export interface ArchivalMaterial {
   aipId?: string;
   ingestDate?: string;
   ingestBy?: string;
+  pages?: number;
+  pageImages?: string[];
   createdAt: string;
   updatedAt: string;
   createdBy: string;
@@ -454,6 +456,17 @@ const material1: ArchivalMaterial = {
   hierarchyPath: "HCDC > Publications > Yearbooks > Yearbook Collection",
   thumbnailUrl: "https://images.unsplash.com/photo-1541339907198-e08756ebafe3?q=80&w=2070&auto=format&fit=crop",
   fileUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+  pages: 240,
+  pageImages: [
+    "https://images.unsplash.com/photo-1541339907198-e08756ebafe3?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1523050854058-8df90110c476?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1509062522246-3755977927d7?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1503676260728-1c00da094abc?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1562774053-701939374585?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1580582932707-520aed937b7b?q=80&w=800&auto=format&fit=crop",
+  ],
   createdAt: "2026-01-14T08:00:00.000Z",
   updatedAt: "2026-03-23T17:59:14.566Z",
   createdBy: "M. Santos",
@@ -505,6 +518,15 @@ const material2: ArchivalMaterial = {
   hierarchyPath: "HCDC > Administrative Records > Strategic Plans > Institutional Plans 2020–2025",
   thumbnailUrl: "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?q=80&w=2070&auto=format&fit=crop",
   fileUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+  pages: 120,
+  pageImages: [
+    "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=800&auto=format&fit=crop",
+  ],
   createdAt: "2026-01-18T08:00:00.000Z",
   updatedAt: "2026-03-23T17:59:30.545Z",
   createdBy: "M. Santos",
@@ -554,6 +576,14 @@ const material3: ArchivalMaterial = {
   termsOfUse: "Available for educational and research use with proper citation.",
   access: "public",
   hierarchyPath: "HCDC > CET > Faculty Research > Research Papers > 2023 Faculty Publications",
+  pages: 45,
+  pageImages: [
+    "https://images.unsplash.com/photo-1532012197267-da84d127e765?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?q=80&w=800&auto=format&fit=crop",
+  ],
   createdAt: "2026-01-17T08:00:00.000Z",
   updatedAt: "2026-03-23T17:59:26.589Z",
   createdBy: "M. Santos",
@@ -603,6 +633,16 @@ const material4: ArchivalMaterial = {
   termsOfUse: null,
   access: "public",
   hierarchyPath: "HCDC > BLIS > Student Research > Capstone Projects > 2024 Capstone Projects",
+  pages: 89,
+  pageImages: [
+    "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?q=80&w=800&auto=format&fit=crop",
+  ],
   createdAt: "2026-01-19T08:00:00.000Z",
   updatedAt: "2026-03-23T17:59:34.512Z",
   createdBy: "M. Santos",
@@ -652,6 +692,14 @@ const material5: ArchivalMaterial = {
   termsOfUse: "Strictly confidential. Access requires Board authorization.",
   access: "confidential",
   hierarchyPath: "HCDC > Administrative Records > Board Minutes > Board Minutes 2022",
+  pages: 58,
+  pageImages: [
+    "https://images.unsplash.com/photo-1553877522-43269d4ea984?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1568992687947-868a62a9f521?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1521737711867-e3b97375f902?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1542744173-05336fcc7ad4?q=80&w=800&auto=format&fit=crop",
+  ],
   createdAt: "2026-01-21T08:00:00.000Z",
   updatedAt: "2026-03-23T17:59:42.230Z",
   createdBy: "M. Santos",
@@ -701,6 +749,15 @@ const material6: ArchivalMaterial = {
   termsOfUse: null,
   access: "public",
   hierarchyPath: "HCDC > Photographs > Historic Photos > Campus Photos 1960–1990",
+  pages: 48,
+  pageImages: [
+    "https://images.unsplash.com/photo-1564429238961-bf8f57dbfa2b?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1569974498991-d3c12a504f95?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1555854877-bab0e564b8d5?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1497375638960-ca368c7231e4?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1544006659-f0b21884ce1d?q=80&w=800&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?q=80&w=800&auto=format&fit=crop",
+  ],
   createdAt: "2026-01-20T08:00:00.000Z",
   updatedAt: "2026-03-23T17:59:38.439Z",
   createdBy: "M. Santos",

@@ -87,6 +87,36 @@ export default function AdminMaterials() {
     fonds: "", subfonds: "", series: ""
   });
 
+  // ══ Feature 1: Auto-sync uploadForm → checklistValues ══
+  // When the user types title, creator, etc. in the ingestion form,
+  // those values auto-propagate into the checklist so they appear as ✅
+  React.useEffect(() => {
+    setChecklistValues(prev => {
+      const next = { ...prev };
+      if (uploadForm.title && uploadForm.title !== prev.title) next.title = uploadForm.title;
+      if (uploadForm.creator && uploadForm.creator !== prev.creator) next.creator = uploadForm.creator;
+      if (uploadForm.description && uploadForm.description !== prev.description) next.description = uploadForm.description;
+      if (uploadForm.format && uploadForm.format !== prev.format) next.format = uploadForm.format;
+      if (uploadForm.dateOfDescription && uploadForm.dateOfDescription !== prev.dateOfDescription) next.dateOfDescription = uploadForm.dateOfDescription;
+      if (uploadForm.levelOfDescription && uploadForm.levelOfDescription !== prev.levelOfDescription) next.levelOfDescription = uploadForm.levelOfDescription;
+      if (uploadForm.extentAndMedium && uploadForm.extentAndMedium !== prev.extentAndMedium) next.extentAndMedium = uploadForm.extentAndMedium;
+      if (uploadForm.access && uploadForm.access !== prev.access) next.accessConditions = uploadForm.access === 'public' ? 'Public access; no restrictions.' : uploadForm.access === 'restricted' ? 'Restricted access; authorization required.' : 'Confidential; board authorization required.';
+      if (uploadForm.termsOfUse && uploadForm.termsOfUse !== prev.termsOfUse) next.termsOfUse = uploadForm.termsOfUse;
+      if (uploadForm.referenceCode && uploadForm.referenceCode !== prev.referenceCode) next.referenceCode = uploadForm.referenceCode;
+      // Sync hierarchy-derived fields
+      if (uploadForm.fonds) {
+        const hierarchyPath = `HCDC > ${uploadForm.fonds}${uploadForm.subfonds ? ' > ' + uploadForm.subfonds : ''}${uploadForm.series ? ' > ' + uploadForm.series : ''}`;
+        next.hierarchyPath = hierarchyPath;
+      }
+      return next;
+    });
+  }, [
+    uploadForm.title, uploadForm.creator, uploadForm.description,
+    uploadForm.format, uploadForm.dateOfDescription, uploadForm.levelOfDescription,
+    uploadForm.extentAndMedium, uploadForm.access, uploadForm.termsOfUse,
+    uploadForm.referenceCode, uploadForm.fonds, uploadForm.subfonds, uploadForm.series
+  ]);
+
   const generatedRefCode = `${uploadForm.year}iA${uploadForm.catNo}${uploadForm.matNo}`;
 
   const [processingState, setProcessingState] = React.useState<"idle" | "scanning" | "compressing" | "done">("idle");
@@ -159,6 +189,7 @@ export default function AdminMaterials() {
     setUploadForm(prev => ({
       ...prev,
       title: prev.title || file.name.replace(/\.[^/.]+$/, ""),
+      format: prev.format || file.type || "application/octet-stream",
     }));
 
     for (let i = 0; i <= 100; i += 10) {
@@ -168,10 +199,12 @@ export default function AdminMaterials() {
 
     try {
       let extractedText = "";
+      let detectedPageCount = 0;
       
       if (isPdf && window.pdfjsLib) {
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        detectedPageCount = pdf.numPages;
         
         let fullText = "";
         let images: string[] = [];
@@ -213,38 +246,130 @@ export default function AdminMaterials() {
       }
 
       if (extractedText) {
-        // Option C + native structure parsing
         setRawExtractionText(extractedText);
         
-        // Normalize any kind of whitespace sequence (including newlines) into a single space
+        // Normalize whitespace for pattern matching
         const cleanText = extractedText.replace(/\s+/g, ' '); 
         const previewSnippet = extractedText.substring(0, 150).trim();
         
-        // Accurate pattern boundary extractor
+        // ══ SMART FIELD EXTRACTION ENGINE (Enhanced) ══
+        const allFieldLabels = [
+          "Reference Code", "Unique ID", "Title", "Creator", "Author",
+          "Date", "Dates", "Year", "Level of Description", "Level",
+          "Extent and Medium", "Extent", "Format", "Fonds", "Sub-fonds",
+          "Subfonds", "Series", "Reference", "Access", "Conditions",
+          "Abstract", "Summary", "Description", "Scope and Content",
+          "Subject", "Keywords", "Publisher", "Published by",
+          "Contributor", "Rights", "Copyright", "Language",
+          "Coverage", "Source", "Relation", "Type",
+          "Archival History", "Custodial History", "Administrative History",
+          "Arrangement", "Physical Characteristics", "Condition",
+          "Finding Aids", "Note", "Notes"
+        ];
+        const nextLabelsStr = allFieldLabels.join("|");
+
         const extractField = (fieldName: string, alternateNames: string[] = []) => {
            const labels = [fieldName, ...alternateNames].map(l => l.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')).join("|");
-           const nextLabels = [
-             "Reference Code", "Unique ID", "Title", "Creator", "Author", "Date", 
-             "Level of Description", "Extent and Medium", "Fonds", "Sub-fonds", "Series",
-             "Reference", "Access", "Conditions", "Abstract"
-           ].join("|");
-           
-           const regex = new RegExp(`(?:^|\\s)(?:${labels})\\s*:?\\s*(.*?)(?=\\s*(?:(?:${nextLabels})\\s*:?\\s*)|$)`, "i");
+           const regex = new RegExp(`(?:^|\\s)(?:${labels})\\s*:?\\s*(.*?)(?=\\s*(?:(?:${nextLabelsStr})\\s*:?\\s*)|$)`, "i");
            const match = cleanText.match(regex);
            return match ? match[1].trim() : "";
         };
         
-        // Extended parsing for extra smart offline capability
+        // ── Core fields ──
         const idMatch = cleanText.match(/(2\d)iA(\d{2})(\d{7})/i);
         const parsedTitle = extractField("Title");
-        const parsedCreator = extractField("Creator", ["Author", "Created By"]);
-        const parsedDate = extractField("Date", ["Dates", "Year"]);
+        const parsedCreator = extractField("Creator", ["Author", "Created By", "Written By", "Prepared By"]);
+        const parsedDate = extractField("Date", ["Dates", "Year", "Date Published", "Publication Date"]);
         const parsedLevel = extractField("Level of Description", ["Level"]);
-        const parsedExtent = extractField("Extent and Medium", ["Format", "Extent"]);
+        const parsedExtent = extractField("Extent and Medium", ["Format", "Extent", "Pages"]);
         const parsedFonds = extractField("Fonds");
         const parsedSubfonds = extractField("Sub-fonds", ["Subfonds", "Sub fonds"]);
         const parsedSeries = extractField("Series");
-        const parsedAbstract = extractField("Abstract", ["Summary", "Description", "Scope and Content"]);
+        const parsedAbstract = extractField("Abstract", ["Summary", "Description", "Scope and Content", "Overview"]);
+        
+        // ── NEW: Extended smart fields ──
+        const parsedSubject = extractField("Subject", ["Keywords", "Topics", "Tags"]);
+        const parsedPublisher = extractField("Publisher", ["Published by", "Publishing", "Issued by"]);
+        const parsedContributor = extractField("Contributor", ["Contributors", "Contributing", "Collaborator"]);
+        const parsedRights = extractField("Rights", ["Copyright", "License", "Permissions"]);
+        const parsedLanguage = extractField("Language", ["Languages", "Written in"]);
+        const parsedCoverage = extractField("Coverage", ["Geographic Coverage", "Region", "Location"]);
+        const parsedSource = extractField("Source", ["Source of Acquisition", "Provenance"]);
+        const parsedArrangement = extractField("Arrangement", ["System of Arrangement", "Organization"]);
+        const parsedArchivalHistory = extractField("Archival History", ["Custodial History", "History"]);
+        const parsedNotes = extractField("Note", ["Notes", "Remarks"]);
+        const parsedPhysical = extractField("Physical Characteristics", ["Condition", "Physical Description"]);
+        
+        // ── SMART INFERENCE: detect patterns without explicit labels ──
+        // Date detection: multiple formats
+        let inferredDate = parsedDate;
+        if (!inferredDate) {
+          const datePatterns = [
+            /\b(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})\b/,                  // YYYY-MM-DD
+            /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}\b/i,  // Month DD, YYYY
+            /\b\d{1,2}\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}\b/i,  // DD Month YYYY
+          ];
+          for (const pattern of datePatterns) {
+            const m = cleanText.match(pattern);
+            if (m) { inferredDate = m[0]; break; }
+          }
+        }
+        
+        // Language inference from content
+        let inferredLanguage = parsedLanguage;
+        if (!inferredLanguage) {
+          const filipinoWords = ['ang', 'mga', 'sa', 'ng', 'na', 'ay', 'para', 'mga', 'ito', 'nito'];
+          const lowerText = cleanText.toLowerCase();
+          const filipinoCount = filipinoWords.filter(w => lowerText.includes(` ${w} `)).length;
+          if (filipinoCount >= 4) inferredLanguage = "eng; fil";
+          else if (filipinoCount >= 2) inferredLanguage = "fil; eng";
+          else inferredLanguage = "eng";
+        }
+        
+        // Access level inference from keywords
+        let inferredAccess: "public" | "restricted" | "confidential" = uploadForm.access;
+        const lowerClean = cleanText.toLowerCase();
+        if (lowerClean.includes('confidential') || lowerClean.includes('classified') || lowerClean.includes('board authorization')) {
+          inferredAccess = 'confidential';
+        } else if (lowerClean.includes('restricted') || lowerClean.includes('authorized personnel') || lowerClean.includes('internal use only')) {
+          inferredAccess = 'restricted';
+        }
+        
+        // "By" pattern for creator: "By John Doe" or "Prepared by Jane Smith"
+        let inferredCreator = parsedCreator;
+        if (!inferredCreator) {
+          const byMatch = cleanText.match(/(?:^|\s)(?:by|prepared\s+by|written\s+by|authored\s+by)\s+([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){0,3})/i);
+          if (byMatch) inferredCreator = byMatch[1].trim();
+        }
+        
+        // Publisher from "Published by ..." or "© YYYY Organization"
+        let inferredPublisher = parsedPublisher;
+        if (!inferredPublisher) {
+          const copyrightMatch = cleanText.match(/©\s*\d{4}\s*([^.;,]+)/i);
+          if (copyrightMatch) inferredPublisher = copyrightMatch[1].trim();
+        }
+        
+        // Subject/keywords from "Keywords:" inline
+        let inferredSubject = parsedSubject;
+        if (!inferredSubject) {
+          const kwMatch = cleanText.match(/(?:keywords?|tags?)\s*:?\s*([^.\n]+)/i);
+          if (kwMatch) inferredSubject = kwMatch[1].trim();
+        }
+        
+        // File size & page count for extent
+        const ogSize = file.size;
+        const fileSizeStr = ogSize > 1048576 ? `${(ogSize / 1048576).toFixed(1)} MB` : `${(ogSize / 1024).toFixed(0)} KB`;
+        let inferredExtent = parsedExtent;
+        if (!inferredExtent) {
+          const parts: string[] = [];
+          if (detectedPageCount > 0) parts.push(`${detectedPageCount} pages`);
+          parts.push(file.type || 'application/octet-stream');
+          parts.push(fileSizeStr);
+          inferredExtent = parts.join('; ');
+        }
+        
+        // Format MIME
+        const inferredFormat = file.type || 'application/octet-stream';
         
         setUploadForm((prev: any) => {
           let fName = prev.fonds;
@@ -275,23 +400,42 @@ export default function AdminMaterials() {
             catNo: idMatch ? idMatch[2] : prev.catNo,
             matNo: idMatch ? idMatch[3] : prev.matNo,
             title: parsedTitle || prev.title,
-            creator: parsedCreator || prev.creator,
+            creator: inferredCreator || prev.creator,
+            format: inferredFormat || prev.format,
+            access: inferredAccess,
             fonds: fName,
             subfonds: sName,
-            series: serName
+            series: serName,
+            extentAndMedium: inferredExtent || prev.extentAndMedium,
           };
         });
 
-        // Also populate checklist values for known fields
+        // Populate checklist with ALL detected/inferred fields
         setChecklistValues(prev => ({
           ...prev,
           title: parsedTitle || prev.title,
-          creator: parsedCreator || prev.creator,
-          date: parsedDate || prev.date,
-          levelOfDescription: parsedLevel || prev.levelOfDescription,
-          extentAndMedium: parsedExtent || prev.extentAndMedium,
-          description: parsedAbstract || previewSnippet,
-          referenceCode: idMatch ? idMatch[0] : "",
+          creator: inferredCreator || prev.creator,
+          date: inferredDate || prev.date,
+          levelOfDescription: parsedLevel || prev.levelOfDescription || "Item",
+          extentAndMedium: inferredExtent || prev.extentAndMedium,
+          description: parsedAbstract || previewSnippet || prev.description,
+          scopeContent: parsedAbstract || prev.scopeContent,
+          referenceCode: idMatch ? idMatch[0] : prev.referenceCode || "",
+          format: inferredFormat || prev.format,
+          language: inferredLanguage || prev.language,
+          subject: inferredSubject || prev.subject,
+          publisher: inferredPublisher || prev.publisher,
+          contributor: parsedContributor || prev.contributor,
+          rights: parsedRights || prev.rights,
+          coverage: parsedCoverage || prev.coverage,
+          source: parsedSource || prev.source,
+          arrangement: parsedArrangement || prev.arrangement,
+          archivalHistory: parsedArchivalHistory || prev.archivalHistory,
+          note: parsedNotes || prev.note,
+          physicalCharacteristics: parsedPhysical || prev.physicalCharacteristics,
+          accessConditions: inferredAccess === 'public' ? 'Public access; no restrictions.' : inferredAccess === 'restricted' ? 'Restricted access; authorization required.' : inferredAccess === 'confidential' ? 'Confidential; board authorization required.' : prev.accessConditions,
+          rulesConventions: prev.rulesConventions || "ISAD(G) Second Edition, 2000; Dublin Core Metadata Element Set v1.1.",
+          dateOfDescription: prev.dateOfDescription || new Date().toISOString().split('T')[0],
         }));
       }
     } catch (err) {
