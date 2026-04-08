@@ -778,7 +778,7 @@ export interface ActivityEntry {
   id: string;
   timestamp: string;
   user: string;
-  actionType: "upload" | "edit" | "metadata_update" | "access_change" | "delete";
+  actionType: "upload" | "edit" | "metadata_update" | "access_change" | "delete" | "request";
   description: string;
   materialId?: string;
 }
@@ -794,4 +794,9 @@ export const ACTIVITY_FEED: ActivityEntry[] = [
   { id: "act-8", timestamp: "2026-03-21T14:15:00Z", user: "M. Santos", actionType: "edit", description: "Edited title of 'HCDC Yearbook 2018–2019' (added alternative title 'Pag-abot')", materialId: "26iA010000001" },
   { id: "act-9", timestamp: "2026-03-20T09:00:00Z", user: "Admin", actionType: "upload", description: "Initialized archival hierarchy structure for HCDC Fonds" },
   { id: "act-10", timestamp: "2026-03-19T16:45:00Z", user: "M. Santos", actionType: "metadata_update", description: "Applied ISAD(G) metadata checklist to Yearbook series" },
+];
+
+export const PENDING_REQUESTS = [
+  { id: "req1", user: "Dr. Maria Santos", purpose: "Dissertation Research", date: "2026-04-05", material: "HCDC-CET-2023-001" },
+  { id: "req2", user: "Prof. John Doe", purpose: "Institutional History Book", date: "2026-04-06", material: "HCDC-CET-2023-005" },
 ];

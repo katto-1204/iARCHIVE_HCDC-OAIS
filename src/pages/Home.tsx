@@ -2,8 +2,9 @@ import * as React from "react";
 import { Link, useLocation } from "wouter";
 import {
   Search, Shield, Database, Lock, CheckCircle, GitBranch, BookOpen,
-  Users, FileSearch, ChevronRight, Download, ArrowRight, LayoutDashboard,
-  FolderOpen, Eye, ClipboardList, Settings, LogIn, Sparkles, Activity
+  Users, FileSearch, ChevronRight, ArrowRight, LayoutDashboard,
+  FolderOpen, Eye, ClipboardList, Settings, LogIn, Sparkles, Activity,
+  FileText, ShieldCheck
 } from "lucide-react";
 import { motion, useScroll, useTransform, useSpring } from "framer-motion";
 import { PublicLayout } from "@/components/layout";
@@ -80,7 +81,7 @@ export default function Home() {
     { icon: Lock, title: "Role-Based Access", desc: "Advanced security protocols separate Public, Restricted, and Confidential materials based on verified institutional clearance levels." },
     { icon: Shield, title: "Fixity & Integrity", desc: "Automated SHA-256 bit-level checks ensure your archival information packages (AIP) remain authentic and unaltered over decades." },
     { icon: GitBranch, title: "Request Workflow", desc: "A streamlined researcher portal for petitioning access to restricted items, integrated directly with archivist approval queues." },
-    { icon: Activity, title: "Audit & Compliance", desc: "Complete transparency with granular activity logs tracking every view, download, and modification for institutional oversight." },
+    { icon: Activity, title: "Audit & Compliance", desc: "Complete transparency with granular activity logs tracking every view and modification for institutional oversight." },
     { icon: LayoutDashboard, title: "OAIS Compliance", desc: "Built on the ISO 14721:2012 framework, managing the full lifecycle from SIP ingestion to DIP access." },
     { icon: ClipboardList, title: "Login Monitoring", desc: "Proactive security tracking for all user sessions, ensuring archival access remains within authorized institutional boundaries." },
   ];
@@ -93,7 +94,7 @@ export default function Home() {
       border: "border-[#4169E1]/30",
       bg: "bg-[#4169E1]/5",
       dot: "bg-[#4169E1]",
-      desc: "Freely accessible to all visitors. No account required to view or download these materials.",
+      desc: "Freely accessible to all visitors. No account required to view these materials.",
       examples: ["HCDC Yearbooks", "Historical photographs", "Public bulletins"],
     },
     {
@@ -146,7 +147,7 @@ export default function Home() {
       textColor: "text-foreground",
       border: "border border-border",
       desc: "Browse public collections freely. Register to request access to restricted materials.",
-      actions: ["Browse public collections", "Search materials", "Request restricted access", "Download public items"],
+      actions: ["Browse public collections", "Search materials", "Request restricted access", "View preservation metadata"],
       cta: "Register Now",
       href: "/register",
     },
@@ -155,7 +156,7 @@ export default function Home() {
   const steps = [
     { num: "01", icon: Search, title: "Browse & Search", desc: "Explore the full archival collection using keyword search, category filters, and date ranges.", color: "bg-[#4169E1]" },
     { num: "02", icon: BookOpen, title: "Request Access", desc: "Submit an access request for restricted materials, providing your research purpose and credentials.", color: "bg-[#960000]" },
-    { num: "03", icon: Download, title: "View & Download", desc: "Once approved, access and download archival materials with full preservation metadata attached.", color: "bg-emerald-600" },
+    { num: "03", icon: FileText, title: "Interactive Viewing", desc: "Once approved, access archival materials with full preservation metadata attached through our secure viewer.", color: "bg-emerald-600" },
   ];
 
   const catColors = [

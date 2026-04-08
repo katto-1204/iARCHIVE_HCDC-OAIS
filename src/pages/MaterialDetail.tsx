@@ -2,7 +2,7 @@ import * as React from "react";
 import { useRoute, Link } from "wouter";
 import { format } from "date-fns";
 import {
-  FileText, Download, Lock, ArrowLeft, CheckCircle,
+  FileText, Lock, ArrowLeft, CheckCircle,
   ZoomIn, ZoomOut, RotateCcw, Maximize2, ExternalLink,
   Database, HardDrive, Calendar, User, Tag, BookOpen, AlertTriangle, Edit,
   ChevronLeft, ChevronRight, X
@@ -315,7 +315,7 @@ export default function MaterialDetail() {
   const { data: user } = useGetMe();
   const { data: requests } = useGetAccessRequests({ status: "approved" });
   const [activeTab, setActiveTab] = React.useState<"details" | "dc" | "related">("details");
-  const [showDownloadModal, setShowDownloadModal] = React.useState(false);
+
   const [showAccessModal, setShowAccessModal] = React.useState(false);
 
   const isApproved = requests?.requests?.some((r: any) => r.materialId === params?.id);
@@ -360,7 +360,7 @@ export default function MaterialDetail() {
   }[material.access as "public" | "restricted" | "confidential"] ?? { label: material.access?.toUpperCase() || "", className: "bg-muted text-muted-foreground border border-border" };
 
   const fixityVerified = material.fixityStatus === "verified" || material.sha256;
-  const canDownload = material.access === "public" || user?.role === "admin" || user?.role === "archivist" || !!isApproved;
+  const canViewDetail = material.access === "public" || user?.role === "admin" || user?.role === "archivist" || !!isApproved;
   const isRestricted = material.access === "restricted" || material.access === "confidential";
   const canAccessFull = material.access === "public" || user?.role === "admin" || user?.role === "archivist" || !!isApproved;
 
@@ -663,17 +663,9 @@ export default function MaterialDetail() {
                 </div>
               )}
 
-              {/* Download Button */}
+              {/* Access Request / Info Section (Download Removed) */}
               <div className="mt-5 pt-5 border-t border-border/60">
-                {canDownload && material.fileUrl ? (
-                  <button onClick={() => setShowDownloadModal(true)} className="w-full bg-[#0a1628] hover:bg-[#4169E1] text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl">
-                    <Download className="w-5 h-5" /> Download
-                  </button>
-                ) : canDownload && !material.fileUrl ? (
-                  <button disabled className="w-full bg-muted text-muted-foreground font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 cursor-not-allowed">
-                    <Download className="w-5 h-5" /> No File Attached
-                  </button>
-                ) : (
+                {!canViewDetail && (
                   <Link
                     href={`/request-access?materialId=${encodeURIComponent(material.id)}&title=${encodeURIComponent(material.title)}&date=${encodeURIComponent(material.date ?? "")}&cover=${encodeURIComponent(material.thumbnailUrl ?? "")}`}
                   >
@@ -682,35 +674,21 @@ export default function MaterialDetail() {
                     </button>
                   </Link>
                 )}
+                {canViewDetail && (
+                   <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl flex items-center gap-3">
+                      <CheckCircle className="w-5 h-5 text-emerald-600" />
+                      <div>
+                        <p className="text-sm text-emerald-800 font-semibold mb-0.5">Authorized for Full Access</p>
+                        <p className="text-xs text-emerald-700/80">You have been granted full interactive viewing rights for this material.</p>
+                      </div>
+                   </div>
+                )}
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {showDownloadModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-md bg-white rounded-2xl border border-border shadow-2xl p-6">
-            <div className="flex items-center gap-2 mb-3 text-[#960000]">
-              <AlertTriangle className="w-5 h-5" />
-              <h3 className="font-bold text-lg">Download Disabled</h3>
-            </div>
-            <p className="text-sm text-muted-foreground mb-5">
-              Direct downloading is currently disabled by repository policy. Please submit an access request or contact the archive administrator for controlled release.
-            </p>
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setShowDownloadModal(false)} className="px-4 py-2 rounded-lg border border-border text-sm font-semibold hover:bg-muted/50">
-                Close
-              </button>
-              <Link href="/request-access">
-                <button onClick={() => setShowDownloadModal(false)} className="px-4 py-2 rounded-lg bg-[#960000] text-white text-sm font-semibold hover:bg-[#7a0000]">
-                  Request Access
-                </button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Restricted Access Modal */}
       <RestrictedAccessModal 

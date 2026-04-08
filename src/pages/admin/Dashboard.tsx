@@ -3,15 +3,16 @@ import { AdminLayout } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui-components";
 import { Badge } from "@/components/ui-components";
 import { CompletionRing } from "@/components/CompletionRing";
-import { FieldHeatmap } from "@/components/FieldHeatmap";
 import { Barcode } from "@/components/Barcode";
 import {
   Database, CheckCircle2, BarChart3, TrendingUp, ShieldCheck,
   ChevronDown, ChevronUp, Clock, Upload, Edit3, Shield,
-  AlertCircle, XCircle, FileText, Activity, Filter,
+  AlertCircle, XCircle, FileText, Activity, Filter, Lock,
 } from "lucide-react";
+import { Link } from "wouter";
 import {
   SAMPLE_MATERIALS, COMBINED_FIELDS, ISADG_AREAS, ACTIVITY_FEED,
+  PENDING_REQUESTS,
   type ArchivalMaterial,
 } from "@/data/sampleData";
 import {
@@ -24,13 +25,16 @@ import { format } from "date-fns";
 
 type FilterTab = "all" | "complete" | "partial" | "incomplete";
 
-const ACTION_ICONS: Record<string, React.ElementType> = {
+const ACTION_ICONS: Record<string, any> = {
   upload: Upload,
   edit: Edit3,
   metadata_update: BarChart3,
   access_change: Shield,
   delete: XCircle,
+  request: ShieldCheck,
 };
+
+const CHART_DATA = [12, 18, 15, 25, 32, 28, 45, 38, 52, 48, 65, 72];
 
 const ACTION_COLORS: Record<string, string> = {
   upload: "#10B981",
@@ -38,6 +42,7 @@ const ACTION_COLORS: Record<string, string> = {
   metadata_update: "#8B5CF6",
   access_change: "#F59E0B",
   delete: "#EF4444",
+  request: "#8B5CF6",
 };
 
 export default function AdminDashboard() {
@@ -92,22 +97,103 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* ═══ A. Metric Cards ═══ */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-        {statCards.map((card, i) => (
-          <Card key={i} className="border-border/50 shadow-sm hover:shadow-md transition-all bg-white relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-28 h-28 -mr-6 -mt-6 rounded-full opacity-10 transition-transform group-hover:scale-125" style={{ backgroundColor: card.color }} />
-            <CardContent className="p-5 relative z-10">
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: card.color + "15" }}>
-                  <card.icon className="w-5 h-5" style={{ color: card.color }} />
+      {/* ═══ Top Section: Charts & Critical Alerts ═══ */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+        {/* Ingestion Trend (Stock Chart) */}
+        <Card className="lg:col-span-2 shadow-sm border-border/50 bg-white overflow-hidden">
+          <CardHeader className="border-b border-border/50 pb-4 flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-lg flex items-center gap-2 text-[#0a1628]">
+                <TrendingUp className="w-5 h-5 text-emerald-500" /> Ingestion Velocity
+              </CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">Growth of digital assets over the last 12 weeks.</p>
+            </div>
+            <div className="text-right">
+              <span className="text-2xl font-bold text-[#0a1628]">+24%</span>
+              <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">Outperforming Target</p>
+            </div>
+          </CardHeader>
+          <CardContent className="p-6 h-[200px] flex items-end gap-1">
+            {CHART_DATA.map((val, i) => (
+              <div key={i} className="flex-1 flex flex-col items-center group cursor-pointer">
+                <div 
+                  className="w-full bg-[#4169E1]/10 group-hover:bg-[#4169E1]/30 transition-all rounded-t-sm relative"
+                  style={{ height: `${(val / 80) * 100}%` }}
+                >
+                  <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-[#0a1628] text-white text-[9px] font-bold px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                    {val}
+                  </div>
+                </div>
+                <span className="text-[8px] mt-2 text-muted-foreground font-bold">W{i+1}</span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Important: Critical Alerts & Requests */}
+        <Card className="shadow-sm border-border/50 bg-[#0a1628] text-white overflow-hidden relative">
+          <div className="absolute top-0 right-0 w-32 h-32 -mr-8 -mt-8 rounded-full bg-white/5 blur-2xl" />
+          <CardHeader className="border-border/10 pb-4 relative z-10">
+            <CardTitle className="text-sm flex items-center gap-2 uppercase tracking-widest font-bold">
+              <AlertCircle className="w-4 h-4 text-amber-400" /> Attention Required
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0 relative z-10">
+            <div className="divide-y divide-white/10">
+              <div className="px-5 py-3.5 hover:bg-white/5 transition-colors">
+                <p className="text-xs font-bold mb-1 flex items-center gap-2">
+                   <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                   Pending Access Requests
+                </p>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-white/60">{PENDING_REQUESTS.length} researchers waiting for review</span>
+                  <Link href="/requests">
+                    <button className="text-[9px] font-black uppercase text-[#4169E1] hover:text-white transition-colors">Review Queue</button>
+                  </Link>
                 </div>
               </div>
-              <h3 className="text-3xl font-bold font-display text-[#0a1628] mb-0.5">{card.value}</h3>
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{card.title}</p>
-              <p className="text-[10px] text-muted-foreground/60 mt-1">{card.desc}</p>
-            </CardContent>
-          </Card>
+              <div className="px-5 py-3.5 hover:bg-white/5 transition-colors">
+                <p className="text-xs font-bold mb-1 flex items-center gap-2">
+                   <div className="w-2 h-2 rounded-full bg-amber-500" />
+                   Metadata Incomplete
+                </p>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-white/60">{materials.filter(m => computeCompletion(m) < 50).length} records below 50%</span>
+                  <button className="text-[9px] font-black uppercase text-[#4169E1] hover:text-white transition-colors" onClick={() => setActiveFilter("incomplete")}>Fix Items</button>
+                </div>
+              </div>
+              <div className="px-5 py-3.5 hover:bg-white/5 transition-colors">
+                <p className="text-xs font-bold mb-1 flex items-center gap-2">
+                   <div className="w-2 h-2 rounded-full bg-[#10B981]" />
+                   OAIS Integrity Scan
+                </p>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-white/60">System-wide scan completed successfully</span>
+                  <span className="text-[9px] text-emerald-500 font-bold">STABLE</span>
+                </div>
+              </div>
+            </div>
+            <div className="p-5 mt-4">
+              <button className="w-full bg-[#4169E1] hover:bg-[#3151b1] text-white text-[10px] font-bold py-2.5 rounded-lg transition-all shadow-lg">
+                Run System Maintenance
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Metric Cards Row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        {statCards.map((card, i) => (
+          <div key={i} className="bg-white border border-border/60 rounded-xl p-4 shadow-sm hover:shadow-md transition-all">
+             <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 rounded-lg" style={{ backgroundColor: card.color + "15" }}>
+                   <card.icon className="w-4 h-4" style={{ color: card.color }} />
+                </div>
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{card.title}</span>
+             </div>
+             <p className="text-2xl font-bold text-[#0a1628] leading-none">{card.value}</p>
+          </div>
         ))}
       </div>
 
@@ -219,23 +305,8 @@ export default function AdminDashboard() {
         </CardContent>
       </Card>
 
-      {/* Bottom grid: Heatmap + Activity Feed */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* ═══ F. Field Completion Heatmap ═══ */}
+        {/* ═══ G. Activity Feed (Now Expanded) ═══ */}
         <Card className="lg:col-span-2 shadow-sm border-border/50 bg-white">
-          <CardHeader className="border-b border-border/50 pb-4">
-            <CardTitle className="text-lg flex items-center gap-2 text-[#0a1628]">
-              <BarChart3 className="w-5 h-5 text-[#8B5CF6]" /> Field Completion Heatmap
-            </CardTitle>
-            <p className="text-xs text-muted-foreground mt-1">Percentage of records where each metadata field is filled across all {materials.length} materials.</p>
-          </CardHeader>
-          <CardContent className="p-5">
-            <FieldHeatmap materials={materials} />
-          </CardContent>
-        </Card>
-
-        {/* ═══ G. Activity Feed ═══ */}
-        <Card className="shadow-sm border-border/50 bg-white">
           <CardHeader className="border-b border-border/50 pb-4">
             <CardTitle className="text-sm flex items-center gap-2 text-[#0a1628] uppercase tracking-wider font-bold">
               <Clock className="w-4 h-4 text-muted-foreground" /> Activity Feed
@@ -279,7 +350,6 @@ export default function AdminDashboard() {
             </div>
           </CardContent>
         </Card>
-      </div>
     </AdminLayout>
   );
 }

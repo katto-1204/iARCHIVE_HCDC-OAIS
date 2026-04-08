@@ -9,7 +9,7 @@ import {
   Search, Plus, Edit, ExternalLink, Layers, Settings2,
   Upload, FolderTree, ShieldCheck, CheckCircle2, FileText,
   FileDigit, Link as LinkIcon, Loader2, Video, Image as ImageIcon,
-  ZoomIn, ZoomOut, RotateCw, Maximize2, Download, AlertTriangle, ChevronRight, X, Save, FolderOpen, ChevronLeft
+  ZoomIn, ZoomOut, RotateCw, Maximize2, AlertTriangle, ChevronRight, X, Save, FolderOpen, ChevronLeft
 } from "lucide-react";
 import { ArchivalTree } from "@/components/ArchivalTree";
 import { MetadataChecklist } from "@/components/MetadataChecklist";
@@ -786,9 +786,6 @@ export default function AdminMaterials() {
                                      <Badge variant="outline" className="text-[9px] bg-emerald-50 text-emerald-700 border-emerald-200 uppercase font-bold px-1.5 py-0.5">Item Level Record</Badge>
                                  </div>
                                </div>
-                               <Button variant="outline" size="sm" onClick={() => downloadMetadataExcel(mat)} className="h-8 shadow-sm">
-                                  <Download className="w-3.5 h-3.5 mr-2" /> Export Metadata
-                               </Button>
                              </div>
                              
                              {/* Re-use MetadataChecklist layout directly! */}
@@ -989,20 +986,6 @@ export default function AdminMaterials() {
                     <Button variant="outline" onClick={() => document.getElementById('folderUploadInput')?.click()} className="whitespace-nowrap h-10 px-3 bg-white hover:bg-emerald-50 text-emerald-700 border-emerald-200">
                       <FolderOpen className="w-4 h-4 mr-1.5" /> Folder
                     </Button>
-                    {processingState === "done" && (
-                      <Button 
-                        variant="outline" 
-                        size="icon" 
-                        title="Download Scanned Metadata Excel"
-                        className="h-10 w-10 border-emerald-200 text-emerald-600 hover:bg-emerald-50 shrink-0"
-                        onClick={() => {
-                          const pseudoMaterial = { ...uploadForm, ...checklistValues } as unknown as ArchivalMaterial;
-                          downloadMetadataExcel(pseudoMaterial);
-                        }}
-                      >
-                        <Download className="w-4 h-4" />
-                      </Button>
-                    )}
                   </div>
                  
                  {processingState === "scanning" && (
@@ -1325,11 +1308,6 @@ function MediaPreview({ material }: { material: ArchivalMaterial }) {
             </div>
             <p className="text-sm font-bold text-[#0a1628]">{material.title}</p>
             <p className="text-[10px] text-muted-foreground mt-2 font-mono uppercase tracking-widest">{material.format || "DOCUMENT"}</p>
-            <div className="mt-6">
-               <Button variant="outline" size="sm" className="bg-white border-primary/20 text-primary h-8 px-4 text-[10px] font-bold uppercase tracking-widest">
-                 Upload Reference File
-               </Button>
-            </div>
           </div>
         )}
         
@@ -1342,8 +1320,7 @@ function MediaPreview({ material }: { material: ArchivalMaterial }) {
               </button>
             ))}
             <div className="w-px h-4 bg-white/20 mx-1" />
-            <button title="Download" className="w-8 h-8 rounded-full hover:bg-white/20 flex items-center justify-center text-white/80 hover:text-white transition-colors">
-              <Download className="w-4 h-4" />
+            <button title="Options" className="w-8 h-8 rounded-full hover:bg-white/20 flex items-center justify-center text-white/80 hover:text-white transition-colors">
             </button>
           </div>
         )}
@@ -1354,11 +1331,6 @@ function MediaPreview({ material }: { material: ArchivalMaterial }) {
         <div className="flex items-center gap-4 text-muted-foreground font-semibold">
            <span className="flex items-center gap-1.5"><ImageIcon className="w-3.5 h-3.5" /> {material.type || "Unknown"}</span>
            <span className="flex items-center gap-1.5 uppercase tracking-widest"><FileDigit className="w-3.5 h-3.5" /> {material.extentAndMedium?.split(";")[1]?.trim() || "N/A"}</span>
-        </div>
-        <div className="flex items-center gap-2">
-           <Button variant="ghost" size="sm" className="h-7 px-3 text-[9px] font-bold text-primary hover:bg-primary/5 uppercase tracking-widest flex items-center gap-1">
-             <ExternalLink className="w-3 h-3" /> External Source
-           </Button>
         </div>
       </div>
     </div>
@@ -1487,14 +1459,6 @@ function MaterialDetailView({ material, onBack }: { material: ArchivalMaterial, 
           </div>
           <div className="flex items-center gap-2">
             {editingFieldCode && <Badge variant="outline" className="text-xs bg-white text-muted-foreground border-border/50">Edit Mode Active</Badge>}
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="h-8 px-3 text-[10px] bg-white border-border/60 hover:bg-muted text-primary flex items-center gap-1.5 font-bold uppercase tracking-wider shadow-sm"
-              onClick={() => downloadMetadataExcel(material)}
-            >
-              <Download className="w-3.5 h-3.5" /> Export to Excel
-            </Button>
           </div>
         </div>
         <div className="divide-y divide-border/50 bg-white">
