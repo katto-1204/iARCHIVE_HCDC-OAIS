@@ -1,6 +1,6 @@
 {
   "extends": "../../tsconfig.base.json",
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "seed.ts"],
   "exclude": ["node_modules", "build", "dist", "**/*.test.ts"],
   "compilerOptions": {
     "noEmit": true,
@@ -11,12 +11,19 @@
     "moduleResolution": "bundler",
     "types": ["node", "vite/client"],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@workspace/db": ["../../lib/db/src"],
+      "@workspace/db/*": ["../../lib/db/src/*"],
+      "drizzle-orm": ["../../lib/db/node_modules/drizzle-orm"],
+      "drizzle-orm/*": ["../../lib/db/node_modules/drizzle-orm/*"]
     }
   },
   "references": [
     {
       "path": "../../lib/api-client-react"
+    },
+    {
+      "path": "../../lib/db"
     }
   ]
 }
