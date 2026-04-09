@@ -342,7 +342,7 @@ export default function MaterialDetail() {
         <div className="text-center">
           <FileText className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-foreground mb-2">Material Not Found</h2>
-          <p className="text-muted-foreground mb-6">This archival record does not exist or has been removed.</p>
+          <p className="text-muted-foreground mb-6">Record ID: <span className="font-mono text-xs">{params?.id}</span></p>
           <Link href="/collections">
             <button className="bg-[#4169E1] text-white font-semibold px-6 py-2.5 rounded-lg text-sm hover:bg-[#3558c8] transition-colors">
               Back to Collections
@@ -393,14 +393,31 @@ export default function MaterialDetail() {
           <span className="text-foreground font-medium truncate max-w-xs">{material.title}</span>
         </div>
         
-        {/* Admin Edit Shortcut */}
-        {(user?.role === "admin" || user?.role === "archivist") && (
-          <Link href={`/admin/collections`}>
-            <button className="flex items-center gap-1.5 text-xs font-bold text-[#4169E1] hover:text-[#3558c8] bg-[#4169E1]/10 px-3 py-1.5 rounded-lg border border-[#4169E1]/20 transition-all">
-              <Edit className="w-3.5 h-3.5" /> Edit in Admin
-            </button>
-          </Link>
-        )}
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => {
+              const headers = ["Field", "Value"];
+              const rows = Object.entries(material).filter(([k,v]) => typeof v === 'string' || typeof v === 'number').map(([k,v]) => [k, v]);
+              const csvContent = [headers.join(","), ...rows.map(r => `"${r[0]}","${String(r[1]).replace(/\n/g, ' ')}"`)].join("\n");
+              const blob = new Blob([csvContent], { type: 'text/csv' });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement("a");
+              link.href = url;
+              link.download = `metadata_${material.uniqueId}.csv`;
+              link.click();
+            }}
+            className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 transition-all"
+          >
+            <FileText className="w-3.5 h-3.5" /> Download Metadata
+          </button>
+          {(user?.role === "admin" || user?.role === "archivist") && (
+            <Link href={`/admin/collections`}>
+              <button className="flex items-center gap-1.5 text-xs font-bold text-[#4169E1] hover:text-[#3558c8] bg-[#4169E1]/10 px-3 py-1.5 rounded-lg border border-[#4169E1]/20 transition-all">
+                <Edit className="w-3.5 h-3.5" /> Edit in Admin
+              </button>
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* ─── MAIN CONTENT ─── */}

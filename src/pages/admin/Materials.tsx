@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
-  Search, Plus, Edit, ExternalLink, Layers, Settings2,
+  Search, Plus, Edit, ExternalLink, Layers, Settings2, Download,
   Upload, FolderTree, ShieldCheck, CheckCircle2, FileText,
   FileDigit, Link as LinkIcon, Loader2, Video, Image as ImageIcon,
   ZoomIn, ZoomOut, RotateCw, Maximize2, AlertTriangle, ChevronRight, X, Save, FolderOpen, ChevronLeft, Lock
@@ -434,6 +434,43 @@ export default function AdminMaterials() {
     setUploadOpen(true);
   };
 
+  const handleExportMetadata = () => {
+    if (filteredMaterials.length === 0) return;
+    
+    // Create CSV content
+    const headers = ["Unique ID", "Title", "Creator", "Date", "Level", "Reference Code", "Description", "Access", "Hierarchy"];
+    const rows = filteredMaterials.map(m => [
+      m.uniqueId,
+      m.title,
+      m.creator,
+      m.dateOfDescription,
+      m.levelOfDescription,
+      m.referenceCode,
+      m.description?.replace(/\n/g, " "),
+      m.access,
+      m.hierarchyPath
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.map(cell => `"${cell || ''}"`).join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `iarchive_metadata_export_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast({ 
+      title: "Export Successful", 
+      description: `Targeting ${filteredMaterials.length} records. Downloaded as CSV.` 
+    });
+  };
+
   // Hierarchy Helpers
   const fondsList = SAMPLE_HIERARCHY.children || []; // Departments (CET, BLIS)
   const currentDeptNode = fondsList.find((f: any) => f.name === uploadForm.subfonds);
@@ -446,9 +483,12 @@ export default function AdminMaterials() {
           <h1 className="text-3xl font-display font-bold text-[#0a1628]">Archival Materials</h1>
           <p className="text-muted-foreground">Browse hierarchy, manage metadata, and catalog items using ISAD(G) standards.</p>
         </div>
-        <div className="flex gap-2">
-           <Button variant="outline" className="shrink-0 gap-2 w-full sm:w-auto" onClick={() => setChecklistOpen(true)}>
-              <ShieldCheck className="w-4 h-4" /> Metadata Checklist
+        <div className="flex gap-2 flex-wrap sm:flex-nowrap">
+           <Button variant="outline" className="shrink-0 gap-2 w-full sm:w-auto hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 transition-all" onClick={handleExportMetadata}>
+              <Download className="w-4 h-4" /> Export Metadata
+           </Button>
+           <Button variant="outline" className="shrink-0 gap-2 w-full sm:w-auto shadow-sm" onClick={() => setChecklistOpen(true)}>
+              <ShieldCheck className="w-4 h-4 text-primary" /> Metadata Checklist
            </Button>
            <Button className="shrink-0 shadow-lg gap-2 w-full sm:w-auto" onClick={() => {
                setProcessingState("idle"); 
@@ -580,7 +620,15 @@ export default function AdminMaterials() {
                             <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-red-600" onClick={(e) => handleDeleteMaterial(mat.id, e)}>
                               <X className="w-3.5 h-3.5" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-7 w-7 text-muted-foreground hover:text-primary"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.open(`/materials/${mat.id}`, '_blank');
+                              }}
+                            >
                               <ExternalLink className="w-3.5 h-3.5" />
                             </Button>
                           </div>
@@ -598,6 +646,29 @@ export default function AdminMaterials() {
                                      <span className="font-mono text-xs font-bold text-muted-foreground">{mat.uniqueId}</span>
                                      <Badge variant="outline" className="text-[9px] bg-emerald-50 text-emerald-700 border-emerald-200 uppercase font-bold px-1.5 py-0.5">Item Level Record</Badge>
                                  </div>
+                               </div>
+                               <div className="flex items-center gap-3">
+                                 <Button 
+                                   variant="outline" 
+                                   size="sm" 
+                                   className="text-[10px] font-bold text-emerald-600 border-emerald-200 hover:bg-emerald-50 gap-1.5"
+                                   onClick={() => {
+                                      const headers = ["Field", "Value"];
+                                      const rows = Object.entries(mat).filter(([k,v]) => typeof v === 'string' || typeof v === 'number').map(([k,v]) => [k, v]);
+                                      const csvContent = [headers.join(","), ...rows.map(r => `"${r[0]}","${String(r[1]).replace(/\n/g, ' ')}"`)].join("\n");
+                                      const blob = new Blob([csvContent], { type: 'text/csv' });
+                                      const url = URL.createObjectURL(blob);
+                                      const link = document.createElement("a");
+                                      link.href = url;
+                                      link.download = `metadata_${mat.uniqueId}.csv`;
+                                      link.click();
+                                   }}
+                                 >
+                                   <Download className="w-3.5 h-3.5" /> Download Metadata
+                                 </Button>
+                                 <Button variant="outline" size="sm" className="text-[10px] font-bold text-indigo-600 border-indigo-200 hover:bg-indigo-50 gap-1.5" onClick={(e) => handleEditMaterial(mat, e)}>
+                                   <Edit className="w-3.5 h-3.5" /> Edit Material
+                                 </Button>
                                </div>
                              </div>
                              
