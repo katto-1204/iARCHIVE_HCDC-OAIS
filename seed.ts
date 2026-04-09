@@ -1,8 +1,5 @@
-import { db, categoriesTable, materialsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, categoriesTable } from "@workspace/db";
 import crypto from "crypto";
-
-
 
 const genId = () => crypto.randomUUID();
 
@@ -71,24 +68,16 @@ const newCategories = [
   { id: genId(), name: "Bachelor of Elementary Education (BEEd)", description: "Program", categoryNo: 33, level: "series" as const, parentId: ste_id },
   { id: genId(), name: "Bachelor of Physical Education (BPEd)", description: "Program", categoryNo: 34, level: "series" as const, parentId: ste_id },
   { id: genId(), name: "Bachelor of Secondary Education", description: "Program", categoryNo: 35, level: "series" as const, parentId: ste_id },
-  { id: genId(), name: "Bachelor of Special Needs Education – Generalist", description: "Program", categoryNo: 36, level: "series" as const, parentId: ste_id },
+  { id: genId(), name: "Bachelor of Special Needs Education \u2013 Generalist", description: "Program", categoryNo: 36, level: "series" as const, parentId: ste_id },
 ];
 
 async function seed() {
   console.log("Seeding categories into DB...");
   try {
-    // We do NOT delete old materials! We just delete old categories and insert new ones
-    // First, let's keep track of existing categories to see if there's any.
-    // If you delete categories and cascade is not set, materials might lose category.
-    // So usually we update them, but since we are redefining the entire structure...
-
-    // We will just clear categories table and insert anew. 
     await db.delete(categoriesTable);
-
     for (const cat of newCategories) {
       await db.insert(categoriesTable).values(cat);
     }
-
     console.log("Seeding Complete!");
     process.exit(0);
   } catch (err) {
