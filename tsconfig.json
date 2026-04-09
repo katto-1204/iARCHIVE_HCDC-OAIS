@@ -1,23 +1,69 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "include": ["src/**/*", "seed.ts"],
-  "exclude": ["node_modules", "build", "dist", "**/*.test.ts"],
   "compilerOptions": {
-    "noEmit": true,
+    /* Standalone configuration: Inlined from tsconfig.base.json to resolve Vercel build issues */
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": [
+      "ESNext",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "jsx": "preserve",
-    "lib": ["esnext", "dom", "dom.iterable"],
+    /* Strictness & Safety */
+    "strict": true,
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": false,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "alwaysStrict": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "noEmitOnError": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    /* Vite & Environment */
+    "noEmit": true,
     "resolveJsonModule": true,
     "allowImportingTsExtensions": true,
-    "moduleResolution": "bundler",
-    "types": ["node", "vite/client"],
+    "types": [
+      "node",
+      "vite/client"
+    ],
+    "customConditions": [
+      "workspace"
+    ],
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@workspace/db": ["../../lib/db/src"],
-      "@workspace/db/*": ["../../lib/db/src/*"],
-      "drizzle-orm": ["../../lib/db/node_modules/drizzle-orm"],
-      "drizzle-orm/*": ["../../lib/db/node_modules/drizzle-orm/*"]
+      "@/*": [
+        "./src/*"
+      ],
+      "@workspace/db": [
+        "../../lib/db/src"
+      ],
+      "@workspace/db/*": [
+        "../../lib/db/src/*"
+      ],
+      "drizzle-orm": [
+        "../../lib/db/node_modules/drizzle-orm"
+      ],
+      "drizzle-orm/*": [
+        "../../lib/db/node_modules/drizzle-orm/*"
+      ]
     }
   },
+  "include": [
+    "src/**/*",
+    "seed.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "build",
+    "dist",
+    "**/*.test.ts"
+  ],
   "references": [
     {
       "path": "../../lib/api-client-react"
