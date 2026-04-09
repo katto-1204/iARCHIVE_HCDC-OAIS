@@ -11,10 +11,11 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import {
-  SAMPLE_MATERIALS, COMBINED_FIELDS, ISADG_AREAS, ACTIVITY_FEED,
+  COMBINED_FIELDS, ISADG_AREAS,
   PENDING_REQUESTS,
   type ArchivalMaterial,
 } from "@/data/sampleData";
+import { getMaterials, getActivityFeed } from "@/data/storage";
 import {
   computeCompletion, computeISADGCompletion, computeDCCompletion,
   computeAreaBreakdown, getEssentialFieldsStatus, getAllFieldValues,
@@ -49,7 +50,8 @@ export default function AdminDashboard() {
   const [activeFilter, setActiveFilter] = React.useState<FilterTab>("all");
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
 
-  const materials = SAMPLE_MATERIALS;
+  const [materials, setMaterials] = React.useState<ArchivalMaterial[]>(() => getMaterials());
+  const [activityFeed] = React.useState(() => getActivityFeed());
   const stats = React.useMemo(() => computeDashboardStats(materials), [materials]);
 
   // Filter materials
@@ -314,7 +316,7 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent className="p-0 max-h-[450px] overflow-y-auto">
             <div className="divide-y divide-border/30">
-              {ACTIVITY_FEED.map(entry => {
+              {activityFeed.map(entry => {
                 const ActionIcon = ACTION_ICONS[entry.actionType] || Activity;
                 const actionColor = ACTION_COLORS[entry.actionType] || "#64748b";
                 return (

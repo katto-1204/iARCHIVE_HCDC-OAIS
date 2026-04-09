@@ -1,0 +1,2118 @@
+[
+  {
+    "id": "TC001",
+    "title": "Admin login redirects to admin dashboard",
+    "description": "Verifies that a user can log in successfully and is redirected to the admin dashboard with an authenticated session.",
+    "category": "User Login",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the user lands on the admin dashboard"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC002",
+    "title": "Admin role routing after login reaches the admin dashboard",
+    "description": "An admin can log in and is routed to the admin dashboard successfully.",
+    "category": "Admin Dashboard",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the user lands on the admin dashboard"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC003",
+    "title": "Approve a pending user registration",
+    "description": "Approving a pending registration moves the user from pending to active users.",
+    "category": "User Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation item to open user management"
+      },
+      {
+        "type": "action",
+        "description": "Click Approve on a pending user"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the user is no longer shown in pending registrations and appears in the active users list"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC004",
+    "title": "Submit access request from restricted/confidential material flow",
+    "description": "A public researcher can submit an access request from a restricted/confidential material and see a submission confirmation.",
+    "category": "View Material Detail",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /collections"
+      },
+      {
+        "type": "action",
+        "description": "Set the access level filter to restricted or confidential"
+      },
+      {
+        "type": "action",
+        "description": "Open a material's detail view from the filtered results"
+      },
+      {
+        "type": "action",
+        "description": "Choose to request access for the material"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the reason for access with a clear research purpose"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the contact details with valid values"
+      },
+      {
+        "type": "action",
+        "description": "Submit the access request"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a submission confirmation is visible"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC005",
+    "title": "Start an access request from a restricted/confidential material detail",
+    "description": "A public researcher who opens a restricted or confidential material is funneled to the access request flow from the material detail view.",
+    "category": "View Material Detail",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /collections"
+      },
+      {
+        "type": "action",
+        "description": "Set the access level filter to restricted or confidential"
+      },
+      {
+        "type": "action",
+        "description": "Open a material's detail view from the filtered results"
+      },
+      {
+        "type": "action",
+        "description": "Choose to request access for the material"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the request access form page is displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC006",
+    "title": "Browse collections using search, OAIS-only, filters, view toggle, open item, then clear filters",
+    "description": "Verifies that a public user can find materials using search and filters, open a material from results, and reset back to the full listing by clearing filters.",
+    "category": "Browse Collections",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /collections"
+      },
+      {
+        "type": "action",
+        "description": "Fill a search query into the search field"
+      },
+      {
+        "type": "action",
+        "description": "Toggle OAIS-only filtering on"
+      },
+      {
+        "type": "action",
+        "description": "Open the filters panel"
+      },
+      {
+        "type": "action",
+        "description": "Select an access level filter option"
+      },
+      {
+        "type": "action",
+        "description": "Toggle between grid and list view"
+      },
+      {
+        "type": "action",
+        "description": "Click a material from the results to open its detail view"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the material detail view is displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC007",
+    "title": "Approve a pending access request",
+    "description": "Approving a pending access request updates its status to approved in the requests list.",
+    "category": "Access Request Management (Admin)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation item to open access requests management"
+      },
+      {
+        "type": "action",
+        "description": "Click Approve on a pending access request"
+      },
+      {
+        "type": "action",
+        "description": "Confirm the approval"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the request is marked as approved in the list"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC008",
+    "title": "Use the material viewer and metadata tabs and export metadata CSV",
+    "description": "A public researcher can open a material, use viewer controls, switch metadata tabs, and download a metadata CSV successfully.",
+    "category": "View Material Detail",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /collections"
+      },
+      {
+        "type": "action",
+        "description": "Open a material's detail view from the collections results"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to a different page using the page thumbnails"
+      },
+      {
+        "type": "action",
+        "description": "Zoom in on the document"
+      },
+      {
+        "type": "action",
+        "description": "Rotate the document"
+      },
+      {
+        "type": "action",
+        "description": "Switch to the Dublin Core metadata tab"
+      },
+      {
+        "type": "action",
+        "description": "Download the material metadata as CSV"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a metadata CSV download is initiated"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC009",
+    "title": "Ingest a new public material and see it listed in admin materials",
+    "description": "This test verifies an admin can complete the ingestion workflow end-to-end and the new material appears in the admin materials list.",
+    "category": "Material Ingestion",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation option to open the admin materials management area"
+      },
+      {
+        "type": "action",
+        "description": "Initiate a new material ingest"
+      },
+      {
+        "type": "action",
+        "description": "Select a department/subfonds from the hierarchy selector"
+      },
+      {
+        "type": "action",
+        "description": "Select a series from the series selector"
+      },
+      {
+        "type": "action",
+        "description": "Fill Ingest Public Material 001 into the material title field"
+      },
+      {
+        "type": "action",
+        "description": "Fill Creator A into the creator field"
+      },
+      {
+        "type": "action",
+        "description": "Select Public as the access level"
+      },
+      {
+        "type": "action",
+        "description": "Fill a valid terms of use text into the terms field"
+      },
+      {
+        "type": "action",
+        "description": "Finalize the ingest workflow"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the newly ingested material is visible in the admin materials list"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC010",
+    "title": "Directly submit an access request from the request access page",
+    "description": "A researcher can complete the request access form from the dedicated page and receives a visible submission confirmation.",
+    "category": "Request Access (Researcher)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /request-access"
+      },
+      {
+        "type": "action",
+        "description": "Select or describe a material to request access for"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the reason for access with a clear research purpose"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the affiliation details with a valid value"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the contact details with valid values"
+      },
+      {
+        "type": "action",
+        "description": "Submit the access request"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a submission confirmation is visible"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC011",
+    "title": "Reject a pending access request",
+    "description": "Rejecting a pending access request updates its status to rejected in the requests list.",
+    "category": "Access Request Management (Admin)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation item to open access requests management"
+      },
+      {
+        "type": "action",
+        "description": "Click Reject on a pending access request"
+      },
+      {
+        "type": "action",
+        "description": "Confirm the rejection"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the request is marked as rejected in the list"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC012",
+    "title": "Export a batch metadata CSV from the filtered admin materials list",
+    "description": "This test verifies an admin can filter the materials list and export a batch metadata CSV for the visible results.",
+    "category": "Export Metadata",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation option to open the admin materials management area"
+      },
+      {
+        "type": "action",
+        "description": "Fill Export Batch Seed 001 into the search field"
+      },
+      {
+        "type": "action",
+        "description": "Initiate a new material ingest"
+      },
+      {
+        "type": "action",
+        "description": "Select a department/subfonds from the hierarchy selector"
+      },
+      {
+        "type": "action",
+        "description": "Select a series from the series selector"
+      },
+      {
+        "type": "action",
+        "description": "Fill Export Batch Seed 001 into the material title field"
+      },
+      {
+        "type": "action",
+        "description": "Fill Creator Export into the creator field"
+      },
+      {
+        "type": "action",
+        "description": "Select Public as the access level"
+      },
+      {
+        "type": "action",
+        "description": "Fill a valid terms of use text into the terms field"
+      },
+      {
+        "type": "action",
+        "description": "Finalize the ingest workflow"
+      },
+      {
+        "type": "action",
+        "description": "Fill Export Batch Seed 001 into the search field"
+      },
+      {
+        "type": "action",
+        "description": "Click the batch export metadata control"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a CSV download is initiated for the visible filtered materials"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC013",
+    "title": "Create and publish an announcement",
+    "description": "Verifies an admin can create an announcement, publish it, and see it appear in the announcements list as an active item.",
+    "category": "Announcement Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation link to announcement management"
+      },
+      {
+        "type": "action",
+        "description": "Start creating a new announcement"
+      },
+      {
+        "type": "action",
+        "description": "Fill Test Announcement Alpha into the announcement title field"
+      },
+      {
+        "type": "action",
+        "description": "Fill Announcement content for automated test into the announcement content field"
+      },
+      {
+        "type": "action",
+        "description": "Set the announcement to active/published"
+      },
+      {
+        "type": "action",
+        "description": "Save the announcement"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the announcements list contains Test Announcement Alpha and indicates it is active"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC014",
+    "title": "View a material in fullscreen and navigate pages",
+    "description": "A public researcher can open fullscreen mode for a material and navigate between pages before returning to the detail view.",
+    "category": "View Material Detail",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /collections"
+      },
+      {
+        "type": "action",
+        "description": "Open a material's detail view from the collections results"
+      },
+      {
+        "type": "action",
+        "description": "Open the document in fullscreen"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the next page using the fullscreen arrow controls"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the previous page using the fullscreen arrow controls"
+      },
+      {
+        "type": "action",
+        "description": "Exit fullscreen mode"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the standard material detail viewer is displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC015",
+    "title": "Edit a material in admin and see updated metadata persisted in the list/details",
+    "description": "This test verifies an admin can edit a material’s metadata and the updated values persist in the UI after saving.",
+    "category": "Material Search and Filter (Admin)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation option to open the admin materials management area"
+      },
+      {
+        "type": "action",
+        "description": "Initiate a new material ingest"
+      },
+      {
+        "type": "action",
+        "description": "Select a department/subfonds from the hierarchy selector"
+      },
+      {
+        "type": "action",
+        "description": "Select a series from the series selector"
+      },
+      {
+        "type": "action",
+        "description": "Fill Admin Edit Seed 001 into the material title field"
+      },
+      {
+        "type": "action",
+        "description": "Fill Creator BeforeEdit into the creator field"
+      },
+      {
+        "type": "action",
+        "description": "Select Public as the access level"
+      },
+      {
+        "type": "action",
+        "description": "Fill a valid terms of use text into the terms field"
+      },
+      {
+        "type": "action",
+        "description": "Finalize the ingest workflow"
+      },
+      {
+        "type": "action",
+        "description": "Fill Admin Edit Seed 001 into the search field"
+      },
+      {
+        "type": "action",
+        "description": "Expand the material row to open its details"
+      },
+      {
+        "type": "action",
+        "description": "Open the edit material workflow for the expanded item"
+      },
+      {
+        "type": "action",
+        "description": "Fill Creator AfterEdit into the creator field"
+      },
+      {
+        "type": "action",
+        "description": "Save the material edits"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the updated creator value Creator AfterEdit is displayed for the material"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC016",
+    "title": "Reject a pending user registration",
+    "description": "Rejecting a pending registration marks the registration as rejected and it no longer appears as pending.",
+    "category": "User Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation item to open user management"
+      },
+      {
+        "type": "action",
+        "description": "Click Reject on a pending user"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the pending registration is marked rejected or removed from the pending list"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC017",
+    "title": "Search admin materials by title/creator/ID and see matching results",
+    "description": "This test verifies searching in admin materials filters the list to matching items based on entered text.",
+    "category": "Material Search and Filter (Admin)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation option to open the admin materials management area"
+      },
+      {
+        "type": "action",
+        "description": "Initiate a new material ingest"
+      },
+      {
+        "type": "action",
+        "description": "Select a department/subfonds from the hierarchy selector"
+      },
+      {
+        "type": "action",
+        "description": "Select a series from the series selector"
+      },
+      {
+        "type": "action",
+        "description": "Fill Admin Search Seed 001 into the material title field"
+      },
+      {
+        "type": "action",
+        "description": "Fill Creator SearchSeed into the creator field"
+      },
+      {
+        "type": "action",
+        "description": "Select Public as the access level"
+      },
+      {
+        "type": "action",
+        "description": "Fill a valid terms of use text into the terms field"
+      },
+      {
+        "type": "action",
+        "description": "Finalize the ingest workflow"
+      },
+      {
+        "type": "action",
+        "description": "Fill Admin Search Seed 001 into the search field"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the materials list shows the seeded material among the results"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC018",
+    "title": "Switch across Details, Dublin Core, and Related Items tabs",
+    "description": "A public researcher can switch between all metadata tabs and see the corresponding content for each tab.",
+    "category": "View Material Detail",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /collections"
+      },
+      {
+        "type": "action",
+        "description": "Open a material's detail view from the collections results"
+      },
+      {
+        "type": "action",
+        "description": "Switch to the Details metadata tab"
+      },
+      {
+        "type": "action",
+        "description": "Switch to the Dublin Core metadata tab"
+      },
+      {
+        "type": "action",
+        "description": "Switch to the Related Items tab"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify related items content is displayed"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC019",
+    "title": "Export a single material metadata CSV from its admin row details",
+    "description": "This test verifies an admin can download a single-item metadata CSV from an individual material in the admin materials view.",
+    "category": "Export Metadata",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation option to open the admin materials management area"
+      },
+      {
+        "type": "action",
+        "description": "Initiate a new material ingest"
+      },
+      {
+        "type": "action",
+        "description": "Select a department/subfonds from the hierarchy selector"
+      },
+      {
+        "type": "action",
+        "description": "Select a series from the series selector"
+      },
+      {
+        "type": "action",
+        "description": "Fill Export Single Seed 001 into the material title field"
+      },
+      {
+        "type": "action",
+        "description": "Fill Creator Export Single into the creator field"
+      },
+      {
+        "type": "action",
+        "description": "Select Public as the access level"
+      },
+      {
+        "type": "action",
+        "description": "Fill a valid terms of use text into the terms field"
+      },
+      {
+        "type": "action",
+        "description": "Finalize the ingest workflow"
+      },
+      {
+        "type": "action",
+        "description": "Fill Export Single Seed 001 into the search field"
+      },
+      {
+        "type": "action",
+        "description": "Expand the material row to open its details"
+      },
+      {
+        "type": "action",
+        "description": "Click the download metadata control for the material"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a CSV download is initiated for the selected material"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC020",
+    "title": "Registering a new account results in pending approval confirmation",
+    "description": "Verifies that a new user can submit registration details and sees a pending-approval confirmation state.",
+    "category": "User Registration",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /register"
+      },
+      {
+        "type": "action",
+        "description": "Fill Test Researcher into the name field"
+      },
+      {
+        "type": "action",
+        "description": "Fill test.researcher.unique@example.com into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill a valid password into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Select an institution"
+      },
+      {
+        "type": "action",
+        "description": "Select a role or user category"
+      },
+      {
+        "type": "action",
+        "description": "Submit the registration form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a confirmation is visible indicating the registration is pending approval"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC021",
+    "title": "Delete a material from admin and confirm it is removed from results",
+    "description": "This test verifies an admin can delete a material and it no longer appears in the admin materials list.",
+    "category": "Material Search and Filter (Admin)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation option to open the admin materials management area"
+      },
+      {
+        "type": "action",
+        "description": "Initiate a new material ingest"
+      },
+      {
+        "type": "action",
+        "description": "Select a department/subfonds from the hierarchy selector"
+      },
+      {
+        "type": "action",
+        "description": "Select a series from the series selector"
+      },
+      {
+        "type": "action",
+        "description": "Fill Admin Delete Seed 001 into the material title field"
+      },
+      {
+        "type": "action",
+        "description": "Fill Creator DeleteSeed into the creator field"
+      },
+      {
+        "type": "action",
+        "description": "Select Public as the access level"
+      },
+      {
+        "type": "action",
+        "description": "Fill a valid terms of use text into the terms field"
+      },
+      {
+        "type": "action",
+        "description": "Finalize the ingest workflow"
+      },
+      {
+        "type": "action",
+        "description": "Fill Admin Delete Seed 001 into the search field"
+      },
+      {
+        "type": "action",
+        "description": "Expand the material row to open its details"
+      },
+      {
+        "type": "action",
+        "description": "Delete the material"
+      },
+      {
+        "type": "action",
+        "description": "Fill Admin Delete Seed 001 into the search field"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the materials list shows no results for the deleted material"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC022",
+    "title": "Delete an existing announcement",
+    "description": "Verifies an admin can delete an announcement and it is removed from the announcements list.",
+    "category": "Announcement Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation link to announcement management"
+      },
+      {
+        "type": "action",
+        "description": "Start creating a new announcement"
+      },
+      {
+        "type": "action",
+        "description": "Fill Test Announcement Delete Gamma into the announcement title field"
+      },
+      {
+        "type": "action",
+        "description": "Fill Delete flow test content into the announcement content field"
+      },
+      {
+        "type": "action",
+        "description": "Save the announcement"
+      },
+      {
+        "type": "action",
+        "description": "Delete the announcement for Test Announcement Delete Gamma"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify Test Announcement Delete Gamma is not present in the announcements list"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC023",
+    "title": "View and filter compliance table then expand a material row for details",
+    "description": "An admin can filter the materials compliance table and expand a material row to see detailed compliance information.",
+    "category": "Admin Dashboard",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Select a non-default compliance filter tab"
+      },
+      {
+        "type": "action",
+        "description": "Expand a material row in the materials table"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify detailed material compliance information is displayed"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC024",
+    "title": "Ingestion access controls allow selecting Restricted and entering terms",
+    "description": "This test verifies an admin can set a material to Restricted, provide terms of use, and finalize ingest successfully.",
+    "category": "Material Ingestion",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation option to open the admin materials management area"
+      },
+      {
+        "type": "action",
+        "description": "Initiate a new material ingest"
+      },
+      {
+        "type": "action",
+        "description": "Select a department/subfonds from the hierarchy selector"
+      },
+      {
+        "type": "action",
+        "description": "Select a series from the series selector"
+      },
+      {
+        "type": "action",
+        "description": "Fill Ingest Restricted Material 001 into the material title field"
+      },
+      {
+        "type": "action",
+        "description": "Fill Creator C into the creator field"
+      },
+      {
+        "type": "action",
+        "description": "Select Restricted as the access level"
+      },
+      {
+        "type": "action",
+        "description": "Fill a valid terms of use text into the terms field"
+      },
+      {
+        "type": "action",
+        "description": "Finalize the ingest workflow"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the newly ingested restricted material is visible in the admin materials list"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC025",
+    "title": "Unpublish an announcement (toggle inactive)",
+    "description": "Verifies an admin can change an existing announcement from active to inactive and the list reflects the updated state.",
+    "category": "Announcement Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation link to announcement management"
+      },
+      {
+        "type": "action",
+        "description": "Start creating a new announcement"
+      },
+      {
+        "type": "action",
+        "description": "Fill Test Announcement Toggle Beta into the announcement title field"
+      },
+      {
+        "type": "action",
+        "description": "Fill Toggle state test content into the announcement content field"
+      },
+      {
+        "type": "action",
+        "description": "Set the announcement to active/published"
+      },
+      {
+        "type": "action",
+        "description": "Save the announcement"
+      },
+      {
+        "type": "action",
+        "description": "Toggle the announcement state to inactive/unpublished for Test Announcement Toggle Beta"
+      },
+      {
+        "type": "action",
+        "description": "Save the announcement"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the announcements list shows Test Announcement Toggle Beta as inactive"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC026",
+    "title": "Create a new category",
+    "description": "Creating a category adds it to the categories list for organization and filtering.",
+    "category": "Category Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation item to open category management"
+      },
+      {
+        "type": "action",
+        "description": "Start creating a new category"
+      },
+      {
+        "type": "action",
+        "description": "Fill Category QA Alpha into the category name field"
+      },
+      {
+        "type": "action",
+        "description": "Fill Category created by automated UI test into the category description field"
+      },
+      {
+        "type": "action",
+        "description": "Save the category"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the new category appears in the categories list"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC027",
+    "title": "Open public material detail via external link from admin materials",
+    "description": "This test verifies an admin can use the external link from an admin material row to reach the public material detail view.",
+    "category": "Material Search and Filter (Admin)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation option to open the admin materials management area"
+      },
+      {
+        "type": "action",
+        "description": "Initiate a new material ingest"
+      },
+      {
+        "type": "action",
+        "description": "Select a department/subfonds from the hierarchy selector"
+      },
+      {
+        "type": "action",
+        "description": "Select a series from the series selector"
+      },
+      {
+        "type": "action",
+        "description": "Fill Admin External Link Seed 001 into the material title field"
+      },
+      {
+        "type": "action",
+        "description": "Fill Creator ExternalLink into the creator field"
+      },
+      {
+        "type": "action",
+        "description": "Select Public as the access level"
+      },
+      {
+        "type": "action",
+        "description": "Fill a valid terms of use text into the terms field"
+      },
+      {
+        "type": "action",
+        "description": "Finalize the ingest workflow"
+      },
+      {
+        "type": "action",
+        "description": "Fill Admin External Link Seed 001 into the search field"
+      },
+      {
+        "type": "action",
+        "description": "Use the external link control for the seeded material"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the material detail view is displayed"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC028",
+    "title": "Filter admin materials by hierarchy tree selection",
+    "description": "This test verifies selecting a node in the hierarchy tree filters the admin materials list accordingly.",
+    "category": "Material Search and Filter (Admin)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation option to open the admin materials management area"
+      },
+      {
+        "type": "action",
+        "description": "Initiate a new material ingest"
+      },
+      {
+        "type": "action",
+        "description": "Select a department/subfonds from the hierarchy selector"
+      },
+      {
+        "type": "action",
+        "description": "Select a series from the series selector"
+      },
+      {
+        "type": "action",
+        "description": "Fill Admin Hierarchy Seed 001 into the material title field"
+      },
+      {
+        "type": "action",
+        "description": "Fill Creator HierarchySeed into the creator field"
+      },
+      {
+        "type": "action",
+        "description": "Select Public as the access level"
+      },
+      {
+        "type": "action",
+        "description": "Fill a valid terms of use text into the terms field"
+      },
+      {
+        "type": "action",
+        "description": "Finalize the ingest workflow"
+      },
+      {
+        "type": "action",
+        "description": "Select the same department or series node in the hierarchy tree browser"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the materials list is filtered and contains the seeded material"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC029",
+    "title": "Review dashboard overview components for admin governance",
+    "description": "An admin can view key dashboard components including charts, stat cards, and the activity feed for governance oversight.",
+    "category": "Admin Dashboard",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Scroll through the admin dashboard overview"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the ingestion velocity chart and stat cards are displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the activity feed is displayed"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC030",
+    "title": "Ingestion preview step supports navigating across previewed pages",
+    "description": "This test verifies that during ingestion the user can navigate among generated preview pages and the preview content updates accordingly.",
+    "category": "Material Ingestion",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation option to open the admin materials management area"
+      },
+      {
+        "type": "action",
+        "description": "Initiate a new material ingest"
+      },
+      {
+        "type": "action",
+        "description": "Select a department/subfonds from the hierarchy selector"
+      },
+      {
+        "type": "action",
+        "description": "Select a series from the series selector"
+      },
+      {
+        "type": "action",
+        "description": "Fill Ingest Preview Navigation 001 into the material title field"
+      },
+      {
+        "type": "action",
+        "description": "Fill Creator B into the creator field"
+      },
+      {
+        "type": "action",
+        "description": "Wait for preview thumbnails to be displayed"
+      },
+      {
+        "type": "action",
+        "description": "Select a thumbnail for a different page in the preview"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the main preview updates to the selected page"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC031",
+    "title": "Edit an existing category",
+    "description": "Editing a category updates its details and the updated category remains available in the list.",
+    "category": "Category Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation item to open category management"
+      },
+      {
+        "type": "action",
+        "description": "Start creating a new category"
+      },
+      {
+        "type": "action",
+        "description": "Fill Category QA To Edit into the category name field"
+      },
+      {
+        "type": "action",
+        "description": "Fill Category seed for edit test into the category description field"
+      },
+      {
+        "type": "action",
+        "description": "Save the category"
+      },
+      {
+        "type": "action",
+        "description": "Start editing the newly created category"
+      },
+      {
+        "type": "action",
+        "description": "Fill Category QA Edited into the category name field"
+      },
+      {
+        "type": "action",
+        "description": "Save the changes"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the category appears in the list with the updated name Category QA Edited"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC032",
+    "title": "Ingestion metadata checklist completion is required to finalize",
+    "description": "This test verifies the ingest workflow enforces completing the metadata checklist before allowing finalization.",
+    "category": "Material Ingestion",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation option to open the admin materials management area"
+      },
+      {
+        "type": "action",
+        "description": "Initiate a new material ingest"
+      },
+      {
+        "type": "action",
+        "description": "Select a department/subfonds from the hierarchy selector"
+      },
+      {
+        "type": "action",
+        "description": "Select a series from the series selector"
+      },
+      {
+        "type": "action",
+        "description": "Fill Ingest Checklist Gate 001 into the material title field"
+      },
+      {
+        "type": "action",
+        "description": "Fill Creator D into the creator field"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the metadata checklist step"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to finalize without completing required checklist items"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify checklist validation feedback is visible and finalization is blocked"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC033",
+    "title": "Persist announcement list after page refresh",
+    "description": "Verifies announcements remain available after reloading the announcement management page within the same browser session.",
+    "category": "Announcement Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation link to announcement management"
+      },
+      {
+        "type": "action",
+        "description": "Start creating a new announcement"
+      },
+      {
+        "type": "action",
+        "description": "Fill Test Announcement Persist Delta into the announcement title field"
+      },
+      {
+        "type": "action",
+        "description": "Fill Persistence test content into the announcement content field"
+      },
+      {
+        "type": "action",
+        "description": "Save the announcement"
+      },
+      {
+        "type": "action",
+        "description": "Refresh the page"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the announcements list still contains Test Announcement Persist Delta"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC034",
+    "title": "Ingestion requires required setup fields before advancing/finalizing",
+    "description": "This test verifies the ingestion workflow blocks progressing or finalizing when required setup fields are missing and shows validation feedback.",
+    "category": "Material Ingestion",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation option to open the admin materials management area"
+      },
+      {
+        "type": "action",
+        "description": "Initiate a new material ingest"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to continue or finalize without selecting hierarchy and without entering title/creator"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify required-field validation errors are visible and the workflow does not proceed"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC035",
+    "title": "Auto-transition from splash to main home content on first visit",
+    "description": "Verifies the splash screen appears on first visit and automatically transitions to the home page content after the progress completes.",
+    "category": "Splash Screen",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the splash progress to complete"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the main home content is displayed and the splash screen is no longer visible"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC036",
+    "title": "Delete an existing category",
+    "description": "Deleting a category removes it from the categories list.",
+    "category": "Category Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation item to open category management"
+      },
+      {
+        "type": "action",
+        "description": "Start creating a new category"
+      },
+      {
+        "type": "action",
+        "description": "Fill Category QA To Delete into the category name field"
+      },
+      {
+        "type": "action",
+        "description": "Fill Category seed for delete test into the category description field"
+      },
+      {
+        "type": "action",
+        "description": "Save the category"
+      },
+      {
+        "type": "action",
+        "description": "Delete the newly created category"
+      },
+      {
+        "type": "action",
+        "description": "Confirm the deletion"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the deleted category no longer appears in the categories list"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC037",
+    "title": "Validate required fields when creating an announcement",
+    "description": "Verifies the announcement form prevents saving when required fields are missing and shows an in-form validation error.",
+    "category": "Announcement Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation link to announcement management"
+      },
+      {
+        "type": "action",
+        "description": "Start creating a new announcement"
+      },
+      {
+        "type": "action",
+        "description": "Leave the announcement title and content fields empty"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to save the announcement"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a validation error is visible and the announcement is not created in the list"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC038",
+    "title": "Clear all filters restores unfiltered collections listing",
+    "description": "Verifies that clearing all filters returns the collections page to an unfiltered state showing the full listing.",
+    "category": "Browse Collections",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /collections"
+      },
+      {
+        "type": "action",
+        "description": "Fill a search query into the search field"
+      },
+      {
+        "type": "action",
+        "description": "Open the filters panel"
+      },
+      {
+        "type": "action",
+        "description": "Select an access level filter option"
+      },
+      {
+        "type": "action",
+        "description": "Clear all filters"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the collections listing is restored to an unfiltered state"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC039",
+    "title": "Registration requires mandatory fields",
+    "description": "Verifies that attempting to register with missing required fields shows validation errors and does not submit.",
+    "category": "User Registration",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /register"
+      },
+      {
+        "type": "action",
+        "description": "Fill Test Researcher into the name field"
+      },
+      {
+        "type": "action",
+        "description": "Fill a valid password into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Select an institution"
+      },
+      {
+        "type": "action",
+        "description": "Select a role or user category"
+      },
+      {
+        "type": "action",
+        "description": "Submit the registration form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a required-field validation error is visible"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC040",
+    "title": "See required-field validation when submitting an empty access request form",
+    "description": "A researcher who submits the request access form without required information sees validation errors and the request is not submitted.",
+    "category": "Request Access (Researcher)",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /request-access"
+      },
+      {
+        "type": "action",
+        "description": "Submit the access request"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify required field validation errors are visible"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC041",
+    "title": "Cancel out of announcement creation without saving",
+    "description": "Verifies an admin can abandon creation/editing and no new announcement is added to the list without saving.",
+    "category": "Announcement Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation link to announcement management"
+      },
+      {
+        "type": "action",
+        "description": "Start creating a new announcement"
+      },
+      {
+        "type": "action",
+        "description": "Fill Test Announcement Unsaved Epsilon into the announcement title field"
+      },
+      {
+        "type": "action",
+        "description": "Fill Unsaved draft content into the announcement content field"
+      },
+      {
+        "type": "action",
+        "description": "Navigate away to the admin dashboard using the app navigation"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation link to announcement management"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify Test Announcement Unsaved Epsilon is not present in the announcements list"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC042",
+    "title": "Do not show splash screen again within the same session",
+    "description": "Verifies returning to the home route in the same browser session does not show the splash screen again and loads main content immediately.",
+    "category": "Splash Screen",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the splash progress to complete"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /about"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the main home content is displayed without showing the splash screen"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC043",
+    "title": "Invalid login shows an error without signing in",
+    "description": "Verifies that submitting incorrect credentials shows an error and the user is not logged in.",
+    "category": "User Login",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill invalid-user@example.com into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill wrong-password into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify an invalid credentials error is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the user is not on an authenticated dashboard"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC044",
+    "title": "Collections filters can narrow results to an empty state and recover by clearing",
+    "description": "Verifies that applying restrictive filters can produce an empty results state and clearing filters restores results.",
+    "category": "Browse Collections",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /collections"
+      },
+      {
+        "type": "action",
+        "description": "Fill a highly specific search query into the search field"
+      },
+      {
+        "type": "action",
+        "description": "Open the filters panel"
+      },
+      {
+        "type": "action",
+        "description": "Select an access level filter option"
+      },
+      {
+        "type": "action",
+        "description": "Select a category filter option"
+      },
+      {
+        "type": "action",
+        "description": "Toggle OAIS-only filtering on"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify an empty results state is displayed"
+      },
+      {
+        "type": "action",
+        "description": "Clear all filters"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify at least one material is displayed in the listing"
+      }
+    ],
+    "priority": "Low"
+  }
+]
