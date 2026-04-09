@@ -9,7 +9,7 @@ import {
   Search, Plus, Edit, ExternalLink, Layers, Settings2,
   Upload, FolderTree, ShieldCheck, CheckCircle2, FileText,
   FileDigit, Link as LinkIcon, Loader2, Video, Image as ImageIcon,
-  ZoomIn, ZoomOut, RotateCw, Maximize2, AlertTriangle, ChevronRight, X, Save, FolderOpen, ChevronLeft
+  ZoomIn, ZoomOut, RotateCw, Maximize2, AlertTriangle, ChevronRight, X, Save, FolderOpen, ChevronLeft, Lock
 } from "lucide-react";
 import { ArchivalTree } from "@/components/ArchivalTree";
 import { MetadataChecklist } from "@/components/MetadataChecklist";
@@ -65,6 +65,7 @@ export default function AdminMaterials() {
   // Upload dialog state
   const [uploadOpen, setUploadOpen] = React.useState(false);
   const [previewOpen, setPreviewOpen] = React.useState(false);
+  const [accessControlOpen, setAccessControlOpen] = React.useState(false);
   const [rawExtractionText, setRawExtractionText] = React.useState("");
   const [pdfPreviewImages, setPdfPreviewImages] = React.useState<string[]>([]);
   const [selectionTarget, setSelectionTarget] = React.useState<{text: string, x: number, y: number} | null>(null);
@@ -79,7 +80,7 @@ export default function AdminMaterials() {
 
   const [uploadForm, setUploadForm] = React.useState({
     title: "", creator: "", dateOfDescription: "", format: "", description: "",
-    levelOfDescription: "Item", extentAndMedium: "", access: "public" as const,
+    levelOfDescription: "Item", extentAndMedium: "", access: "public" as "public" | "restricted" | "confidential",
     videoUrl: "", hierarchyPath: "", termsOfUse: "", referenceCode: "",
     
     // Auto Reference Code Gen fields
@@ -188,123 +189,63 @@ export default function AdminMaterials() {
     }
   }, []);
 
-  const handleMediaUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setUploadForm(prev => ({ ...prev, format: file.type || "unknown" }));
-
-    setProcessingState("compressing");
-    for (let i = 0; i <= 100; i += 20) {
-      setScanProgress(i);
-      await new Promise(r => setTimeout(r, 60));
-    }
-    
-    // Read file as Base64 for local storage persistence
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const base64 = e.target?.result as string;
-      setUploadForm(prev => ({ ...prev, fileData: base64 }));
-    };
-    reader.readAsDataURL(file);
-
-    const ogSize = file.size;
-    const newSize = Math.floor(ogSize * 0.3); // Compressed BY 70%
-    setFileDetails({ name: file.name, ogSize, newSize });
-    setUploadForm(prev => ({ ...prev, extentAndMedium: `${((ogSize-newSize)/ogSize*100).toFixed(0)}% Compressed` }));
-    setProcessingState("done");
-  };
-
-  const handleMetadataScanUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-
-    setProcessingState("scanning");
-    setScanProgress(0);
-
-    // Identify if folder/multiple images were uploaded
-    if (files.length > 1) {
-       const imageFiles = Array.from(files)
-         .filter(f => f.type.startsWith('image/'))
-         .sort((a,b) => a.name.localeCompare(b.name));
-       
-       setUploadForm(prev => ({
-          ...prev,
-          title: prev.title || "Batch Folder Upload",
-          format: "multipart/folder",
-       }));
-       
-       let extractedImages: string[] = [];
-       for (let i = 0; i < imageFiles.length; i++) {
-          const file = imageFiles[i];
-          const base64 = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = e => resolve(e.target?.result as string);
-            reader.readAsDataURL(file);
-          });
-          extractedImages.push(base64);
-          setScanProgress(Math.round(((i + 1) / imageFiles.length) * 100));
-       }
-       setPdfPreviewImages(extractedImages);
-       setUploadForm(prev => ({ ...prev, pages: extractedImages.length }));
-       setProcessingState("done");
-       setUploadOpen(false);
-       setPreviewOpen(true);
-       return;
-    }
-
-    const file = files[0];
+  const extractFileContent = async (file: File) => {
     const isPdf = file.type === "application/pdf";
     const isDocx = file.name.toLowerCase().endsWith(".docx");
     const isCsv = file.name.toLowerCase().endsWith(".csv");
     const isXlsx = file.name.toLowerCase().endsWith(".xlsx");
+    const isImage = file.type.startsWith("image/");
     
-    setUploadForm(prev => ({
-      ...prev,
-      title: prev.title || file.name.replace(/\.[^/.]+$/, ""),
-      format: prev.format || file.type || "application/octet-stream",
-    }));
+    setProcessingState("scanning");
+    setScanProgress(0);
 
-    for (let i = 0; i <= 100; i += 10) {
-      setScanProgress(i);
-      await new Promise(r => setTimeout(r, 50));
-    }
-
+    let extractedText = "";
+    let detectedPageCount = 0;
+    let extractedImages: string[] = [];
+    
     try {
-      let extractedText = "";
-      let detectedPageCount = 0;
-      let extractedImages: string[] = [];
-      
       if (isPdf && window.pdfjsLib) {
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
         detectedPageCount = pdf.numPages;
         
         let fullText = "";
-        
-        // Loop through all pages so NO PDF gets skipped!
-        const pagesToExtract = pdf.numPages;
-        for (let i = 1; i <= pagesToExtract; i++) {
-           const page = await pdf.getPage(i);
-           const textContent = await page.getTextContent();
-           fullText += textContent.items.map((item: any) => item.str).join(" ") + "\n\n";
-           
-           // Render to canvas for visual preview!
-           try {
-             const viewport = page.getViewport({ scale: 1.0 });
-             const canvas = document.createElement('canvas');
-             const context = canvas.getContext('2d');
-             if (context) {
-               canvas.height = viewport.height;
-               canvas.width = viewport.width;
-               await page.render({ canvasContext: context, viewport: viewport }).promise;
-               extractedImages.push(canvas.toDataURL("image/png"));
-             }
-           } catch(e) { console.error("Canvas render fail", e) }
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          fullText += textContent.items.map((item: any) => item.str).join(" ") + "\n\n";
+          
+          // Limit visual preview extraction to first 10 pages to save memory/storage
+          if (i <= 10) {
+            try {
+              const viewport = page.getViewport({ scale: 1.5 });
+              const canvas = document.createElement('canvas');
+              const context = canvas.getContext('2d');
+              if (context) {
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                await page.render({ canvasContext: context, viewport: viewport }).promise;
+                extractedImages.push(canvas.toDataURL("image/png"));
+              }
+            } catch(e) { console.error("Canvas render fail on page", i, e) }
+          }
+          setScanProgress(Math.round((i / pdf.numPages) * 100));
         }
         
+        // Add a placeholder/note if pages were truncated
+        if (pdf.numPages > 10) {
+           console.log(`Preview limited to 10/${pdf.numPages} pages for performance.`);
+        }
         extractedText = fullText;
-        setPdfPreviewImages(extractedImages);
+      } else if (isImage) {
+        const base64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = e => resolve(e.target?.result as string);
+          reader.readAsDataURL(file);
+        });
+        extractedImages = [base64];
+        detectedPageCount = 1;
+        setScanProgress(100);
       } else if (isDocx && window.mammoth) {
         const arrayBuffer = await file.arrayBuffer();
         const result = await window.mammoth.extractRawText({ arrayBuffer });
@@ -318,218 +259,90 @@ export default function AdminMaterials() {
         extractedText = window.XLSX.utils.sheet_to_txt(ws, { sep: " " });
       }
 
-      if (extractedText) {
-        setRawExtractionText(extractedText);
-        
-        // Normalize whitespace for pattern matching
-        const cleanText = extractedText.replace(/\s+/g, ' '); 
+      setPdfPreviewImages(extractedImages);
+      setRawExtractionText(extractedText);
+      
+      if (extractedText || extractedImages.length > 0) {
         const previewSnippet = extractedText.substring(0, 150).trim();
-        
-        // ══ SMART FIELD EXTRACTION ENGINE (Enhanced) ══
-        const allFieldLabels = [
-          "Reference Code", "Unique ID", "Title", "Creator", "Author",
-          "Date", "Dates", "Year", "Level of Description", "Level",
-          "Extent and Medium", "Extent", "Format", "Fonds", "Sub-fonds",
-          "Subfonds", "Series", "Reference", "Access", "Conditions",
-          "Abstract", "Summary", "Description", "Scope and Content",
-          "Subject", "Keywords", "Publisher", "Published by",
-          "Contributor", "Rights", "Copyright", "Language",
-          "Coverage", "Source", "Relation", "Type",
-          "Archival History", "Custodial History", "Administrative History",
-          "Arrangement", "Physical Characteristics", "Condition",
-          "Finding Aids", "Note", "Notes"
-        ];
-        const nextLabelsStr = allFieldLabels.join("|");
-
-        const extractField = (fieldName: string, alternateNames: string[] = []) => {
-           const labels = [fieldName, ...alternateNames].map(l => l.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')).join("|");
-           const regex = new RegExp(`(?:^|\\s)(?:${labels})\\s*:?\\s*(.*?)(?=\\s*(?:(?:${nextLabelsStr})\\s*:?\\s*)|$)`, "i");
-           const match = cleanText.match(regex);
-           return match ? match[1].trim() : "";
-        };
-        
-        // ── Core fields ──
-        const idMatch = cleanText.match(/(2\d)iA(\d{2})(\d{7})/i);
-        const parsedTitle = extractField("Title");
-        const parsedCreator = extractField("Creator", ["Author", "Created By", "Written By", "Prepared By"]);
-        const parsedDate = extractField("Date", ["Dates", "Year", "Date Published", "Publication Date"]);
-        const parsedLevel = extractField("Level of Description", ["Level"]);
-        const parsedExtent = extractField("Extent and Medium", ["Format", "Extent", "Pages"]);
-        const parsedFonds = extractField("Fonds");
-        const parsedSubfonds = extractField("Sub-fonds", ["Subfonds", "Sub fonds"]);
-        const parsedSeries = extractField("Series");
-        const parsedAbstract = extractField("Abstract", ["Summary", "Description", "Scope and Content", "Overview"]);
-        
-        // ── NEW: Extended smart fields ──
-        const parsedSubject = extractField("Subject", ["Keywords", "Topics", "Tags"]);
-        const parsedPublisher = extractField("Publisher", ["Published by", "Publishing", "Issued by"]);
-        const parsedContributor = extractField("Contributor", ["Contributors", "Contributing", "Collaborator"]);
-        const parsedRights = extractField("Rights", ["Copyright", "License", "Permissions"]);
-        const parsedLanguage = extractField("Language", ["Languages", "Written in"]);
-        const parsedCoverage = extractField("Coverage", ["Geographic Coverage", "Region", "Location"]);
-        const parsedSource = extractField("Source", ["Source of Acquisition", "Provenance"]);
-        const parsedArrangement = extractField("Arrangement", ["System of Arrangement", "Organization"]);
-        const parsedArchivalHistory = extractField("Archival History", ["Custodial History", "History"]);
-        const parsedNotes = extractField("Note", ["Notes", "Remarks"]);
-        const parsedPhysical = extractField("Physical Characteristics", ["Condition", "Physical Description"]);
-        
-        // ── SMART INFERENCE: detect patterns without explicit labels ──
-        // Date detection: multiple formats
-        let inferredDate = parsedDate;
-        if (!inferredDate) {
-          const datePatterns = [
-            /\b(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})\b/,                  // YYYY-MM-DD
-            /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}\b/i,  // Month DD, YYYY
-            /\b\d{1,2}\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}\b/i,  // DD Month YYYY
-          ];
-          for (const pattern of datePatterns) {
-            const m = cleanText.match(pattern);
-            if (m) { inferredDate = m[0]; break; }
-          }
-        }
-        
-        // Language inference from content
-        let inferredLanguage = parsedLanguage;
-        if (!inferredLanguage) {
-          const filipinoWords = ['ang', 'mga', 'sa', 'ng', 'na', 'ay', 'para', 'mga', 'ito', 'nito'];
-          const lowerText = cleanText.toLowerCase();
-          const filipinoCount = filipinoWords.filter(w => lowerText.includes(` ${w} `)).length;
-          if (filipinoCount >= 4) inferredLanguage = "eng; fil";
-          else if (filipinoCount >= 2) inferredLanguage = "fil; eng";
-          else inferredLanguage = "eng";
-        }
-        
-        // Access level inference from keywords
         let inferredAccess: "public" | "restricted" | "confidential" = uploadForm.access;
-        const lowerClean = cleanText.toLowerCase();
-        if (lowerClean.includes('confidential') || lowerClean.includes('classified') || lowerClean.includes('board authorization')) {
-          inferredAccess = 'confidential';
-        } else if (lowerClean.includes('restricted') || lowerClean.includes('authorized personnel') || lowerClean.includes('internal use only')) {
-          inferredAccess = 'restricted';
-        }
-        
-        // "By" pattern for creator: "By John Doe" or "Prepared by Jane Smith"
-        let inferredCreator = parsedCreator;
-        if (!inferredCreator) {
-          const byMatch = cleanText.match(/(?:^|\s)(?:by|prepared\s+by|written\s+by|authored\s+by)\s+([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){0,3})/i);
-          if (byMatch) inferredCreator = byMatch[1].trim();
-        }
-        
-        // Publisher from "Published by ..." or "© YYYY Organization"
-        let inferredPublisher = parsedPublisher;
-        if (!inferredPublisher) {
-          const copyrightMatch = cleanText.match(/©\s*\d{4}\s*([^.;,]+)/i);
-          if (copyrightMatch) inferredPublisher = copyrightMatch[1].trim();
-        }
-        
-        // Subject/keywords from "Keywords:" inline
-        let inferredSubject = parsedSubject;
-        if (!inferredSubject) {
-          const kwMatch = cleanText.match(/(?:keywords?|tags?)\s*:?\s*([^.\n]+)/i);
-          if (kwMatch) inferredSubject = kwMatch[1].trim();
-        }
-        
-        // File size & page count for extent
-        const ogSize = file.size;
-        const fileSizeStr = ogSize > 1048576 ? `${(ogSize / 1048576).toFixed(1)} MB` : `${(ogSize / 1024).toFixed(0)} KB`;
-        let inferredExtent = parsedExtent;
-        if (!inferredExtent) {
-          const parts: string[] = [];
-          if (detectedPageCount > 0) parts.push(`${detectedPageCount} pages`);
-          parts.push(file.type || 'application/octet-stream');
-          parts.push(fileSizeStr);
-          inferredExtent = parts.join('; ');
-        }
-        
-        // Format MIME
-        const inferredFormat = file.type || 'application/octet-stream';
-        
-        setUploadForm((prev: any) => {
-          let fName = prev.fonds;
-          let sName = prev.subfonds;
-          let serName = prev.series;
-          
-          if (parsedFonds && fondsList) {
-             const foundF = fondsList.find((f: any) => f.name.toLowerCase().includes(parsedFonds.toLowerCase()));
-             if (foundF) {
-               fName = foundF.name;
-               if (parsedSubfonds && foundF.children) {
-                 const foundS = foundF.children.find((s: any) => s.name.toLowerCase().includes(parsedSubfonds.toLowerCase()));
-                 if (foundS) {
-                   sName = foundS.name;
-                   if (parsedSeries && foundS.children) {
-                      const foundSer = foundS.children.find((ser: any) => ser.name.toLowerCase().includes(parsedSeries.toLowerCase()));
-                      if (foundSer) serName = foundSer.name;
-                   }
-                 }
-               }
-             }
-          }
-          
-          return {
-            ...prev, 
-            description: parsedAbstract || prev.description || previewSnippet,
-            year: idMatch ? idMatch[1] : prev.year,
-            catNo: idMatch ? idMatch[2] : prev.catNo,
-            matNo: idMatch ? idMatch[3] : prev.matNo,
-            title: parsedTitle || prev.title,
-            creator: inferredCreator || prev.creator,
-            format: inferredFormat || prev.format,
-            access: inferredAccess,
-            fonds: fName || "HCDC — Holy Cross of Davao College",
-            subfonds: sName || prev.subfonds,
-            series: serName || prev.series,
-            extentAndMedium: inferredExtent || prev.extentAndMedium,
-            pageImages: extractedImages.length > 0 ? extractedImages : [
-              "https://images.unsplash.com/photo-1586281380349-632531db7ed4?w=800&auto=format&fit=crop",
-              "https://images.unsplash.com/photo-1616628188550-808682f392ce?w=800&auto=format&fit=crop",
-              "https://images.unsplash.com/photo-1544816155-12df9643f363?w=800&auto=format&fit=crop",
-              "https://images.unsplash.com/photo-1586281380117-5a60ae2050cc?w=800&auto=format&fit=crop" // 4th page for restricted test
-            ], // Use actual extracted PDF pages if available, else mock
-            fileUrl: URL.createObjectURL(file), // Provide a mock file url so "No File Attached" disappears
-            pages: detectedPageCount > 0 ? detectedPageCount : 4
-          };
-        });
+        const lowerClean = extractedText.toLowerCase();
+        if (lowerClean.includes('confidential') || lowerClean.includes('classified')) inferredAccess = 'confidential';
+        else if (lowerClean.includes('restricted') || lowerClean.includes('authorized personnel')) inferredAccess = 'restricted';
 
-        // Populate checklist with ALL detected/inferred fields
+        setUploadForm((prev: any) => ({
+          ...prev, 
+          title: prev.title || file.name.replace(/\.[^/.]+$/, ""),
+          format: prev.format || file.type || "application/octet-stream",
+          description: prev.description || previewSnippet,
+          access: inferredAccess,
+          pageImages: extractedImages.length > 0 ? extractedImages : prev.pageImages,
+          pages: detectedPageCount || prev.pages || 1
+        }));
+
         setChecklistValues(prev => ({
           ...prev,
-          title: parsedTitle || prev.title,
-          creator: inferredCreator || prev.creator,
-          date: inferredDate || prev.date,
-          levelOfDescription: parsedLevel || prev.levelOfDescription || "Item",
-          extentAndMedium: inferredExtent || prev.extentAndMedium,
-          description: parsedAbstract || previewSnippet || prev.description,
-          scopeContent: parsedAbstract || prev.scopeContent,
-          referenceCode: idMatch ? idMatch[0] : prev.referenceCode || "",
-          format: inferredFormat || prev.format,
-          language: inferredLanguage || prev.language,
-          subject: inferredSubject || prev.subject,
-          publisher: inferredPublisher || prev.publisher,
-          contributor: parsedContributor || prev.contributor,
-          rights: parsedRights || prev.rights,
-          coverage: parsedCoverage || prev.coverage,
-          source: parsedSource || prev.source,
-          arrangement: parsedArrangement || prev.arrangement,
-          archivalHistory: parsedArchivalHistory || prev.archivalHistory,
-          note: parsedNotes || prev.note,
-          physicalCharacteristics: parsedPhysical || prev.physicalCharacteristics,
-          accessConditions: inferredAccess === 'public' ? 'Public access; no restrictions.' : inferredAccess === 'restricted' ? 'Restricted access; authorization required.' : inferredAccess === 'confidential' ? 'Confidential; board authorization required.' : prev.accessConditions,
-          rulesConventions: prev.rulesConventions || "ISAD(G) Second Edition, 2000; Dublin Core Metadata Element Set v1.1.",
+          title: prev.title || file.name.replace(/\.[^/.]+$/, ""),
+          description: prev.description || previewSnippet,
           dateOfDescription: prev.dateOfDescription || new Date().toISOString().split('T')[0],
         }));
       }
     } catch (err) {
-      console.error("Scan failed", err);
+      console.error("Extraction failed", err);
     }
-
-    setProcessingState("done");
     
-    // Automatically jump to the preview modal to verify pages/text.
-    setTimeout(() => {
+    setProcessingState("done");
+    if (extractedImages.length > 0 || extractedText) {
+       setTimeout(() => { setUploadOpen(false); setPreviewOpen(true); }, 500);
+    }
+  };
+
+  const handleMediaUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64 = e.target?.result as string;
+      setUploadForm(prev => ({ ...prev, fileData: base64 }));
+    };
+    reader.readAsDataURL(file);
+
+    const ogSize = file.size;
+    const newSize = Math.floor(ogSize * 0.3);
+    setFileDetails({ name: file.name, ogSize, newSize });
+    
+    await extractFileContent(file);
+  };
+
+  const handleMetadataScanUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    if (files.length > 1) {
+       setProcessingState("scanning");
+       const imageFiles = Array.from(files)
+         .filter(f => f.type.startsWith('image/'))
+         .sort((a,b) => a.name.localeCompare(b.name));
+       
+       let images: string[] = [];
+       for (let i = 0; i < imageFiles.length; i++) {
+          const base64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = e => resolve(e.target?.result as string);
+            reader.readAsDataURL(imageFiles[i]);
+          });
+          images.push(base64);
+          setScanProgress(Math.round(((i + 1) / imageFiles.length) * 100));
+       }
+       setPdfPreviewImages(images);
+       setUploadForm(prev => ({ ...prev, pages: images.length, pageImages: images }));
+       setProcessingState("done");
        setUploadOpen(false);
        setPreviewOpen(true);
-    }, 600);
+       return;
+    }
+
+    await extractFileContent(files[0]);
   };
 
   const filteredMaterials = React.useMemo(() => {
@@ -1005,15 +818,9 @@ export default function AdminMaterials() {
 
           <DialogFooter className="mt-2 border-t pt-4 flex gap-2">
             <Button variant="ghost" onClick={() => setUploadOpen(false)}>Cancel Ingest</Button>
-            {processingState === "done" && rawExtractionText ? (
-                <Button onClick={() => { setUploadOpen(false); setPreviewOpen(true); }} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
-                   Review Scanned Document <FileText className="w-4 h-4 ml-2" />
-                </Button>
-            ) : (
-                <Button onClick={submitIngest} className="gap-2 bg-[#0a1628] hover:bg-[#1a2b4b]">
-                  Skip to Metadata Checklist <ChevronRight className="w-4 h-4 ml-2" />
-                </Button>
-            )}
+            <Button onClick={() => { setUploadOpen(false); setPreviewOpen(true); }} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+               Proceed to Page Preview <ChevronRight className="w-4 h-4 ml-2" />
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1140,51 +947,79 @@ export default function AdminMaterials() {
              </div>
           )}
 
-          <div className="p-6 border-t bg-white shrink-0 shadow-[0_-10px_20px_rgba(0,0,0,0.02)] z-10 flex flex-col gap-6">
-             {/* OAIS Scanner and Access Control Section */}
-             <div className="flex gap-6 items-start bg-slate-50 border border-slate-200 p-4 rounded-xl">
-               <div className="flex-1">
-                 <label className="text-xs font-bold text-[#0a1628] uppercase tracking-widest block mb-2">Access Level Definition</label>
-                 <select 
-                   value={uploadForm.access} 
-                   onChange={e => setUploadForm(p => ({ ...p, access: e.target.value as any }))}
-                   className="w-full bg-white border border-slate-300 rounded-md text-sm px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all font-medium"
-                 >
-                   <option value="public">Public</option>
-                   <option value="restricted">Restricted</option>
-                   <option value="confidential">Confidential</option>
-                 </select>
-                 
-                 <div className="mt-4 flex items-center gap-2 text-[11px] font-bold text-emerald-700 bg-emerald-100/50 px-3 py-2 rounded-md border border-emerald-200 shadow-sm w-full">
-                    <ShieldCheck className="w-4 h-4 text-emerald-600" /> OAIS Compliance Scan: 
-                    {Object.values(checklistValues).filter(Boolean).length > 20 ? ' Level A (Strong)' : ' Level C (Basic)'}
-                 </div>
-               </div>
-               
-               <div className="flex-1 flex flex-col">
-                 <label className="text-xs font-bold text-[#0a1628] uppercase tracking-widest block mb-2">Author's Terms of Use</label>
-                 <textarea 
-                   placeholder="Enter any specific terms, copyright, or usage restrictions..." 
-                   value={uploadForm.termsOfUse || ""}
-                   onChange={e => setUploadForm(p => ({...p, termsOfUse: e.target.value}))}
-                   className="min-h-[90px] w-full bg-white border border-slate-300 rounded-md text-sm p-3 text-slate-800 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-                 />
-               </div>
-             </div>
-             
-             {/* Footer Actions */}
+          <div className="p-6 border-t bg-white shrink-0 shadow-[0_-10px_20px_rgba(0,0,0,0.02)] z-10">
              <div className="flex justify-between items-center">
-               <Button variant="outline" onClick={() => setPreviewOpen(false)} className="text-slate-500">Back to Upload</Button>
+               <Button variant="outline" onClick={() => { setPreviewOpen(false); setUploadOpen(true); }} className="text-slate-500">Back to Setup</Button>
                <div className="flex gap-4 items-center">
                  <span className="text-xs text-indigo-600 font-bold bg-indigo-50 px-3 py-1.5 rounded-full flex items-center gap-1.5 border border-indigo-100">
-                   <span className="animate-pulse flex items-center">✨</span> Auto-extraction complete
+                   <ShieldCheck className="w-3.5 h-3.5" /> Review captured pages & extraction
                  </span>
-                 <Button onClick={() => { setPreviewOpen(false); submitIngest(); }} className="gap-2 bg-[#0a1628] hover:bg-[#1a2b4b] shadow-lg">
-                   Proceed to Checklist <ChevronRight className="w-4 h-4 ml-2" />
+                 <Button onClick={() => { setPreviewOpen(false); setAccessControlOpen(true); }} className="gap-2 bg-[#0a1628] hover:bg-[#1a2b4b] shadow-lg">
+                   Proceed to Access Control <ChevronRight className="w-4 h-4 ml-2" />
                  </Button>
                </div>
              </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══ Access Control Step ═══ */}
+      <Dialog open={accessControlOpen} onOpenChange={setAccessControlOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="w-6 h-6 text-[#960000]" /> Access Control & Terms
+            </DialogTitle>
+            <DialogDescription>
+              Define the sensitivity of this archival material and set usage restrictions.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+             <div className="space-y-3">
+               <label className="text-sm font-bold text-[#0a1628] uppercase tracking-widest block">Access Level Selection</label>
+               <div className="grid grid-cols-3 gap-3">
+                  {["public", "restricted", "confidential"].map((level) => (
+                    <button
+                      key={level}
+                      onClick={() => setUploadForm(p => ({ ...p, access: level as any }))}
+                      className={cn(
+                        "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all font-bold uppercase text-[10px] tracking-widest",
+                        uploadForm.access === level 
+                          ? "bg-indigo-50 border-indigo-600 text-indigo-700 shadow-md" 
+                          : "bg-white border-border hover:border-indigo-200 text-muted-foreground"
+                      )}
+                    >
+                      <Lock className={cn("w-5 h-5", uploadForm.access === level ? "text-indigo-600" : "text-muted-foreground/40")} />
+                      {level}
+                    </button>
+                  ))}
+               </div>
+               <p className="text-[10px] text-muted-foreground leading-relaxed">
+                 {uploadForm.access === "public" && "Visible to everyone. No approval required for viewing."}
+                 {uploadForm.access === "restricted" && "Thumbnail and limited preview visible. Full access requires approval."}
+                 {uploadForm.access === "confidential" && "Highly sensitive. Strictly board-level or archivist-only access."}
+               </p>
+             </div>
+
+             <div className="space-y-3">
+               <label className="text-sm font-bold text-[#0a1628] uppercase tracking-widest block font-mono">Author Terms & Copyrights</label>
+               <Textarea 
+                 placeholder="Enter any specific terms, copyright, or usage restrictions if provided by the donor/creator..." 
+                 value={uploadForm.termsOfUse || ""}
+                 onChange={e => setUploadForm(p => ({...p, termsOfUse: e.target.value}))}
+                 className="min-h-[120px] bg-slate-50 border-slate-200"
+               />
+               <p className="text-[10px] text-muted-foreground">This text will be prominently displayed alongside the material record.</p>
+             </div>
+          </div>
+
+          <DialogFooter className="border-t pt-4">
+            <Button variant="ghost" onClick={() => { setAccessControlOpen(false); setPreviewOpen(true); }}>Back to Preview</Button>
+            <Button onClick={() => { setAccessControlOpen(false); setChecklistOpen(true); }} className="gap-2 bg-[#0a1628] hover:bg-[#1a2b4b]">
+               Proceed to Metadata Checklist <ChevronRight className="w-4 h-4" />
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -1195,6 +1030,27 @@ export default function AdminMaterials() {
             <DialogTitle className="flex items-center gap-2"><ShieldCheck className="w-6 h-6 text-emerald-500" /> Apply Full Metadata Schema</DialogTitle>
             <DialogDescription>Verify the automatically generated ISAD(G) schema mapping.</DialogDescription>
           </DialogHeader>
+
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6 flex gap-4 items-center">
+             <div className="flex flex-col gap-1 items-center px-4 border-r border-slate-200">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Access Level</span>
+                <Badge className={cn(
+                  "uppercase text-[10px] font-bold",
+                  uploadForm.access === "public" ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-100" :
+                  uploadForm.access === "restricted" ? "bg-amber-100 text-amber-700 hover:bg-amber-100" :
+                  "bg-red-100 text-red-700 hover:bg-red-100"
+                )}>{uploadForm.access}</Badge>
+             </div>
+             <div className="flex-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Assigned Terms</span>
+                <p className="text-xs font-semibold text-[#0a1628] line-clamp-2 italic">
+                  {uploadForm.termsOfUse || "No specific terms assigned."}
+                </p>
+             </div>
+             <Button variant="ghost" size="sm" onClick={() => { setChecklistOpen(false); setAccessControlOpen(true); }} className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700">
+               Edit
+             </Button>
+          </div>
           <MetadataChecklist 
             selectedFields={selectedChecklistFields} 
             onToggle={(fieldKey) => setSelectedChecklistFields(prev => { 

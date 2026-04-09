@@ -80,7 +80,42 @@ export function saveMaterial(material: ArchivalMaterial) {
       updatedAt: now 
     });
   }
-  localStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify(materials));
+
+  try {
+    localStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify(materials));
+  } catch (e) {
+    if (e instanceof DOMException && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED')) {
+      console.warn("LocalStorage quota exceeded, pruning page images from stored materials...");
+      
+      // Attempt to save space by removing large pageImages from older materials
+      const prunedMaterials = materials.map(m => {
+        // Only keep first 2 images for non-selected materials to save space
+         if (m.pageImages && m.pageImages.length > 2) {
+            return { ...m, pageImages: m.pageImages.slice(0, 2) };
+         }
+         return m;
+      });
+
+      try {
+        localStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify(prunedMaterials));
+      } catch (innerError) {
+        // If still failing, aggressively strip all images except current one
+        const aggressivePrune = materials.map(m => {
+          if (m.id !== material.id) {
+             return { ...m, pageImages: [] };
+          }
+          // Limit current one to 4 pages max
+          if (m.pageImages && m.pageImages.length > 4) {
+             return { ...m, pageImages: m.pageImages.slice(0, 4) };
+          }
+          return m;
+        });
+        localStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify(aggressivePrune));
+      }
+    } else {
+      throw e;
+    }
+  }
   return materials;
 }
 
