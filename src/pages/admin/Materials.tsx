@@ -70,6 +70,11 @@ export default function AdminMaterials() {
   const [pdfPreviewImages, setPdfPreviewImages] = React.useState<string[]>([]);
   const [selectionTarget, setSelectionTarget] = React.useState<{text: string, x: number, y: number} | null>(null);
   
+  // Storage for separated processing
+  const [mainMaterialText, setMainMaterialText] = React.useState("");
+  const [mainFileName, setMainFileName] = React.useState("");
+  const [metadataFileName, setMetadataFileName] = React.useState("");
+  
   const [checklistOpen, setChecklistOpen] = React.useState(false);
   const [selectedChecklistFields, setSelectedChecklistFields] = React.useState<Set<string>>(new Set());
   const [checklistValues, setChecklistValues] = React.useState<Record<string, string>>({});
@@ -93,24 +98,30 @@ export default function AdminMaterials() {
     series: ""
   });
 
+  const generatedRefCode = `${uploadForm.year}iA${uploadForm.catNo}${uploadForm.matNo}`;
+
   // ══ Feature 1: Auto-sync uploadForm → checklistValues ══
   // When the user types title, creator, etc. in the ingestion form,
   // those values auto-propagate into the checklist so they appear as ✅
   React.useEffect(() => {
     setChecklistValues(prev => {
       const next = { ...prev };
-      if (uploadForm.title && uploadForm.title !== prev.title) next.title = uploadForm.title;
-      if (uploadForm.creator && uploadForm.creator !== prev.creator) next.creator = uploadForm.creator;
-      if (uploadForm.description && uploadForm.description !== prev.description) next.description = uploadForm.description;
-      if (uploadForm.format && uploadForm.format !== prev.format) next.format = uploadForm.format;
-      if (uploadForm.dateOfDescription && uploadForm.dateOfDescription !== prev.dateOfDescription) next.dateOfDescription = uploadForm.dateOfDescription;
-      if (uploadForm.levelOfDescription && uploadForm.levelOfDescription !== prev.levelOfDescription) next.levelOfDescription = uploadForm.levelOfDescription;
-      if (uploadForm.extentAndMedium && uploadForm.extentAndMedium !== prev.extentAndMedium) next.extentAndMedium = uploadForm.extentAndMedium;
-      if (uploadForm.access && uploadForm.access !== prev.access) next.accessConditions = uploadForm.access === 'public' ? 'Public access; no restrictions.' : uploadForm.access === 'restricted' ? 'Restricted access; authorization required.' : 'Confidential; board authorization required.';
-      if (uploadForm.termsOfUse && uploadForm.termsOfUse !== prev.termsOfUse) next.termsOfUse = uploadForm.termsOfUse;
-      if (uploadForm.referenceCode && uploadForm.referenceCode !== prev.referenceCode) next.referenceCode = uploadForm.referenceCode;
-      // Sync hierarchy-derived fields
-      if (uploadForm.fonds) {
+      if (uploadForm.title !== undefined && uploadForm.title !== prev.title) next.title = uploadForm.title;
+      if (uploadForm.creator !== undefined && uploadForm.creator !== prev.creator) next.creator = uploadForm.creator;
+      if (uploadForm.description !== undefined && uploadForm.description !== prev.description) next.description = uploadForm.description;
+      if (uploadForm.format !== undefined && uploadForm.format !== prev.format) next.format = uploadForm.format;
+      if (uploadForm.dateOfDescription !== undefined && uploadForm.dateOfDescription !== prev.dateOfDescription) next.dateOfDescription = uploadForm.dateOfDescription;
+      if (uploadForm.levelOfDescription !== undefined && uploadForm.levelOfDescription !== prev.levelOfDescription) next.levelOfDescription = uploadForm.levelOfDescription;
+      if (uploadForm.extentAndMedium !== undefined && uploadForm.extentAndMedium !== prev.extentAndMedium) next.extentAndMedium = uploadForm.extentAndMedium;
+      if (uploadForm.access !== undefined) {
+          const expectedAccess = uploadForm.access === 'public' ? 'Public access; no restrictions.' : uploadForm.access === 'restricted' ? 'Restricted access; authorization required.' : 'Confidential; board authorization required.';
+          if (expectedAccess !== prev.accessConditions) next.accessConditions = expectedAccess;
+      }
+      if (uploadForm.termsOfUse !== undefined && uploadForm.termsOfUse !== prev.termsOfUse) next.termsOfUse = uploadForm.termsOfUse;
+      if (generatedRefCode && generatedRefCode !== prev.referenceCode) next.referenceCode = generatedRefCode;
+      
+      // Sync hierarchy-derived fields (Optional: could map to source/context if desired)
+      if (uploadForm.fonds !== undefined) {
         const hierarchyPath = `HCDC > ${uploadForm.fonds}${uploadForm.subfonds ? ' > ' + uploadForm.subfonds : ''}${uploadForm.series ? ' > ' + uploadForm.series : ''}`;
         next.hierarchyPath = hierarchyPath;
       }
@@ -120,12 +131,12 @@ export default function AdminMaterials() {
     uploadForm.title, uploadForm.creator, uploadForm.description,
     uploadForm.format, uploadForm.dateOfDescription, uploadForm.levelOfDescription,
     uploadForm.extentAndMedium, uploadForm.access, uploadForm.termsOfUse,
-    uploadForm.referenceCode, uploadForm.fonds, uploadForm.subfonds, uploadForm.program, uploadForm.series
+    uploadForm.referenceCode, uploadForm.fonds, uploadForm.subfonds, uploadForm.program, uploadForm.series,
+    generatedRefCode
   ]);
 
-  const generatedRefCode = `${uploadForm.year}iA${uploadForm.catNo}${uploadForm.matNo}`;
-
   const [processingState, setProcessingState] = React.useState<"idle" | "scanning" | "compressing" | "done">("idle");
+  const [metadataProcessingState, setMetadataProcessingState] = React.useState<"idle" | "scanning" | "done">("idle");
   const [scanProgress, setScanProgress] = React.useState(0);
   const [fileDetails, setFileDetails] = React.useState<{ name: string; ogSize: number; newSize: number } | null>(null);
   const [needsManualInput, setNeedsManualInput] = React.useState(true); // Default show for new modal layout
@@ -189,15 +200,14 @@ export default function AdminMaterials() {
     }
   }, []);
 
-  const extractFileContent = async (file: File) => {
+  const extractMainFile = async (file: File) => {
     const isPdf = file.type === "application/pdf";
     const isDocx = file.name.toLowerCase().endsWith(".docx");
-    const isCsv = file.name.toLowerCase().endsWith(".csv");
-    const isXlsx = file.name.toLowerCase().endsWith(".xlsx");
     const isImage = file.type.startsWith("image/");
     
     setProcessingState("scanning");
     setScanProgress(0);
+    setMainFileName(file.name);
 
     let extractedText = "";
     let detectedPageCount = 0;
@@ -215,7 +225,6 @@ export default function AdminMaterials() {
           const textContent = await page.getTextContent();
           fullText += textContent.items.map((item: any) => item.str).join(" ") + "\n\n";
           
-          // Limit visual preview extraction to first 10 pages to save memory/storage
           if (i <= 10) {
             try {
               const viewport = page.getViewport({ scale: 1.5 });
@@ -231,11 +240,6 @@ export default function AdminMaterials() {
           }
           setScanProgress(Math.round((i / pdf.numPages) * 100));
         }
-        
-        // Add a placeholder/note if pages were truncated
-        if (pdf.numPages > 10) {
-           console.log(`Preview limited to 10/${pdf.numPages} pages for performance.`);
-        }
         extractedText = fullText;
       } else if (isImage) {
         const base64 = await new Promise<string>((resolve) => {
@@ -250,6 +254,67 @@ export default function AdminMaterials() {
         const arrayBuffer = await file.arrayBuffer();
         const result = await window.mammoth.extractRawText({ arrayBuffer });
         extractedText = result.value;
+      }
+
+      setPdfPreviewImages(extractedImages.length > 0 ? extractedImages : pdfPreviewImages);
+      setMainMaterialText(extractedText);
+      
+      // Smart Fallback Scanning - only use if no metadata text extracted yet
+      if (!rawExtractionText && extractedText) {
+         setRawExtractionText(extractedText);
+      }
+      
+      if (!uploadForm.title && !metadataFileName) {
+         const previewSnippet = extractedText.substring(0, 150).trim();
+         let inferredAccess: "public" | "restricted" | "confidential" = uploadForm.access;
+         const lowerClean = extractedText.toLowerCase();
+         if (lowerClean.includes('confidential') || lowerClean.includes('classified')) inferredAccess = 'confidential';
+         else if (lowerClean.includes('restricted') || lowerClean.includes('authorized personnel')) inferredAccess = 'restricted';
+
+         setUploadForm((prev: any) => ({
+           ...prev, 
+           title: prev.title || file.name.replace(/\.[^/.]+$/, ""),
+           format: prev.format || file.type || "application/octet-stream",
+           description: prev.description || previewSnippet,
+           access: inferredAccess,
+           pageImages: extractedImages.length > 0 ? extractedImages : prev.pageImages,
+           pages: detectedPageCount || prev.pages || 1
+         }));
+
+         setChecklistValues(prev => ({
+           ...prev,
+           title: prev.title || file.name.replace(/\.[^/.]+$/, ""),
+           description: prev.description || previewSnippet,
+         }));
+      } else {
+         setUploadForm((prev: any) => ({
+            ...prev,
+            pageImages: extractedImages.length > 0 ? extractedImages : prev.pageImages,
+            pages: detectedPageCount || prev.pages || 1
+         }));
+      }
+    } catch (err) {
+      console.error("Extraction failed", err);
+    }
+    
+    setProcessingState("done");
+  };
+
+  const extractMetadataFile = async (file: File) => {
+    const isDocx = file.name.toLowerCase().endsWith(".docx");
+    const isCsv = file.name.toLowerCase().endsWith(".csv");
+    const isXlsx = file.name.toLowerCase().endsWith(".xlsx");
+    
+    setMetadataProcessingState("scanning");
+    setMetadataFileName(file.name);
+
+    let extractedText = "";
+    
+    try {
+      if (isDocx && window.mammoth) {
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await window.mammoth.extractRawText({ arrayBuffer });
+        extractedText = result.value;
       } else if (isCsv) {
         extractedText = await file.text();
       } else if (isXlsx && window.XLSX) {
@@ -257,61 +322,80 @@ export default function AdminMaterials() {
         const wb = window.XLSX.read(arrayBuffer);
         const ws = wb.Sheets[wb.SheetNames[0]];
         extractedText = window.XLSX.utils.sheet_to_txt(ws, { sep: " " });
+        
+        // Advanced XLSX Extraction for Auto-filling Fields
+        const jsonData = window.XLSX.utils.sheet_to_json(ws);
+        if (jsonData && jsonData.length > 0) {
+           const firstRow: any = jsonData[0];
+           const lowerMap: any = {};
+           Object.keys(firstRow).forEach(k => lowerMap[k.toLowerCase()] = String(firstRow[k]));
+           
+           const newTitle = lowerMap.title || lowerMap.name || lowerMap.subject || "";
+           const newCreator = lowerMap.creator || lowerMap.author || lowerMap.institution || lowerMap.publisher || "";
+           const newDesc = lowerMap.description || lowerMap.summary || lowerMap.abstract || "";
+           const newDate = lowerMap.date || lowerMap.year || lowerMap["date of description"] || "";
+
+           setUploadForm((prev: any) => ({
+              ...prev,
+              title: newTitle || prev.title,
+              creator: newCreator || prev.creator,
+              description: newDesc || prev.description,
+              dateOfDescription: newDate || prev.dateOfDescription
+           }));
+           setChecklistValues((prev: any) => ({
+              ...prev,
+              title: newTitle || prev.title,
+              creator: newCreator || prev.creator,
+              description: newDesc || prev.description,
+           }));
+        }
       }
 
-      setPdfPreviewImages(extractedImages);
       setRawExtractionText(extractedText);
       
-      if (extractedText || extractedImages.length > 0) {
-        const previewSnippet = extractedText.substring(0, 150).trim();
-        let inferredAccess: "public" | "restricted" | "confidential" = uploadForm.access;
-        const lowerClean = extractedText.toLowerCase();
-        if (lowerClean.includes('confidential') || lowerClean.includes('classified')) inferredAccess = 'confidential';
-        else if (lowerClean.includes('restricted') || lowerClean.includes('authorized personnel')) inferredAccess = 'restricted';
-
-        setUploadForm((prev: any) => ({
-          ...prev, 
-          title: prev.title || file.name.replace(/\.[^/.]+$/, ""),
-          format: prev.format || file.type || "application/octet-stream",
-          description: prev.description || previewSnippet,
-          access: inferredAccess,
-          pageImages: extractedImages.length > 0 ? extractedImages : prev.pageImages,
-          pages: detectedPageCount || prev.pages || 1
-        }));
-
-        setChecklistValues(prev => ({
-          ...prev,
-          title: prev.title || file.name.replace(/\.[^/.]+$/, ""),
-          description: prev.description || previewSnippet,
-          dateOfDescription: prev.dateOfDescription || new Date().toISOString().split('T')[0],
-        }));
-      }
+      const previewSnippet = extractedText.substring(0, 150).trim();
+      setChecklistValues(prev => ({
+        ...prev,
+        description: prev.description || previewSnippet,
+        dateOfDescription: prev.dateOfDescription || new Date().toISOString().split('T')[0],
+      }));
     } catch (err) {
-      console.error("Extraction failed", err);
+      console.error("Metadata extraction failed", err);
     }
     
-    setProcessingState("done");
-    if (extractedImages.length > 0 || extractedText) {
-       setTimeout(() => { setUploadOpen(false); setPreviewOpen(true); }, 500);
-    }
+    setMetadataProcessingState("done");
   };
 
   const handleMediaUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const base64 = e.target?.result as string;
-      setUploadForm(prev => ({ ...prev, fileData: base64 }));
-    };
-    reader.readAsDataURL(file);
+    if (file.type.startsWith("image/")) {
+       const img = new Image();
+       img.src = URL.createObjectURL(file);
+       await new Promise(r => img.onload = r);
+       const canvas = document.createElement("canvas");
+       let w = img.width; let h = img.height;
+       if (w > 1600) { h *= 1600 / w; w = 1600; }
+       canvas.width = w; canvas.height = h;
+       const ctx = canvas.getContext("2d")!;
+       ctx.drawImage(img, 0, 0, w, h);
+       const base64 = canvas.toDataURL("image/jpeg", 0.6); // Compress to save localStorage quota
+       setUploadForm(prev => ({ ...prev, fileData: base64 }));
+    } else {
+       const reader = new FileReader();
+       reader.onload = (e) => {
+         const base64 = e.target?.result as string;
+         setUploadForm(prev => ({ ...prev, fileData: base64 }));
+       };
+       reader.readAsDataURL(file);
+    }
 
     const ogSize = file.size;
     const newSize = Math.floor(ogSize * 0.3);
     setFileDetails({ name: file.name, ogSize, newSize });
     
-    await extractFileContent(file);
+    await extractMainFile(file);
   };
 
   const handleMetadataScanUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -319,7 +403,7 @@ export default function AdminMaterials() {
     if (!files || files.length === 0) return;
 
     if (files.length > 1) {
-       setProcessingState("scanning");
+       setMetadataProcessingState("scanning");
        const imageFiles = Array.from(files)
          .filter(f => f.type.startsWith('image/'))
          .sort((a,b) => a.name.localeCompare(b.name));
@@ -332,17 +416,17 @@ export default function AdminMaterials() {
             reader.readAsDataURL(imageFiles[i]);
           });
           images.push(base64);
-          setScanProgress(Math.round(((i + 1) / imageFiles.length) * 100));
        }
-       setPdfPreviewImages(images);
-       setUploadForm(prev => ({ ...prev, pages: images.length, pageImages: images }));
-       setProcessingState("done");
-       setUploadOpen(false);
-       setPreviewOpen(true);
+       // If no main images present, populate as main preview
+       if (pdfPreviewImages.length === 0) {
+          setPdfPreviewImages(images);
+          setUploadForm(prev => ({ ...prev, pages: images.length, pageImages: images }));
+       }
+       setMetadataProcessingState("done");
        return;
     }
 
-    await extractFileContent(files[0]);
+    await extractMetadataFile(files[0]);
   };
 
   const filteredMaterials = React.useMemo(() => {
@@ -362,8 +446,15 @@ export default function AdminMaterials() {
   const totalPages = Math.ceil(filteredMaterials.length / itemsPerPage);
   const paginatedMaterials = filteredMaterials.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  const toggleMaterialDetail = (mat: ArchivalMaterial) => {
-    setSelectedMaterial(prev => prev?.uniqueId === mat.uniqueId ? null : mat);
+  const toggleMaterialDetail = async (mat: ArchivalMaterial) => {
+    if (selectedMaterial?.uniqueId === mat.uniqueId) {
+      setSelectedMaterial(null);
+    } else {
+      // Import dynamically or ensure storage.ts exports loadMaterial
+      const { loadMaterial } = await import('@/data/storage');
+      const hydrated = await loadMaterial(mat.id);
+      setSelectedMaterial(hydrated || mat);
+    }
   };
 
   const submitIngest = () => {
@@ -386,9 +477,9 @@ export default function AdminMaterials() {
     setChecklistOpen(true);
   };
 
-  const confirmDeleteMaterial = () => {
+  const confirmDeleteMaterial = async () => {
     if (materialToDelete) {
-      const updated = deleteMaterial(materialToDelete);
+      const updated = await deleteMaterial(materialToDelete);
       setMaterials(updated);
       addActivity({
         user: "Admin",
@@ -434,40 +525,128 @@ export default function AdminMaterials() {
     setUploadOpen(true);
   };
 
-  const handleExportMetadata = () => {
+  const handleExportMetadata = async () => {
     if (filteredMaterials.length === 0) return;
     
-    // Create CSV content
-    const headers = ["Unique ID", "Title", "Creator", "Date", "Level", "Reference Code", "Description", "Access", "Hierarchy"];
-    const rows = filteredMaterials.map(m => [
-      m.uniqueId,
-      m.title,
-      m.creator,
-      m.dateOfDescription,
-      m.levelOfDescription,
-      m.referenceCode,
-      m.description?.replace(/\n/g, " "),
-      m.access,
-      m.hierarchyPath
-    ]);
+    if (!(window as any).ExcelJS || !(window as any).saveAs) {
+      toast({ title: "Error", description: "Excel export library not loaded yet.", variant: "destructive" });
+      return;
+    }
 
-    const csvContent = [
-      headers.join(","),
-      ...rows.map(row => row.map(cell => `"${cell || ''}"`).join(","))
-    ].join("\n");
+    const ExcelJS = (window as any).ExcelJS;
+    const saveAs = (window as any).saveAs;
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'iArchive Digital Repository';
+    workbook.created = new Date();
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `iarchive_metadata_export_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
+    filteredMaterials.forEach((mat, index) => {
+      // Abbreviate sheet name as Excel sets max length to 31 chars
+      const safeTitle = (mat.referenceCode || mat.uniqueId || `Record ${index+1}`).substring(0, 30).replace(/[:\\\/?*\[\]]/g, "-");
+      const sheet = workbook.addWorksheet(safeTitle, {
+        views: [{ state: 'frozen', ySplit: 2 }]
+      });
+
+      sheet.columns = [
+        { key: 'code', width: 20 },
+        { key: 'name', width: 40 },
+        { key: 'standard', width: 15 },
+        { key: 'value', width: 80 }
+      ];
+
+      const titleRow = sheet.addRow(['ARCHIVAL DESCRIPTION RECORD']);
+      sheet.mergeCells('A1:D1');
+      titleRow.height = 30;
+      const titleCell = sheet.getCell('A1');
+      titleCell.font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
+      titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A2A44' } }; // Dark navy
+      titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+      const headerRow = sheet.addRow(['FIELD CODE', 'FIELD NAME', 'STANDARD', 'VALUE']);
+      headerRow.height = 20;
+      headerRow.eachCell((cell: any) => {
+        cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4775B3' } }; // Steel blue
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FF8FAACC' } },
+          bottom: { style: 'thin', color: { argb: 'FF8FAACC' } },
+          left: { style: 'thin', color: { argb: 'FF8FAACC' } },
+          right: { style: 'thin', color: { argb: 'FF8FAACC' } }
+        };
+      });
+
+      const addDivider = (text: string) => {
+        const div = sheet.addRow([text]);
+        sheet.mergeCells(`A${div.number}:D${div.number}`);
+        const c = sheet.getCell(`A${div.number}`);
+        c.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF000000' } };
+        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDF3D0' } }; // Gold background
+        c.alignment = { horizontal: 'center', vertical: 'middle' };
+      };
+
+      let dataRowIndex = 0;
+      const addDataRow = (fieldDef: any, value: string) => {
+        const row = sheet.addRow([fieldDef.code, fieldDef.name, fieldDef.standard, value]);
+        const bgColor = dataRowIndex % 2 !== 0 ? 'FFF4F8FC' : 'FFFFFFFF';
+
+        const cellA = row.getCell(1);
+        cellA.font = { name: 'Calibri', size: 10, bold: true };
+        cellA.alignment = { horizontal: 'center', vertical: 'middle' };
+        
+        const cellB = row.getCell(2);
+        cellB.font = { name: 'Calibri', size: 10 };
+        cellB.alignment = { vertical: 'middle' };
+
+        const cellC = row.getCell(3);
+        cellC.font = { name: 'Calibri', size: 10, italic: true };
+        cellC.alignment = { horizontal: 'center', vertical: 'middle' };
+
+        const cellD = row.getCell(4);
+        cellD.font = { name: 'Calibri', size: 10 };
+        cellD.alignment = { vertical: 'top', wrapText: true };
+
+        row.eachCell((cell: any) => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFD9E2EE' } },
+            bottom: { style: 'thin', color: { argb: 'FFD9E2EE' } },
+            left: { style: 'thin', color: { argb: 'FFD9E2EE' } },
+            right: { style: 'thin', color: { argb: 'FFD9E2EE' } }
+          };
+        });
+
+        dataRowIndex++;
+      };
+
+      addDivider('--- ISAD(G) ARCHIVAL DESCRIPTION ---');
+      COMBINED_FIELDS.filter(f => f.standard === 'ISAD(G)' || f.standard === 'Both').forEach(f => {
+        const value = (mat as any)[f.fieldKey] || '';
+        addDataRow(f, value);
+      });
+
+      addDivider('--- DUBLIN CORE METADATA ---');
+      dataRowIndex = 0; 
+      COMBINED_FIELDS.filter(f => f.standard === 'Dublin Core').forEach(f => {
+        const value = (mat as any)[f.fieldKey] || '';
+        addDataRow(f, value);
+      });
+
+      const footerRow = sheet.addRow([`iArchive Digital Repository • Holy Cross of Davao College • Generated: ${new Date().toISOString().split('T')[0]}`]);
+      sheet.mergeCells(`A${footerRow.number}:D${footerRow.number}`);
+      footerRow.height = 20;
+      const footerCell = sheet.getCell(`A${footerRow.number}`);
+      footerCell.font = { name: 'Calibri', size: 9, italic: true, color: { argb: 'FF5A7394' } };
+      footerCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE6ECF5' } };
+      footerCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    saveAs(blob, `iarchive_metadata_export_${new Date().toISOString().split('T')[0]}.xlsx`);
+
     toast({ 
       title: "Export Successful", 
-      description: `Targeting ${filteredMaterials.length} records. Downloaded as CSV.` 
+      description: `Targeted ${filteredMaterials.length} records. Downloaded as Excel Workbook.` 
     });
   };
 
@@ -520,6 +699,11 @@ export default function AdminMaterials() {
                  levelOfDescription: "Item", extentAndMedium: "", accessConditions: "Public access; no restrictions.",
                  termsOfUse: "", referenceCode: ""
                });
+               setMainFileName("");
+               setMetadataFileName("");
+               setRawExtractionText("");
+               setMainMaterialText("");
+               setPdfPreviewImages([]);
                setUploadOpen(true);
             }}>
               <Plus className="w-4 h-4 text-white" /> Ingest Material
@@ -672,6 +856,47 @@ export default function AdminMaterials() {
                                </div>
                              </div>
                              
+                             {/* ACTUAL VIEWER */}
+                             <div className="mb-8 rounded-xl overflow-hidden border shadow-sm bg-[#1e1e1e]">
+                               <div className="flex items-center justify-between px-4 py-2 bg-[#2a2a2a] text-white/70 text-xs font-bold uppercase tracking-widest border-b border-white/10">
+                                  <span className="flex items-center gap-2"><ZoomIn className="w-3.5 h-3.5 text-indigo-400" /> Media Viewer</span>
+                                  {mat.access !== 'public' ? (
+                                    <span className="flex items-center gap-1.5 text-red-400 bg-red-400/10 px-2 py-0.5 rounded uppercase font-bold"><Lock className="w-3 h-3" /> {mat.access} - Admin Override Mode</span>
+                                  ) : (
+                                    <span className="text-emerald-400">Public Object</span>
+                                  )}
+                               </div>
+                               {selectedMaterial?.fileUrl && selectedMaterial.fileUrl.startsWith("data:application/pdf") ? (
+                                   <div className="relative w-full h-[700px] bg-[#333]">
+                                      <object data={selectedMaterial.fileUrl} type="application/pdf" className="w-full h-full">
+                                         <iframe src={selectedMaterial.fileUrl} className="w-full h-full border-0">
+                                            <div className="p-8 text-center text-white/50">Your browser does not support embedding PDFs.</div>
+                                         </iframe>
+                                      </object>
+                                   </div>
+                               ) : selectedMaterial?.fileUrl && selectedMaterial.fileUrl.startsWith("data:video/") ? (
+                                   <video src={selectedMaterial.fileUrl} controls className="w-full h-[600px] object-contain bg-black" />
+                               ) : selectedMaterial?.pageImages && selectedMaterial.pageImages.length > 0 ? (
+                                   <div className="flex overflow-x-auto gap-4 p-8 snap-x bg-[#1a1a1a] custom-scrollbar scroll-smooth">
+                                       {selectedMaterial.pageImages.map((img, i) => (
+                                          <div key={i} className="shrink-0 snap-center relative group">
+                                             <img src={img} className="h-[600px] object-contain shadow-2xl bg-white border border-white/10 rounded" />
+                                             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white backdrop-blur-sm text-[10px] font-bold px-3 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">Page {i + 1}</div>
+                                          </div>
+                                       ))}
+                                   </div>
+                               ) : selectedMaterial?.fileUrl && selectedMaterial.fileUrl.startsWith("data:image/") ? (
+                                   <div className="bg-[#1a1a1a] p-8 flex justify-center">
+                                      <img src={selectedMaterial.fileUrl} className="max-h-[600px] max-w-full object-contain rounded shadow-2xl bg-white" />
+                                   </div>
+                               ) : (
+                                   <div className="h-[300px] flex flex-col items-center justify-center text-white/30 bg-[#222]">
+                                      <FileText className="w-12 h-12 mb-4 opacity-40" />
+                                      <p className="text-sm font-semibold uppercase tracking-wider">No viewable media representation</p>
+                                   </div>
+                               )}
+                             </div>
+                             
                              {/* Re-use MetadataChecklist layout directly! */}
                              <MetadataChecklist 
                                 values={mat as any}
@@ -679,11 +904,11 @@ export default function AdminMaterials() {
                                 onToggle={() => {}}
                                 onSelectAll={() => {}}
                                 onClearAll={() => {}}
-                                onValueChange={(fieldKey, value) => {
+                                onValueChange={async (fieldKey, value) => {
                                   // Inline edit propagation for CRUD saving
                                   const updatedMat = { ...mat, [fieldKey]: value };
-                                  saveMaterial(updatedMat as any);
-                                  setMaterials(prev => prev.map(m => m.id === mat.id ? (updatedMat as any) : m));
+                                  const updated = await saveMaterial(updatedMat as any);
+                                  setMaterials(updated);
                                 }}
                                 className="shadow-none border border-border/60"
                              />
@@ -872,14 +1097,14 @@ export default function AdminMaterials() {
                     </Button>
                   </div>
                  
-                 {processingState === "scanning" && (
+                 {metadataProcessingState === "scanning" && (
                    <div className="mt-3 text-xs text-emerald-700 font-bold flex items-center gap-2">
-                     <Loader2 className="w-3.5 h-3.5 animate-spin" /> Extracting Content... {scanProgress}%
+                     <Loader2 className="w-3.5 h-3.5 animate-spin" /> Extracting Metadata...
                    </div>
                  )}
-                 {processingState === "done" && (
+                 {metadataProcessingState === "done" && (
                    <div className="mt-3 text-[10px] text-emerald-700 font-bold flex items-center gap-1.5 bg-emerald-100 p-1.5 rounded">
-                     <CheckCircle2 className="w-3.5 h-3.5" /> Text Extracted for Checklist
+                     <CheckCircle2 className="w-3.5 h-3.5" /> Text Extracted for Checklist: {metadataFileName}
                    </div>
                  )}
               </div>
@@ -889,7 +1114,15 @@ export default function AdminMaterials() {
 
           <DialogFooter className="mt-2 border-t pt-4 flex gap-2">
             <Button variant="ghost" onClick={() => setUploadOpen(false)}>Cancel Ingest</Button>
-            <Button onClick={() => { setUploadOpen(false); setPreviewOpen(true); }} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+            <Button onClick={() => {
+                if (validationErrors.length > 0 && !uploadForm.title) {
+                    setValidationErrors(['title', 'creator']);
+                    toast({ title: "Validation Error", description: "Please provide a Title and Creator", variant: "destructive" });
+                    return;
+                }
+                setUploadOpen(false); 
+                setPreviewOpen(true); 
+              }} disabled={processingState === "scanning" || metadataProcessingState === "scanning" || !uploadForm.fileData} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
                Proceed to Page Preview <ChevronRight className="w-4 h-4 ml-2" />
             </Button>
           </DialogFooter>
@@ -1136,7 +1369,7 @@ export default function AdminMaterials() {
           />
           <DialogFooter>
             <Button variant="ghost" onClick={() => setChecklistOpen(false)}>Cancel</Button>
-            <Button onClick={() => {
+            <Button onClick={async () => {
               const hierarchyPath = `HCDC > ${uploadForm.subfonds}${uploadForm.program ? ' > ' + uploadForm.program : ''}${uploadForm.series ? ' > ' + uploadForm.series : ''}`;
               const newMaterial: ArchivalMaterial = {
                  ...selectedMaterial, // if editing
@@ -1156,26 +1389,30 @@ export default function AdminMaterials() {
                  fileUrl: (uploadForm as any).fileData || (uploadForm as any).fileUrl,
               } as any;
 
-              const updated = saveMaterial(newMaterial);
-              setMaterials(updated);
-              
-              // Clear filters after successful ingest to make it visible
-              if (!editingMaterialId) {
-                setSelectedHierarchyItem(null);
-                setSearch("");
-                setCurrentPage(1);
-              }
-              
-              addActivity({
-                user: "Admin",
-                actionType: editingMaterialId ? "edit" : "upload",
-                description: `${editingMaterialId ? 'Updated' : 'Ingested'} material: ${newMaterial.title}`,
-                materialId: newMaterial.uniqueId
-              });
+              try {
+                const updated = await saveMaterial(newMaterial);
+                setMaterials(updated);
+                
+                // Clear filters after successful ingest to make it visible
+                if (!editingMaterialId) {
+                  setSelectedHierarchyItem(null);
+                  setSearch("");
+                  setCurrentPage(1);
+                }
+                
+                addActivity({
+                  user: "Admin",
+                  actionType: editingMaterialId ? "edit" : "upload",
+                  description: `${editingMaterialId ? 'Updated' : 'Ingested'} material: ${newMaterial.title}`,
+                  materialId: newMaterial.uniqueId
+                });
 
-              toast({ title: editingMaterialId ? "Updated" : "Ingestion Confirmed", description: "Material saved successfully." }); 
-              setChecklistOpen(false);
-              setEditingMaterialId(null);
+                toast({ title: editingMaterialId ? "Updated" : "Ingestion Confirmed", description: "Material saved successfully." }); 
+                setChecklistOpen(false);
+                setEditingMaterialId(null);
+              } catch (e) {
+                toast({ title: "Storage Error", description: "Failed to store material data.", variant: "destructive" });
+              }
             }} className="bg-emerald-600 hover:bg-emerald-700">
               {editingMaterialId ? "Update Item" : "Finalize Ingest"}
             </Button>

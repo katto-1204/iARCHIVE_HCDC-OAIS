@@ -143,10 +143,10 @@ export default function AdminDashboard() {
           <CardContent className="p-0 relative z-10">
             <div className="divide-y divide-white/10">
               <div className="px-5 py-3.5 hover:bg-white/5 transition-colors">
-                <p className="text-xs font-bold mb-1 flex items-center gap-2">
+                <div className="text-xs font-bold mb-1 flex items-center gap-2">
                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                    Pending Access Requests
-                </p>
+                </div>
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] text-white/60">{PENDING_REQUESTS.length} researchers waiting for review</span>
                   <Link href="/requests">
@@ -155,20 +155,20 @@ export default function AdminDashboard() {
                 </div>
               </div>
               <div className="px-5 py-3.5 hover:bg-white/5 transition-colors">
-                <p className="text-xs font-bold mb-1 flex items-center gap-2">
+                <div className="text-xs font-bold mb-1 flex items-center gap-2">
                    <div className="w-2 h-2 rounded-full bg-amber-500" />
                    Metadata Incomplete
-                </p>
+                </div>
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] text-white/60">{materials.filter(m => computeCompletion(m) < 50).length} records below 50%</span>
                   <button className="text-[9px] font-black uppercase text-[#4169E1] hover:text-white transition-colors" onClick={() => setActiveFilter("incomplete")}>Fix Items</button>
                 </div>
               </div>
               <div className="px-5 py-3.5 hover:bg-white/5 transition-colors">
-                <p className="text-xs font-bold mb-1 flex items-center gap-2">
+                <div className="text-xs font-bold mb-1 flex items-center gap-2">
                    <div className="w-2 h-2 rounded-full bg-[#10B981]" />
                    OAIS Integrity Scan
-                </p>
+                </div>
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] text-white/60">System-wide scan completed successfully</span>
                   <span className="text-[9px] text-emerald-500 font-bold">STABLE</span>

@@ -1,3 +1,4 @@
+import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { SAMPLE_MATERIALS, ACTIVITY_FEED, type ArchivalMaterial, type ActivityEntry } from "./sampleData";
 
 const STORAGE_KEYS = {
@@ -6,8 +7,40 @@ const STORAGE_KEYS = {
   VERSION: "iarchive_version",
 };
 
-// Bump this whenever sample data structure changes
-const STORAGE_VERSION = "3";
+const STORAGE_VERSION = "4"; // Bump version
+
+interface IArchiveDB extends DBSchema {
+  files: {
+    key: string;
+    value: { id: string; blob: string | Blob; type?: string };
+  };
+}
+
+let dbPromise: Promise<IDBPDatabase<IArchiveDB>> | null = null;
+export function getDB() {
+  if (typeof window === "undefined") return null;
+  if (!dbPromise) {
+    dbPromise = openDB<IArchiveDB>('iarchive', 1, {
+      upgrade(db) {
+        db.createObjectStore('files', { keyPath: 'id' });
+      },
+    });
+  }
+  return dbPromise;
+}
+
+export async function saveFile(id: string, data: string | Blob, type?: string) {
+  const db = await getDB();
+  if (!db) return;
+  await db.put('files', { id, blob: data, type });
+}
+
+export async function getFile(id: string): Promise<{ blob: string | Blob; type?: string } | undefined> {
+  const db = await getDB();
+  if (!db) return undefined;
+  const entry = await db.get('files', id);
+  return entry ? { blob: entry.blob, type: entry.type } : undefined;
+}
 
 /** Initialize storage if empty or outdated */
 export function initializeStorage() {
@@ -28,7 +61,6 @@ export function getMaterials(): ArchivalMaterial[] {
   
   const currentVersion = localStorage.getItem(STORAGE_KEYS.VERSION);
   if (currentVersion !== STORAGE_VERSION) {
-    // Preserve any custom user-added materials (id not in SAMPLE_MATERIALS)
     const oldStored = localStorage.getItem(STORAGE_KEYS.MATERIALS);
     let userAdded: ArchivalMaterial[] = [];
     if (oldStored) {
@@ -37,8 +69,6 @@ export function getMaterials(): ArchivalMaterial[] {
             userAdded = oldMaterials.filter(m => !SAMPLE_MATERIALS.some(s => s.id === m.id));
         } catch(e) {}
     }
-    
-    // Merge updated sample materials with user added materials
     const merged = [...SAMPLE_MATERIALS, ...userAdded];
     localStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify(merged));
     localStorage.setItem(STORAGE_KEYS.VERSION, STORAGE_VERSION);
@@ -53,81 +83,96 @@ export function getMaterials(): ArchivalMaterial[] {
   try {
     return JSON.parse(stored);
   } catch (e) {
-    console.error("Failed to parse materials from localStorage", e);
     return SAMPLE_MATERIALS;
   }
 }
 
-/** Get Single Material */
 export function getMaterialById(id: string): ArchivalMaterial | undefined {
   const materials = getMaterials();
   return materials.find(m => m.id === id || m.uniqueId === id);
 }
 
+/** Load heavy material with its IDB contents if fileId exists */
+export async function loadMaterial(id: string): Promise<ArchivalMaterial | undefined> {
+   const mat = getMaterialById(id);
+   if (!mat) return undefined;
+   if (mat.fileId) {
+      try {
+         const fileEntry = await getFile(mat.fileId);
+         if (fileEntry) {
+            mat.fileUrl = fileEntry.blob as string;
+         }
+         const thumbsEntry = await getFile(mat.fileId + "_thumbs");
+         if (thumbsEntry) {
+            mat.pageImages = JSON.parse(thumbsEntry.blob as string);
+         }
+      } catch (e) {
+         console.error("Failed to load rich media from IDB", e);
+      }
+   }
+   return mat;
+}
+
 /** Save/Update Material */
-export function saveMaterial(material: ArchivalMaterial) {
+export async function saveMaterial(material: ArchivalMaterial) {
   const materials = getMaterials();
   const index = materials.findIndex(m => m.id === material.id);
   const now = new Date().toISOString();
   
-  if (index >= 0) {
-    materials[index] = { ...material, updatedAt: now };
-  } else {
-    // New material
-    materials.push({ 
-      ...material, 
-      createdAt: material.createdAt || now, 
-      updatedAt: now 
-    });
-  }
-
+  let processedMaterial = { ...material };
+  
   try {
-    localStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify(materials));
-  } catch (e) {
-    if (e instanceof DOMException && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED')) {
-      console.warn("LocalStorage quota exceeded, pruning page images from stored materials...");
-      
-      // Attempt to save space by removing large pageImages from older materials
-      const prunedMaterials = materials.map(m => {
-        // Only keep first 2 images for non-selected materials to save space
-         if (m.pageImages && m.pageImages.length > 2) {
-            return { ...m, pageImages: m.pageImages.slice(0, 2) };
-         }
-         return m;
-      });
+     // If there is heavy binary data, move it to IndexedDB
+     if (material.fileUrl && material.fileUrl.startsWith('data:')) {
+         const fileId = material.id;
+         await saveFile(fileId, material.fileUrl);
+         processedMaterial.fileUrl = undefined;
+         processedMaterial.fileId = fileId;
+     }
+     if (material.pageImages && material.pageImages.length > 0) {
+         const fileId = material.id;
+         await saveFile(fileId + "_thumbs", JSON.stringify(material.pageImages));
+         processedMaterial.pageImages = []; 
+         processedMaterial.fileId = fileId;
+     }
 
-      try {
-        localStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify(prunedMaterials));
-      } catch (innerError) {
-        // If still failing, aggressively strip all images except current one
-        const aggressivePrune = materials.map(m => {
-          if (m.id !== material.id) {
-             return { ...m, pageImages: [] };
-          }
-          // Limit current one to 4 pages max
-          if (m.pageImages && m.pageImages.length > 4) {
-             return { ...m, pageImages: m.pageImages.slice(0, 4) };
-          }
-          return m;
-        });
-        localStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify(aggressivePrune));
-      }
-    } else {
-      throw e;
-    }
+     if (index >= 0) {
+       materials[index] = { ...processedMaterial, updatedAt: now };
+     } else {
+       materials.push({ 
+         ...processedMaterial, 
+         createdAt: processedMaterial.createdAt || now, 
+         updatedAt: now 
+       });
+     }
+
+     localStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify(materials));
+     
+     // Return hydrated representation for UI optimism
+     return getMaterials().map(m => m.id === material.id ? material : m);
+  } catch (e) {
+     console.error("Critical Storage Error saving material:", e);
+     throw new Error("IndexedDB or LocalStorage save failed");
   }
-  return materials;
 }
 
 /** Delete Material */
-export function deleteMaterial(id: string) {
+export async function deleteMaterial(id: string) {
   const materials = getMaterials();
   const filtered = materials.filter(m => m.id !== id);
   localStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify(filtered));
+  
+  // Cleanup indexedDB
+  const db = await getDB();
+  if (db) {
+     await db.delete('files', id);
+     await db.delete('files', id + '_thumbs');
+  }
+  
   return filtered;
 }
 
-/** Read Activity Feed */
+/** Read/Add Activity Feed */
 export function getActivityFeed(): ActivityEntry[] {
   if (typeof window === "undefined") return ACTIVITY_FEED;
   const stored = localStorage.getItem(STORAGE_KEYS.ACTIVITY);
@@ -135,22 +180,13 @@ export function getActivityFeed(): ActivityEntry[] {
     initializeStorage();
     return ACTIVITY_FEED;
   }
-  try {
-    return JSON.parse(stored);
-  } catch (e) {
-    return ACTIVITY_FEED;
-  }
+  try { return JSON.parse(stored); } catch (e) { return ACTIVITY_FEED; }
 }
 
-/** Add Activity Log Entry */
 export function addActivity(entry: Omit<ActivityEntry, "id" | "timestamp">) {
   const feed = getActivityFeed();
-  const newEntry: ActivityEntry = {
-    ...entry,
-    id: `act-${Date.now()}`,
-    timestamp: new Date().toISOString(),
-  };
-  const updatedFeed = [newEntry, ...feed].slice(0, 50); // Keep last 50
+  const newEntry: ActivityEntry = { ...entry, id: `act-${Date.now()}`, timestamp: new Date().toISOString() };
+  const updatedFeed = [newEntry, ...feed].slice(0, 50);
   localStorage.setItem(STORAGE_KEYS.ACTIVITY, JSON.stringify(updatedFeed));
   return updatedFeed;
 }

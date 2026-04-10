@@ -8,7 +8,7 @@ import {
   ChevronLeft, ChevronRight, X
 } from "lucide-react";
 import { useGetMe, useGetAccessRequests } from "@workspace/api-client-react";
-import { getMaterialById } from "@/data/storage";
+import { getMaterialById, loadMaterial } from "@/data/storage";
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   if (!value) return null;
@@ -307,9 +307,17 @@ export default function MaterialDetail() {
 
   React.useEffect(() => {
     if (params?.id) {
-      setMaterial(getMaterialById(params.id));
+      loadMaterial(params.id).then((hydratedMat) => {
+        setMaterial(hydratedMat);
+        setIsLoading(false);
+      }).catch(e => {
+        console.error("Failed to load material", e);
+        setMaterial(getMaterialById(params!.id));
+        setIsLoading(false);
+      });
+    } else {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, [params?.id]);
 
   const { data: user } = useGetMe();

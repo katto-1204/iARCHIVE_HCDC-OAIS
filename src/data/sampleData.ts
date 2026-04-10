@@ -397,6 +397,7 @@ export interface ArchivalMaterial {
   access: "public" | "restricted" | "confidential";
   hierarchyPath: string;
   fileUrl?: string;
+  fileId?: string;
   thumbnailUrl?: string;
   sha256?: string;
   sipId?: string;
