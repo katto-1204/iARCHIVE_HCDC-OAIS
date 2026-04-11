@@ -1,17 +1,37 @@
 import { Link } from "wouter";
 import { AdminLayout } from "@/components/layout";
 import { Card, CardContent } from "@/components/ui-components";
-import { BookOpen, Search, Shield, Megaphone, ArrowRight, Clock, Star, ArrowUpRight, FileText } from "lucide-react";
+import { BookOpen, Search, Shield, Megaphone, ArrowRight, Clock, Star, ArrowUpRight, FileText, CheckCircle2, XCircle } from "lucide-react";
 import { useGetAnnouncements, useGetMaterials, useGetAccessRequests } from "@workspace/api-client-react";
 import { format } from "date-fns";
 import * as React from "react";
+import { getMaterialById } from "@/data/storage";
 
 export default function StudentDashboard() {
   const [tab, setTab] = React.useState<"overview" | "accessed">("overview");
   const { data: announcements } = useGetAnnouncements();
   const activeAnnouncements = (announcements ?? []).filter((a: any) => a.isActive);
   const { data: materialsData } = useGetMaterials({ access: "public", limit: 5 });
-  const { data: approvedRequests, isLoading: isRequestsLoading } = useGetAccessRequests({ status: "approved" });
+  const { data: approvedRequests, isLoading: isApprovedLoading } = useGetAccessRequests({ status: "approved" });
+  const { data: pendingRequests, isLoading: isPendingLoading } = useGetAccessRequests({ status: "pending" });
+  const { data: rejectedRequests, isLoading: isRejectedLoading } = useGetAccessRequests({ status: "rejected" });
+  const isRequestsLoading = isApprovedLoading || isPendingLoading || isRejectedLoading;
+
+  const allRequests = React.useMemo(() => {
+    return [
+      ...(pendingRequests?.requests || []).map((r: any) => ({ ...r, status: "pending" })),
+      ...(approvedRequests?.requests || []).map((r: any) => ({ ...r, status: "approved" })),
+      ...(rejectedRequests?.requests || []).map((r: any) => ({ ...r, status: "rejected" })),
+    ];
+  }, [pendingRequests?.requests, approvedRequests?.requests, rejectedRequests?.requests]);
+
+  const statusOrder = ["borrow", "request", "decision"] as const;
+
+  const getStatusTone = (status: string) => {
+    if (status === "approved") return { bg: "bg-emerald-500", text: "text-emerald-700", chip: "bg-emerald-50 border-emerald-200" };
+    if (status === "rejected") return { bg: "bg-red-500", text: "text-red-700", chip: "bg-red-50 border-red-200" };
+    return { bg: "bg-amber-500", text: "text-amber-700", chip: "bg-amber-50 border-amber-200" };
+  };
 
   return (
     <AdminLayout>
@@ -176,42 +196,89 @@ export default function StudentDashboard() {
         </div>
       ) : (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {isRequestsLoading ? (
-               [...Array(3)].map((_, i) => (
-                <div key={i} className="h-48 bg-white border border-border/50 rounded-2xl animate-pulse" />
+               [...Array(4)].map((_, i) => (
+                <div key={i} className="h-56 bg-white border border-border/50 rounded-2xl animate-pulse" />
               ))
-            ) : (approvedRequests?.requests?.length ?? 0) > 0 ? (
-              approvedRequests?.requests?.map((req: any) => (
-                <Link key={req.id} href={`/materials/${req.materialId}`}>
-                  <Card className="h-full border-border/50 shadow-sm hover:shadow-lg transition-all hover:border-[#960000]/30 hover:-translate-y-1 bg-white cursor-pointer group overflow-hidden">
-                    <CardContent className="p-0 flex flex-col h-full">
-                      <div className="h-32 bg-muted flex items-center justify-center relative overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-br from-[#960000]/5 to-transparent" />
-                        <FileText className="w-10 h-10 text-[#960000]/20 group-hover:scale-110 transition-transform" />
-                        <div className="absolute top-3 right-3 bg-emerald-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest shadow-lg">
-                          Approved
+            ) : (allRequests.length ?? 0) > 0 ? (
+              allRequests.map((req: any) => {
+                const tone = getStatusTone(req.status);
+                const material = req.materialId ? getMaterialById(req.materialId) : undefined;
+                const coverUrl = material?.thumbnailUrl || material?.pageImages?.[0];
+                const statusIcon = req.status === "approved" ? CheckCircle2 : req.status === "rejected" ? XCircle : Clock;
+                return (
+                  <Link key={req.id} href={req.materialId ? `/materials/${req.materialId}` : "/collections"}> 
+                    <Card className="h-full border-border/60 shadow-sm hover:shadow-lg transition-all hover:border-[#960000]/30 hover:-translate-y-1 bg-white cursor-pointer group overflow-hidden">
+                      <CardContent className="p-0">
+                        <div className="flex flex-col md:flex-row">
+                          <div className="flex-1 p-6">
+                            <div className={`inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full border ${tone.chip} ${tone.text}`}>
+                              <statusIcon className="w-3 h-3" /> {req.status}
+                            </div>
+                            <h3 className="mt-3 font-bold text-lg text-[#0a1628] group-hover:text-[#960000] transition-colors line-clamp-2">
+                              {req.materialTitle || material?.title || "Untitled Material"}
+                            </h3>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Requested {format(new Date(req.createdAt), "MMM d, yyyy")}
+                            </p>
+
+                            <div className="mt-5">
+                              <div className="grid grid-cols-3 items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                <div className="flex flex-col items-center gap-2">
+                                  <span className={req.status !== "rejected" ? "text-[#0a1628]" : ""}>Borrow</span>
+                                  <div className={`w-9 h-9 rounded-full border-2 flex items-center justify-center ${req.status !== "rejected" ? "border-emerald-500 text-emerald-500" : "border-muted text-muted-foreground"}`}>
+                                    <CheckCircle2 className="w-4 h-4" />
+                                  </div>
+                                </div>
+                                <div className="flex flex-col items-center gap-2">
+                                  <span className={req.status !== "rejected" ? "text-[#0a1628]" : ""}>Request</span>
+                                  <div className={`w-9 h-9 rounded-full border-2 flex items-center justify-center ${req.status !== "rejected" ? "border-emerald-500 text-emerald-500" : "border-muted text-muted-foreground"}`}>
+                                    <CheckCircle2 className="w-4 h-4" />
+                                  </div>
+                                </div>
+                                <div className="flex flex-col items-center gap-2">
+                                  <span className={req.status === "approved" ? "text-emerald-600" : req.status === "rejected" ? "text-red-600" : "text-amber-600"}>
+                                    {req.status === "pending" ? "Pending" : req.status}
+                                  </span>
+                                  <div className={`w-9 h-9 rounded-full border-2 flex items-center justify-center ${req.status === "approved" ? "border-emerald-500 text-emerald-500" : req.status === "rejected" ? "border-red-500 text-red-500" : "border-amber-500 text-amber-500"}`}>
+                                    {req.status === "approved" ? <CheckCircle2 className="w-4 h-4" /> : req.status === "rejected" ? <XCircle className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="mt-3 grid grid-cols-3 items-center gap-2">
+                                <div className="h-1 rounded-full bg-emerald-500" />
+                                <div className={`h-1 rounded-full ${req.status === "pending" ? "bg-amber-400" : req.status === "approved" ? "bg-emerald-500" : "bg-red-500"}`} />
+                                <div className={`h-1 rounded-full ${req.status === "approved" ? "bg-emerald-500" : req.status === "rejected" ? "bg-red-500" : "bg-muted"}`} />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="md:w-48 w-full bg-muted/20 border-l border-border/60 flex items-center justify-center p-4">
+                            <div className="w-full h-48 md:h-40 rounded-xl overflow-hidden bg-white border border-border/60">
+                              {coverUrl ? (
+                                <img src={coverUrl} className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <FileText className="w-8 h-8 text-muted-foreground/40" />
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <div className="p-5 flex-1 flex flex-col">
-                        <h3 className="font-bold text-sm text-[#0a1628] group-hover:text-[#960000] transition-colors line-clamp-2 h-10 mb-2">{req.materialTitle}</h3>
-                        <div className="mt-auto pt-4 border-t border-border/40 flex items-center justify-between text-[10px] text-muted-foreground font-bold uppercase tracking-wider">
-                          <span className="flex items-center gap-1.5"><Clock className="w-3 h-3" /> Approved {format(new Date(req.updatedAt || req.createdAt), 'MMM d, yyyy')}</span>
-                          <span className="text-[#960000]">View Details →</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))
+                      </CardContent>
+                    </Card>
+                  </Link>
+                );
+              })
             ) : (
               <div className="col-span-full py-24 text-center bg-white rounded-3xl border border-dashed border-border/80">
                 <div className="w-20 h-20 bg-muted/50 rounded-full flex items-center justify-center mx-auto mb-6">
                   <Shield className="w-10 h-10 text-muted-foreground/30" />
                 </div>
-                <h3 className="text-xl font-bold text-[#0a1628] mb-2">No accessible restricted materials</h3>
+                <h3 className="text-xl font-bold text-[#0a1628] mb-2">No access requests yet</h3>
                 <p className="text-muted-foreground max-w-sm mx-auto mb-8 text-sm">
-                  You haven't requested access to any restricted materials yet, or your requests are still pending review.
+                  Start a request from any restricted material and track its status here.
                 </p>
                 <Link href="/collections">
                   <button className="bg-[#0a1628] text-white font-bold py-3 px-8 rounded-xl hover:bg-[#1a1a1a] transition-all">

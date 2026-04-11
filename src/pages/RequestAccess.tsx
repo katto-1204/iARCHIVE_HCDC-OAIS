@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useGetMe, useSubmitAccessRequest } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
+import { getMaterialById, loadMaterial } from "@/data/storage";
 import { format } from "date-fns";
 
 const requestSchema = z.object({
@@ -28,9 +29,13 @@ export default function RequestAccess() {
 
   // Fetch material details if we have an ID
   const { data: material, isLoading: isMatLoading } = useQuery({
-    queryKey: ["/api/materials", materialId],
+    queryKey: ["/materials", materialId],
     enabled: !!materialId,
     queryFn: async () => {
+      const local = getMaterialById(materialId);
+      if (local) {
+        return (await loadMaterial(local.id)) || local;
+      }
       const resp = await fetch(`/api/materials/${materialId}`);
       if (!resp.ok) throw new Error("Material not found");
       return resp.json();
