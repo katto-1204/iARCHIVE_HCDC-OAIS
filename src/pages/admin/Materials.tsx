@@ -68,6 +68,7 @@ export default function AdminMaterials() {
   const [accessControlOpen, setAccessControlOpen] = React.useState(false);
   const [rawExtractionText, setRawExtractionText] = React.useState("");
   const [pdfPreviewImages, setPdfPreviewImages] = React.useState<string[]>([]);
+  const [pdfPreviewBlobs, setPdfPreviewBlobs] = React.useState<Blob[]>([]);
   const [selectionTarget, setSelectionTarget] = React.useState<{text: string, x: number, y: number} | null>(null);
   
   // Storage for separated processing
@@ -87,6 +88,8 @@ export default function AdminMaterials() {
     title: "", creator: "", dateOfDescription: "", format: "", description: "",
     levelOfDescription: "Item", extentAndMedium: "", access: "public" as "public" | "restricted" | "confidential",
     videoUrl: "", hierarchyPath: "", termsOfUse: "", referenceCode: "",
+    fileData: undefined as undefined | Blob,
+    fileType: "",
     
     // Auto Reference Code Gen fields
     year: "26", catNo: "01", matNo: "0000001",
@@ -200,6 +203,30 @@ export default function AdminMaterials() {
     }
   }, []);
 
+  const createObjectUrl = (blob: Blob) => URL.createObjectURL(blob);
+
+  const compressImageToBlob = async (file: File, maxWidth: number, quality: number) => {
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
+    await new Promise((resolve) => (img.onload = resolve));
+    const canvas = document.createElement("canvas");
+    let w = img.width;
+    let h = img.height;
+    if (w > maxWidth) {
+      h *= maxWidth / w;
+      w = maxWidth;
+    }
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas unavailable");
+    ctx.drawImage(img, 0, 0, w, h);
+    const blob: Blob = await new Promise((resolve) => {
+      canvas.toBlob((b) => resolve(b as Blob), "image/jpeg", quality);
+    });
+    return blob;
+  };
+
   const extractMainFile = async (file: File) => {
     const isPdf = file.type === "application/pdf";
     const isDocx = file.name.toLowerCase().endsWith(".docx");
@@ -212,6 +239,7 @@ export default function AdminMaterials() {
     let extractedText = "";
     let detectedPageCount = 0;
     let extractedImages: string[] = [];
+    let extractedImageBlobs: Blob[] = [];
     
     try {
       if (isPdf && window.pdfjsLib) {
@@ -227,14 +255,18 @@ export default function AdminMaterials() {
           
           if (i <= 10) {
             try {
-              const viewport = page.getViewport({ scale: 1.5 });
+              const viewport = page.getViewport({ scale: 1.0 });
               const canvas = document.createElement('canvas');
               const context = canvas.getContext('2d');
               if (context) {
                 canvas.height = viewport.height;
                 canvas.width = viewport.width;
                 await page.render({ canvasContext: context, viewport: viewport }).promise;
-                extractedImages.push(canvas.toDataURL("image/png"));
+                const blob: Blob = await new Promise((resolve) => {
+                  canvas.toBlob((b) => resolve(b as Blob), "image/jpeg", 0.45);
+                });
+                extractedImageBlobs.push(blob);
+                extractedImages.push(createObjectUrl(blob));
               }
             } catch(e) { console.error("Canvas render fail on page", i, e) }
           }
@@ -242,12 +274,9 @@ export default function AdminMaterials() {
         }
         extractedText = fullText;
       } else if (isImage) {
-        const base64 = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = e => resolve(e.target?.result as string);
-          reader.readAsDataURL(file);
-        });
-        extractedImages = [base64];
+        const blob = await compressImageToBlob(file, 1200, 0.5);
+        extractedImageBlobs = [blob];
+        extractedImages = [createObjectUrl(blob)];
         detectedPageCount = 1;
         setScanProgress(100);
       } else if (isDocx && window.mammoth) {
@@ -257,6 +286,7 @@ export default function AdminMaterials() {
       }
 
       setPdfPreviewImages(extractedImages.length > 0 ? extractedImages : pdfPreviewImages);
+      setPdfPreviewBlobs(extractedImageBlobs.length > 0 ? extractedImageBlobs : pdfPreviewBlobs);
       setMainMaterialText(extractedText);
       
       // Smart Fallback Scanning - only use if no metadata text extracted yet
@@ -371,28 +401,14 @@ export default function AdminMaterials() {
     if (!file) return;
 
     if (file.type.startsWith("image/")) {
-       const img = new Image();
-       img.src = URL.createObjectURL(file);
-       await new Promise(r => img.onload = r);
-       const canvas = document.createElement("canvas");
-       let w = img.width; let h = img.height;
-       if (w > 1600) { h *= 1600 / w; w = 1600; }
-       canvas.width = w; canvas.height = h;
-       const ctx = canvas.getContext("2d")!;
-       ctx.drawImage(img, 0, 0, w, h);
-       const base64 = canvas.toDataURL("image/jpeg", 0.6); // Compress to save localStorage quota
-       setUploadForm(prev => ({ ...prev, fileData: base64 }));
+       const blob = await compressImageToBlob(file, 1200, 0.5);
+       setUploadForm(prev => ({ ...prev, fileData: blob, fileType: blob.type || file.type }));
     } else {
-       const reader = new FileReader();
-       reader.onload = (e) => {
-         const base64 = e.target?.result as string;
-         setUploadForm(prev => ({ ...prev, fileData: base64 }));
-       };
-       reader.readAsDataURL(file);
+       setUploadForm(prev => ({ ...prev, fileData: file, fileType: file.type }));
     }
 
     const ogSize = file.size;
-    const newSize = Math.floor(ogSize * 0.3);
+     const newSize = Math.floor(ogSize * 0.1);
     setFileDetails({ name: file.name, ogSize, newSize });
     
     await extractMainFile(file);
@@ -409,18 +425,17 @@ export default function AdminMaterials() {
          .sort((a,b) => a.name.localeCompare(b.name));
        
        let images: string[] = [];
+       let imageBlobs: Blob[] = [];
        for (let i = 0; i < imageFiles.length; i++) {
-          const base64 = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = e => resolve(e.target?.result as string);
-            reader.readAsDataURL(imageFiles[i]);
-          });
-          images.push(base64);
+         const blob = await compressImageToBlob(imageFiles[i], 1200, 0.5);
+         imageBlobs.push(blob);
+         images.push(createObjectUrl(blob));
        }
        // If no main images present, populate as main preview
        if (pdfPreviewImages.length === 0) {
           setPdfPreviewImages(images);
-          setUploadForm(prev => ({ ...prev, pages: images.length, pageImages: images }));
+         setPdfPreviewBlobs(imageBlobs);
+         setUploadForm(prev => ({ ...prev, pages: images.length, pageImages: images }));
        }
        setMetadataProcessingState("done");
        return;
@@ -866,7 +881,7 @@ export default function AdminMaterials() {
                                     <span className="text-emerald-400">Public Object</span>
                                   )}
                                </div>
-                               {selectedMaterial?.fileUrl && selectedMaterial.fileUrl.startsWith("data:application/pdf") ? (
+                               {(selectedMaterial?.fileUrl && selectedMaterial.fileUrl.startsWith("data:application/pdf")) || selectedMaterial?.fileType?.includes("pdf") || selectedMaterial?.format?.includes("pdf") ? (
                                    <div className="relative w-full h-[700px] bg-[#333]">
                                       <object data={selectedMaterial.fileUrl} type="application/pdf" className="w-full h-full">
                                          <iframe src={selectedMaterial.fileUrl} className="w-full h-full border-0">
@@ -874,7 +889,7 @@ export default function AdminMaterials() {
                                          </iframe>
                                       </object>
                                    </div>
-                               ) : selectedMaterial?.fileUrl && selectedMaterial.fileUrl.startsWith("data:video/") ? (
+                               ) : selectedMaterial?.fileType?.startsWith("video/") || (selectedMaterial?.fileUrl && selectedMaterial.fileUrl.startsWith("data:video/")) ? (
                                    <video src={selectedMaterial.fileUrl} controls className="w-full h-[600px] object-contain bg-black" />
                                ) : selectedMaterial?.pageImages && selectedMaterial.pageImages.length > 0 ? (
                                    <div className="flex overflow-x-auto gap-4 p-8 snap-x bg-[#1a1a1a] custom-scrollbar scroll-smooth">
@@ -885,7 +900,7 @@ export default function AdminMaterials() {
                                           </div>
                                        ))}
                                    </div>
-                               ) : selectedMaterial?.fileUrl && selectedMaterial.fileUrl.startsWith("data:image/") ? (
+                               ) : selectedMaterial?.fileType?.startsWith("image/") || (selectedMaterial?.fileUrl && selectedMaterial.fileUrl.startsWith("data:image/")) ? (
                                    <div className="bg-[#1a1a1a] p-8 flex justify-center">
                                       <img src={selectedMaterial.fileUrl} className="max-h-[600px] max-w-full object-contain rounded shadow-2xl bg-white" />
                                    </div>
@@ -1381,12 +1396,13 @@ export default function AdminMaterials() {
                  createdBy: (selectedMaterial as any)?.createdBy || "Admin",
                  ...uploadForm,
                  ...checklistValues,
-                 pageImages: pdfPreviewImages,
+                  pageImages: pdfPreviewBlobs.length > 0 ? pdfPreviewBlobs : pdfPreviewImages,
                  hierarchyPath,
                  access: uploadForm.access,
                  title: checklistValues.title || uploadForm.title,
                  creator: checklistValues.creator || uploadForm.creator,
-                 fileUrl: (uploadForm as any).fileData || (uploadForm as any).fileUrl,
+                  fileUrl: (uploadForm as any).fileData || (uploadForm as any).fileUrl,
+                  fileType: (uploadForm as any).fileType || uploadForm.format,
               } as any;
 
               try {

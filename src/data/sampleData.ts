@@ -398,6 +398,7 @@ export interface ArchivalMaterial {
   hierarchyPath: string;
   fileUrl?: string;
   fileId?: string;
+  fileType?: string;
   thumbnailUrl?: string;
   sha256?: string;
   sipId?: string;

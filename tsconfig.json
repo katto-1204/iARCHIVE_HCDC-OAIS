@@ -40,17 +40,8 @@
       "@/*": [
         "./src/*"
       ],
-      "@workspace/db": [
-        "../../lib/db/src"
-      ],
-      "@workspace/db/*": [
-        "../../lib/db/src/*"
-      ],
-      "drizzle-orm": [
-        "../../lib/db/node_modules/drizzle-orm"
-      ],
-      "drizzle-orm/*": [
-        "../../lib/db/node_modules/drizzle-orm/*"
+      "@workspace/api-client-react": [
+        "./src/lib/api-client-react.ts"
       ]
     }
   },
@@ -63,13 +54,5 @@
     "build",
     "dist",
     "**/*.test.ts"
-  ],
-  "references": [
-    {
-      "path": "../../lib/api-client-react"
-    },
-    {
-      "path": "../../lib/db"
-    }
   ]
 }

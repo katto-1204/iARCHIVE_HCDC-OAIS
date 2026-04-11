@@ -8,11 +8,37 @@ const STORAGE_KEYS = {
 };
 
 const STORAGE_VERSION = "4"; // Bump version
+async function migrateBase64Media(materials: ArchivalMaterial[]) {
+  let changed = false;
+  for (const mat of materials) {
+    if (mat.fileUrl && typeof mat.fileUrl === "string" && mat.fileUrl.startsWith("data:")) {
+      const blob = await dataUrlToBlob(mat.fileUrl);
+      await saveFile(mat.fileId || mat.id, blob, blob.type || mat.fileType);
+      mat.fileId = mat.fileId || mat.id;
+      mat.fileType = blob.type || mat.fileType;
+      mat.fileUrl = undefined;
+      changed = true;
+    }
+    if (mat.pageImages && mat.pageImages.length > 0) {
+      const first = mat.pageImages[0];
+      if (typeof first === "string" && first.startsWith("data:")) {
+        const blobs = await Promise.all(mat.pageImages.map((img) => dataUrlToBlob(img)));
+        await saveFile((mat.fileId || mat.id) + "_thumbs", blobs, "image/jpeg");
+        mat.fileId = mat.fileId || mat.id;
+        mat.pageImages = [];
+        changed = true;
+      }
+    }
+  }
+  if (changed) {
+    localStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify(materials));
+  }
+}
 
 interface IArchiveDB extends DBSchema {
   files: {
     key: string;
-    value: { id: string; blob: string | Blob; type?: string };
+    value: { id: string; blob: string | Blob | Blob[]; type?: string };
   };
 }
 
@@ -29,17 +55,27 @@ export function getDB() {
   return dbPromise;
 }
 
-export async function saveFile(id: string, data: string | Blob, type?: string) {
+export async function saveFile(id: string, data: string | Blob | Blob[], type?: string) {
   const db = await getDB();
   if (!db) return;
   await db.put('files', { id, blob: data, type });
 }
 
-export async function getFile(id: string): Promise<{ blob: string | Blob; type?: string } | undefined> {
+export async function getFile(id: string): Promise<{ blob: string | Blob | Blob[]; type?: string } | undefined> {
   const db = await getDB();
   if (!db) return undefined;
   const entry = await db.get('files', id);
   return entry ? { blob: entry.blob, type: entry.type } : undefined;
+}
+
+async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
+  const res = await fetch(dataUrl);
+  return res.blob();
+}
+
+function toObjectUrl(value: string | Blob): string {
+  if (typeof value === "string") return value;
+  return URL.createObjectURL(value);
 }
 
 /** Initialize storage if empty or outdated */
@@ -81,7 +117,9 @@ export function getMaterials(): ArchivalMaterial[] {
     return SAMPLE_MATERIALS;
   }
   try {
-    return JSON.parse(stored);
+    const parsed = JSON.parse(stored) as ArchivalMaterial[];
+    void migrateBase64Media(parsed);
+    return parsed;
   } catch (e) {
     return SAMPLE_MATERIALS;
   }
@@ -100,11 +138,20 @@ export async function loadMaterial(id: string): Promise<ArchivalMaterial | undef
       try {
          const fileEntry = await getFile(mat.fileId);
          if (fileEntry) {
-            mat.fileUrl = fileEntry.blob as string;
+        if (Array.isArray(fileEntry.blob)) {
+          // Unexpected, but avoid crashing
+        } else {
+          mat.fileUrl = toObjectUrl(fileEntry.blob as string | Blob);
+          mat.fileType = fileEntry.type || mat.fileType;
+        }
          }
          const thumbsEntry = await getFile(mat.fileId + "_thumbs");
          if (thumbsEntry) {
-            mat.pageImages = JSON.parse(thumbsEntry.blob as string);
+        if (Array.isArray(thumbsEntry.blob)) {
+          mat.pageImages = thumbsEntry.blob.map((b) => toObjectUrl(b));
+        } else if (typeof thumbsEntry.blob === "string") {
+          mat.pageImages = JSON.parse(thumbsEntry.blob as string);
+        }
          }
       } catch (e) {
          console.error("Failed to load rich media from IDB", e);
@@ -122,19 +169,42 @@ export async function saveMaterial(material: ArchivalMaterial) {
   let processedMaterial = { ...material };
   
   try {
-     // If there is heavy binary data, move it to IndexedDB
-     if (material.fileUrl && material.fileUrl.startsWith('data:')) {
-         const fileId = material.id;
-         await saveFile(fileId, material.fileUrl);
-         processedMaterial.fileUrl = undefined;
-         processedMaterial.fileId = fileId;
-     }
-     if (material.pageImages && material.pageImages.length > 0) {
-         const fileId = material.id;
-         await saveFile(fileId + "_thumbs", JSON.stringify(material.pageImages));
-         processedMaterial.pageImages = []; 
-         processedMaterial.fileId = fileId;
-     }
+      // If there is heavy binary data, move it to IndexedDB
+        if (material.fileUrl) {
+          const fileId = material.fileId || material.id;
+          if (typeof material.fileUrl === "string" && material.fileUrl.startsWith("data:")) {
+            const blob = await dataUrlToBlob(material.fileUrl);
+            await saveFile(fileId, blob, blob.type || material.fileType);
+            processedMaterial.fileType = blob.type || material.fileType;
+            processedMaterial.fileUrl = undefined;
+            processedMaterial.fileId = fileId;
+          } else if (material.fileUrl instanceof Blob) {
+            await saveFile(fileId, material.fileUrl, material.fileUrl.type || material.fileType);
+            processedMaterial.fileType = material.fileUrl.type || material.fileType;
+            processedMaterial.fileUrl = undefined;
+            processedMaterial.fileId = fileId;
+          } else if (typeof material.fileUrl === "string" && material.fileUrl.startsWith("blob:")) {
+            processedMaterial.fileUrl = undefined;
+            processedMaterial.fileId = fileId;
+          }
+        }
+        if (material.pageImages && material.pageImages.length > 0) {
+          const fileId = material.fileId || material.id;
+          const first = material.pageImages[0] as any;
+          if (first instanceof Blob) {
+            await saveFile(fileId + "_thumbs", material.pageImages as unknown as Blob[], "image/jpeg");
+            processedMaterial.pageImages = [];
+            processedMaterial.fileId = fileId;
+          } else if (typeof first === "string" && first.startsWith("data:")) {
+            const blobs = await Promise.all((material.pageImages as string[]).map((img) => dataUrlToBlob(img)));
+            await saveFile(fileId + "_thumbs", blobs, "image/jpeg");
+            processedMaterial.pageImages = [];
+            processedMaterial.fileId = fileId;
+          } else if (typeof first === "string" && first.startsWith("blob:")) {
+            processedMaterial.pageImages = [];
+            processedMaterial.fileId = fileId;
+          }
+        }
 
      if (index >= 0) {
        materials[index] = { ...processedMaterial, updatedAt: now };
