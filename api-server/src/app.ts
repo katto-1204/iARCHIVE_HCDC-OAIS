@@ -39,15 +39,16 @@ app.post("/api/auth/login", (req, res, next) => {
     "student@hcdc.edu.ph": { id: "demo-student", name: "Demo Student", role: "student", status: "active" },
   };
   
-  if (demoUsers[email] && password === "admin123") {
+  const inputEmail = (email || "").toLowerCase();
+  if (demoUsers[inputEmail] && password === "admin123") {
     const secret = process.env.JWT_SECRET || "iarchive-hcdc-secret-2026";
     const token = jwt.sign({ 
-      userId: demoUsers[email].id, 
-      email: email, 
-      role: demoUsers[email].role, 
-      name: demoUsers[email].name 
+      userId: demoUsers[inputEmail].id, 
+      email: inputEmail, 
+      role: demoUsers[inputEmail].role, 
+      name: demoUsers[inputEmail].name 
     }, secret, { expiresIn: "7d" });
-    return res.json({ token, user: demoUsers[email] });
+    return res.json({ token, user: demoUsers[inputEmail] });
   }
   next();
 });
