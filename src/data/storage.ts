@@ -182,22 +182,24 @@ export async function saveMaterial(material: ArchivalMaterial) {
             processedMaterial.fileType = blob.type || material.fileType;
             processedMaterial.fileUrl = undefined;
             processedMaterial.fileId = fileId;
-          } else if (material.fileUrl && typeof material.fileUrl === "object" && (material.fileUrl as any) instanceof Blob) {
-            const fileBlob = material.fileUrl as any as Blob;
-            await saveFile(fileId, fileBlob, fileBlob.type || material.fileType);
-            processedMaterial.fileType = fileBlob.type || material.fileType;
-            processedMaterial.fileUrl = undefined;
-            processedMaterial.fileId = fileId;
-          } else if (typeof material.fileUrl === "string" && material.fileUrl.startsWith("blob:")) {
-            processedMaterial.fileUrl = undefined;
-            processedMaterial.fileId = fileId;
+          } else {
+            const fileUrl = material.fileUrl as unknown;
+            if (fileUrl && typeof fileUrl !== "string" && fileUrl instanceof Blob) {
+              await saveFile(fileId, fileUrl, fileUrl.type || material.fileType);
+              processedMaterial.fileType = fileUrl.type || material.fileType;
+              processedMaterial.fileUrl = undefined;
+              processedMaterial.fileId = fileId;
+            } else if (typeof material.fileUrl === "string" && material.fileUrl.startsWith("blob:")) {
+              processedMaterial.fileUrl = undefined;
+              processedMaterial.fileId = fileId;
+            }
           }
         }
         if (material.pageImages && material.pageImages.length > 0) {
           const fileId = material.fileId || material.id;
           const first = material.pageImages[0] as any;
-          if (first && typeof first === "object" && first instanceof Blob) {
-            await saveFile(fileId + "_thumbs", material.pageImages as any as Blob[], "image/jpeg");
+          if (first instanceof Blob) {
+            await saveFile(fileId + "_thumbs", material.pageImages as unknown as Blob[], "image/jpeg");
             processedMaterial.pageImages = [];
             processedMaterial.fileId = fileId;
           } else if (typeof first === "string" && first.startsWith("data:")) {

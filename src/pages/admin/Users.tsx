@@ -107,12 +107,16 @@ export default function AdminUsers() {
     return <Badge variant={variants[role] || "default"} className="capitalize">{role}</Badge>;
   };
 
-  const filtered = data?.users?.filter(u =>
-    !search ||
-    u.name.toLowerCase().includes(search.toLowerCase()) ||
-    u.email.toLowerCase().includes(search.toLowerCase()) ||
-    (u.institution || "").toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = React.useMemo(() => {
+    const list = data?.users || [];
+    if (!search) return list;
+    const q = search.toLowerCase();
+    return list.filter(u =>
+      u.name.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q) ||
+      (u.institution || "").toLowerCase().includes(q)
+    );
+  }, [data?.users, search]);
 
   const tabConfig = [
     { id: "active", label: "Active Users", icon: ShieldCheck },
@@ -225,7 +229,13 @@ export default function AdminUsers() {
             </TableHeader>
             <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={7} className="text-center h-32 text-muted-foreground">Loading users...</TableCell></TableRow>
+              [...Array(6)].map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell colSpan={7} className="h-16">
+                    <div className="h-8 w-full rounded-md bg-muted/40 animate-pulse" />
+                  </TableCell>
+                </TableRow>
+              ))
             ) : (filtered?.length ?? 0) === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="h-32 text-center">

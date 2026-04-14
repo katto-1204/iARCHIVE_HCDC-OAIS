@@ -16,18 +16,11 @@ import { MetadataChecklist } from "@/components/MetadataChecklist";
 import { Barcode } from "@/components/Barcode";
 import {
   SAMPLE_MATERIALS, SAMPLE_HIERARCHY, COMBINED_FIELDS, LEVEL_LABELS,
-  type ArchivalMaterial
+  type ArchivalMaterial, type HierarchyNode, type HierarchyLevel
 } from "@/data/sampleData";
 import { 
-  addActivity 
+  getMaterials, saveMaterial, deleteMaterial, addActivity, addIngestRequest, updateIngestRequest
 } from "@/data/storage";
-import { 
-  useGetMaterials, 
-  useCreateMaterial, 
-  useUpdateMaterial, 
-  useDeleteMaterial 
-} from "@/lib/api-client-react";
-
 
 declare global {
   interface Window {
@@ -43,35 +36,113 @@ import {
   getAllFieldValues, downloadMetadataExcel,
 } from "@/data/metadataUtils";
 import { useToast } from "@/hooks/use-toast";
+import { useGetMe } from "@workspace/api-client-react";
 
 type ViewMode = "table" | "detail";
+
+const hierarchyLevels: HierarchyLevel[] = ["subfonds", "series", "subseries", "file"];
+
+const slugify = (value: string) =>
+  value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
+
+const buildHierarchyWithMaterials = (base: HierarchyNode, mats: ArchivalMaterial[]): HierarchyNode => {
+  const root: HierarchyNode = JSON.parse(JSON.stringify(base));
+
+  const ensureChild = (parent: HierarchyNode, name: string, level: HierarchyLevel) => {
+    parent.children = parent.children || [];
+    let child = parent.children.find((c) => c.name === name && c.level === level);
+    if (!child) {
+      child = {
+        id: `${parent.id}-${slugify(name)}-${level}`,
+        name,
+        level,
+        children: [],
+      } as HierarchyNode;
+      parent.children.push(child);
+    }
+    return child;
+  };
+
+  const addItem = (parent: HierarchyNode, material: ArchivalMaterial) => {
+    parent.children = parent.children || [];
+    const itemKey = material.uniqueId || material.id;
+    const exists = parent.children.some((c) => c.level === "item" && c.materialId === itemKey);
+    if (!exists) {
+      parent.children.push({
+        id: `item-${material.id}`,
+        name: material.title || material.uniqueId || "Untitled Material",
+        level: "item",
+        materialId: itemKey,
+      });
+    }
+  };
+
+  mats.forEach((material) => {
+    const path = (material.hierarchyPath || "").split(">").map((p) => p.trim()).filter(Boolean);
+    const parts = path[0]?.startsWith("HCDC") ? path.slice(1) : path;
+    let current = root;
+
+    parts.forEach((segment, index) => {
+      const level = hierarchyLevels[index] || "file";
+      current = ensureChild(current, segment, level);
+    });
+
+    addItem(current, material);
+  });
+
+  return root;
+};
 
 export default function AdminMaterials() {
   const [search, setSearch] = React.useState("");
   const [selectedHierarchyItem, setSelectedHierarchyItem] = React.useState<string | null>(null);
+  const [materials, setMaterials] = React.useState<ArchivalMaterial[]>([]);
+  const [materialsLoading, setMaterialsLoading] = React.useState(true);
+  const { data: me } = useGetMe();
+  const fallbackRole = typeof window !== "undefined" && window.location.pathname.startsWith("/archivist") ? "archivist" : "admin";
+  const currentRole = (me?.role || fallbackRole) as "admin" | "archivist";
+  const isAdmin = currentRole === "admin";
+  const approvalStatusFor = (material: ArchivalMaterial) => material.approvalStatus || "approved";
+  const [approvalFilter, setApprovalFilter] = React.useState<"all" | "approved" | "pending" | "rejected">("all");
+
+  // Pagination
   const [currentPage, setCurrentPage] = React.useState(1);
   const itemsPerPage = 8;
+  const approvalCounts = React.useMemo(() => {
+    const counts = { all: materials.length, approved: 0, pending: 0, rejected: 0 };
+    materials.forEach((mat) => {
+      const status = approvalStatusFor(mat);
+      if (status === "approved") counts.approved += 1;
+      if (status === "pending") counts.pending += 1;
+      if (status === "rejected") counts.rejected += 1;
+    });
+    return counts;
+  }, [materials]);
 
-  const { data: materialsData, isLoading: isLoadingMaterials, refetch: refetchMaterials } = useGetMaterials({
-    limit: itemsPerPage,
-    page: currentPage,
-    search: search || undefined,
-    category: selectedHierarchyItem || undefined
-  });
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [search, selectedHierarchyItem, approvalFilter]);
 
-  const materials = materialsData?.materials || [];
-  const totalItems = materialsData?.total || 0;
-  const totalPages = materialsData?.totalPages || 1;
+  React.useEffect(() => {
+    setMaterials(getMaterials());
+    setMaterialsLoading(false);
+  }, []);
 
-  const { mutate: deleteMat, isPending: isDeleting } = useDeleteMaterial();
-  const { mutate: createMat, isPending: isCreating } = useCreateMaterial();
-  const { mutate: updateMat, isPending: isUpdating } = useUpdateMaterial();
+  React.useEffect(() => {
+    const sync = () => setMaterials(getMaterials());
+    window.addEventListener("storage", sync);
+    window.addEventListener("focus", sync);
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener("focus", sync);
+    };
+  }, []);
 
+  // Material detail expansion
   const [selectedMaterial, setSelectedMaterial] = React.useState<ArchivalMaterial | null>(null);
   const [editingMaterialId, setEditingMaterialId] = React.useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [materialToDelete, setMaterialToDelete] = React.useState<string | null>(null);
-
 
   // Upload dialog state
   const [uploadOpen, setUploadOpen] = React.useState(false);
@@ -455,8 +526,29 @@ export default function AdminMaterials() {
     await extractMetadataFile(files[0]);
   };
 
-  const filteredMaterials = materials;
-  const paginatedMaterials = materials;
+  const filteredMaterials = React.useMemo(() => {
+    let result = [...materials];
+    if (search) {
+      const s = search.toLowerCase();
+      result = result.filter(m =>
+        m.title?.toLowerCase().includes(s) || m.uniqueId.toLowerCase().includes(s) || m.creator?.toLowerCase().includes(s)
+      );
+    }
+    if (approvalFilter !== "all") {
+      result = result.filter((m) => approvalStatusFor(m) === approvalFilter);
+    }
+    if (selectedHierarchyItem) {
+      result = result.filter(m =>
+        m.hierarchyPath?.includes(selectedHierarchyItem) ||
+        m.uniqueId === selectedHierarchyItem ||
+        m.id === selectedHierarchyItem
+      );
+    }
+    return result;
+  }, [materials, search, selectedHierarchyItem, approvalFilter]);
+
+  const totalPages = Math.ceil(filteredMaterials.length / itemsPerPage);
+  const paginatedMaterials = filteredMaterials.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const toggleMaterialDetail = async (mat: ArchivalMaterial) => {
     if (selectedMaterial?.uniqueId === mat.uniqueId) {
@@ -489,25 +581,50 @@ export default function AdminMaterials() {
     setChecklistOpen(true);
   };
 
+  const updateApprovalStatus = async (material: ArchivalMaterial, status: "approved" | "rejected") => {
+    const now = new Date().toISOString();
+    const updatedMaterial = {
+      ...material,
+      approvalStatus: status,
+      approvedAt: status === "approved" ? now : undefined,
+      approvedBy: status === "approved" ? (me?.name || "Admin") : undefined,
+    } as ArchivalMaterial;
+
+    const updated = await saveMaterial(updatedMaterial as any);
+    setMaterials(updated);
+
+    if (material.approvalStatus === "pending") {
+      updateIngestRequest(material.id, status);
+    }
+
+    const hierarchyLabel = material.hierarchyPath || "Unassigned";
+    addActivity({
+      user: me?.name || "Admin",
+      actionType: status === "approved" ? "approve" : "reject",
+      description: `${status === "approved" ? "Approved" : "Rejected"} material: ${material.title} (Hierarchy: ${hierarchyLabel})`,
+      materialId: material.uniqueId,
+    });
+
+    toast({
+      title: status === "approved" ? "Approved" : "Rejected",
+      description: status === "approved" ? "Material is now published." : "Material has been rejected.",
+    });
+  };
+
   const confirmDeleteMaterial = async () => {
     if (materialToDelete) {
-      deleteMat({ id: materialToDelete }, {
-        onSuccess: () => {
-          addActivity({
-            user: "Admin",
-            actionType: "delete",
-            description: `Deleted material: ${materialToDelete}`
-          });
-          toast({ title: "Deleted", description: "Material removed from repository." });
-          refetchMaterials();
-          setDeleteDialogOpen(false);
-          setMaterialToDelete(null);
-        },
-        onError: () => {
-          toast({ title: "Error", description: "Failed to delete material.", variant: "destructive" });
-        }
+      const target = materials.find((m) => m.id === materialToDelete);
+      const updated = await deleteMaterial(materialToDelete);
+      setMaterials(updated);
+      addActivity({
+        user: me?.name || "Admin",
+        actionType: "delete",
+        description: `Deleted material: ${target?.title || materialToDelete}`
       });
+      toast({ title: "Deleted", description: "Material removed from repository." });
     }
+    setDeleteDialogOpen(false);
+    setMaterialToDelete(null);
   };
 
   const handleDeleteMaterial = (id: string, e: React.MouseEvent) => {
@@ -531,15 +648,15 @@ export default function AdminMaterials() {
       hierarchyPath: mat.hierarchyPath || "",
       termsOfUse: mat.termsOfUse || "",
       referenceCode: mat.referenceCode || "",
+      fileData: undefined,
+      fileType: mat.fileType || "",
       year: mat.uniqueId?.substring(0, 2) || "26",
       catNo: mat.uniqueId?.substring(4, 6) || "01",
       matNo: mat.uniqueId?.substring(6) || "0000001",
       fonds: "HCDC — Holy Cross of Davao College",
       subfonds: mat.hierarchyPath?.split(" > ")[1]?.trim() || "",
       program: mat.hierarchyPath?.split(" > ")[2]?.trim() || "",
-      series: mat.hierarchyPath?.split(" > ")[3]?.trim() || "",
-      fileData: undefined,
-      fileType: mat.fileType || ""
+      series: mat.hierarchyPath?.split(" > ")[3]?.trim() || ""
     });
     setChecklistValues(mat as any);
     setUploadOpen(true);
@@ -670,8 +787,13 @@ export default function AdminMaterials() {
     });
   };
 
+  const hierarchyTree = React.useMemo(
+    () => buildHierarchyWithMaterials(SAMPLE_HIERARCHY, materials),
+    [materials]
+  );
+
   // Hierarchy Helpers
-  const fondsList = SAMPLE_HIERARCHY.children || []; // Departments (CET, BLIS)
+  const fondsList = hierarchyTree.children || []; // Departments (CET, BLIS)
   const currentDeptNode = fondsList.find((f: any) => f.name === uploadForm.subfonds);
   const programList = currentDeptNode?.children || []; // Programs (Faculty Research, Student Research)
 
@@ -741,7 +863,7 @@ export default function AdminMaterials() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-2 max-h-[700px] overflow-y-auto custom-scrollbar">
-              <ArchivalTree node={SAMPLE_HIERARCHY} selectedId={selectedHierarchyItem} onSelectItem={(id) => {
+              <ArchivalTree node={hierarchyTree} selectedId={selectedHierarchyItem} onSelectItem={(id) => {
                 setSelectedHierarchyItem(prev => prev === id ? null : id);
                 setSelectedMaterial(null);
               }} />
@@ -768,17 +890,42 @@ export default function AdminMaterials() {
               <div className="text-sm text-muted-foreground flex items-center gap-2 shrink-0">
                 <Layers className="w-4 h-4" /> {filteredMaterials.length} items
               </div>
+            </div>
+
+            <div className="px-4 pb-4 pt-2 flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground border-b border-border/40">
+              {([
+                { key: "all", label: "All", count: approvalCounts.all },
+                { key: "approved", label: "Approved", count: approvalCounts.approved },
+                { key: "pending", label: "Pending", count: approvalCounts.pending },
+                { key: "rejected", label: "Rejected", count: approvalCounts.rejected },
+              ] as const).map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setApprovalFilter(tab.key)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full border transition-colors bg-white",
+                    approvalFilter === tab.key
+                      ? "bg-[#0a1628] text-white border-[#0a1628]"
+                      : "bg-white text-muted-foreground border-border hover:border-[#0a1628]/30 hover:text-[#0a1628]"
+                  )}
+                >
+                  {tab.label}
+                  <span className="ml-2 text-[9px] font-mono">{tab.count}</span>
+                </button>
+              ))}
+            </div>
+
             <div className="overflow-x-auto">
-              <div className="min-w-full divide-y divide-border/40">
-                <div className="grid grid-cols-[1fr_100px] md:grid-cols-[120px_60px_1fr_100px_70px_80px_60px] gap-2 px-4 py-2.5 bg-muted/30 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                  <span className="hidden md:inline text-left">Unique ID</span><span className="hidden md:inline text-left">Barcode</span><span className="text-left">Title</span><span className="hidden md:inline text-left">Progress</span><span className="hidden md:inline text-right">%</span><span className="text-center">Status</span><span className="hidden md:inline"></span>
+              <div className="min-w-[920px] divide-y divide-border/40">
+                <div className="grid grid-cols-[140px_70px_1fr_120px_70px_90px_120px_60px] gap-2 px-4 py-2.5 bg-muted/30 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                  <span>Unique ID</span><span>Barcode</span><span>Title</span><span>Progress</span><span className="text-right">%</span><span className="text-center">Metadata</span><span className="text-center">Approval</span><span></span>
                 </div>
 
-                {isLoadingMaterials ? (
-                   <div className="p-12 text-center text-muted-foreground bg-white/50 rounded-xl border border-dashed flex flex-col items-center gap-3">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                      <p className="text-sm font-medium">Archiving access to repository...</p>
-                   </div>
+                {materialsLoading ? (
+                  <div className="py-16 text-center text-muted-foreground">
+                    <div className="mx-auto h-8 w-32 rounded bg-muted/40 animate-pulse" />
+                    <div className="mx-auto mt-3 h-3 w-56 rounded bg-muted/30 animate-pulse" />
+                  </div>
                 ) : filteredMaterials.length === 0 ? (
                   <div className="py-16 text-center text-muted-foreground">
                     <FileText className="w-10 h-10 mx-auto mb-3 opacity-20" />
@@ -791,17 +938,21 @@ export default function AdminMaterials() {
                     const color = getCompletionColor(pct);
                     const isOAIS = checkOAISCompliance(mat);
                     const isExpanded = selectedMaterial?.uniqueId === mat.uniqueId;
+                    const approvalStatus = approvalStatusFor(mat);
+                    const approvalBadge = approvalStatus === "approved"
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      : approvalStatus === "pending"
+                      ? "bg-amber-50 text-amber-700 border-amber-200"
+                      : "bg-red-50 text-red-700 border-red-200";
 
                     return (
                       <React.Fragment key={mat.uniqueId}>
-                        <div className={cn("grid grid-cols-[1fr_100px] md:grid-cols-[120px_60px_1fr_100px_70px_80px_60px] gap-2 px-4 py-3 items-center hover:bg-muted/10 transition-colors group cursor-pointer", isExpanded && "bg-muted/5")} onClick={() => toggleMaterialDetail(mat)}>
-                          <div className="hidden md:flex items-center gap-1.5">
+                        <div className={cn("grid grid-cols-[140px_70px_1fr_120px_70px_90px_120px_60px] gap-2 px-4 py-3 items-center hover:bg-muted/10 transition-colors group cursor-pointer", isExpanded && "bg-muted/5")} onClick={() => toggleMaterialDetail(mat)}>
+                          <div className="flex items-center gap-1.5">
                             <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
                             <span className="font-mono text-[11px] font-bold text-[#0a1628]">{mat.uniqueId}</span>
                           </div>
-                          <div className="hidden md:block">
-                            <Barcode value={mat.uniqueId} width={50} height={16} />
-                          </div>
+                          <Barcode value={mat.uniqueId} width={50} height={16} />
                           <div className="min-w-0 pr-4">
                             <span className="text-sm font-semibold text-[#0a1628] group-hover:text-primary truncate block text-left transition-colors w-full">
                               {mat.title}
@@ -815,14 +966,30 @@ export default function AdminMaterials() {
                               )}
                             </div>
                           </div>
-                          <div className="hidden md:block h-1.5 bg-muted/60 rounded-full overflow-hidden">
+                          <div className="h-1.5 bg-muted/60 rounded-full overflow-hidden">
                             <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: color }} />
                           </div>
-                          <span className="hidden md:block text-right text-xs font-bold" style={{ color }}>{pct}%</span>
+                          <span className="text-right text-xs font-bold" style={{ color }}>{pct}%</span>
                           <div className="text-center">
                             <Badge variant={pct >= 100 ? "success" : pct >= 50 ? "accent" : "default"} className="text-[9px] capitalize">{pct >= 100 ? "Complete" : pct >= 50 ? "Partial" : "Incomplete"}</Badge>
                           </div>
-                          <div className="hidden md:flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="text-center">
+                            <Badge variant="outline" className={cn("text-[9px] capitalize", approvalBadge)}>{approvalStatus}</Badge>
+                          </div>
+                          <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {isAdmin && approvalStatus === "pending" && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-emerald-600 hover:text-emerald-700"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void updateApprovalStatus(mat, "approved");
+                                }}
+                              >
+                                <ShieldCheck className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
                             <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={(e) => handleEditMaterial(mat, e)}>
                               <Edit className="w-3.5 h-3.5" />
                             </Button>
@@ -857,6 +1024,29 @@ export default function AdminMaterials() {
                                  </div>
                                </div>
                                <div className="flex items-center gap-3">
+                                 <Badge variant="outline" className={cn("text-[9px] capitalize", approvalBadge)}>
+                                   {approvalStatus}
+                                 </Badge>
+                                 {isAdmin && approvalStatus === "pending" && (
+                                   <div className="flex items-center gap-2">
+                                     <Button
+                                       variant="outline"
+                                       size="sm"
+                                       className="text-[10px] font-bold text-emerald-600 border-emerald-200 hover:bg-emerald-50 gap-1.5"
+                                       onClick={() => void updateApprovalStatus(mat, "approved")}
+                                     >
+                                       <ShieldCheck className="w-3.5 h-3.5" /> Approve
+                                     </Button>
+                                     <Button
+                                       variant="outline"
+                                       size="sm"
+                                       className="text-[10px] font-bold text-red-600 border-red-200 hover:bg-red-50 gap-1.5"
+                                       onClick={() => void updateApprovalStatus(mat, "rejected")}
+                                     >
+                                       <X className="w-3.5 h-3.5" /> Reject
+                                     </Button>
+                                   </div>
+                                 )}
                                  <Button 
                                    variant="outline" 
                                    size="sm" 
@@ -950,7 +1140,7 @@ export default function AdminMaterials() {
             {totalPages > 1 && (
               <div className="flex items-center justify-between p-4 border-t border-border/40 bg-muted/5">
                 <span className="text-xs text-muted-foreground font-medium">
-                   Showing {(currentPage - 1) * itemsPerPage + 1} to Math.min(currentPage * itemsPerPage, filteredMaterials.length) of {filteredMaterials.length} materials
+                   Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredMaterials.length)} of {filteredMaterials.length} materials
                 </span>
                 <div className="flex gap-1.5">
                    <Button variant="outline" size="sm" className="h-8" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>Previous</Button>
@@ -1396,6 +1586,13 @@ export default function AdminMaterials() {
             <Button variant="ghost" onClick={() => setChecklistOpen(false)}>Cancel</Button>
             <Button onClick={async () => {
               const hierarchyPath = `HCDC > ${uploadForm.subfonds}${uploadForm.program ? ' > ' + uploadForm.program : ''}${uploadForm.series ? ' > ' + uploadForm.series : ''}`;
+              const existingApproval = (selectedMaterial as any)?.approvalStatus;
+              const approvalStatus = editingMaterialId
+                ? (existingApproval || "approved")
+                : (currentRole === "archivist" ? "pending" : "approved");
+              const approvalMeta = approvalStatus === "approved"
+                ? { approvedAt: new Date().toISOString(), approvedBy: me?.name || "Admin" }
+                : {};
               const newMaterial: ArchivalMaterial = {
                  ...selectedMaterial, // if editing
                  id: editingMaterialId || crypto.randomUUID(),
@@ -1403,7 +1600,8 @@ export default function AdminMaterials() {
                  materialId: checklistValues.referenceCode || generatedRefCode || uploadForm.referenceCode, 
                  createdAt: (selectedMaterial as any)?.createdAt || new Date().toISOString(),
                  updatedAt: new Date().toISOString(),
-                 createdBy: (selectedMaterial as any)?.createdBy || "Admin",
+                 createdBy: (selectedMaterial as any)?.createdBy || (me?.name || (currentRole === "archivist" ? "Archivist" : "Admin")),
+                 createdByRole: (selectedMaterial as any)?.createdByRole || currentRole,
                  ...uploadForm,
                  ...checklistValues,
                   pageImages: pdfPreviewBlobs.length > 0 ? pdfPreviewBlobs : pdfPreviewImages,
@@ -1411,42 +1609,63 @@ export default function AdminMaterials() {
                  access: uploadForm.access,
                  title: checklistValues.title || uploadForm.title,
                  creator: checklistValues.creator || uploadForm.creator,
-                  fileUrl: (uploadForm as any).fileData || (uploadForm as any).fileUrl,
-                  fileType: (uploadForm as any).fileType || uploadForm.format,
+                 fileUrl: (uploadForm as any).fileData || (uploadForm as any).fileUrl,
+                 fileType: (uploadForm as any).fileType || uploadForm.format,
+                 ingestDate: (selectedMaterial as any)?.ingestDate || new Date().toISOString(),
+                 ingestBy: (selectedMaterial as any)?.ingestBy || (me?.name || (currentRole === "archivist" ? "Archivist" : "Admin")),
+                 approvalStatus,
+                 ...approvalMeta,
               } as any;
 
-              const mutation = editingMaterialId ? updateMat : createMat;
-              
-              // Prepare payload (exclude large binary data for now to avoid Firestore limits, 
-              // but we should eventually use Storage)
-              const payload = { ...newMaterial };
-              delete payload.fileData; // Don't send local blob to API in JSON
-
-              mutation({ id: editingMaterialId || undefined, data: payload }, {
-                onSuccess: () => {
-                  refetchMaterials();
-                  
-                  if (!editingMaterialId) {
-                    setSelectedHierarchyItem(null);
-                    setSearch("");
-                    setCurrentPage(1);
-                  }
-                  
-                  addActivity({
-                    user: "Admin",
-                    actionType: editingMaterialId ? "edit" : "upload",
-                    description: `${editingMaterialId ? 'Updated' : 'Ingested'} material: ${newMaterial.title}`,
-                    materialId: newMaterial.uniqueId
-                  });
-
-                  toast({ title: editingMaterialId ? "Updated" : "Ingestion Confirmed", description: "Material saved successfully." }); 
-                  setChecklistOpen(false);
-                  setEditingMaterialId(null);
-                },
-                onError: (err: any) => {
-                  toast({ title: "Error", description: err.message || "Failed to save material.", variant: "destructive" });
+              try {
+                const updated = await saveMaterial(newMaterial);
+                setMaterials(updated);
+                
+                // Clear filters after successful ingest to make it visible
+                if (!editingMaterialId) {
+                  setSelectedHierarchyItem(null);
+                  setSearch("");
+                  setCurrentPage(1);
                 }
-              });
+                
+                const hierarchyLabel = hierarchyPath || "Unassigned";
+                const actionType = editingMaterialId
+                  ? "edit"
+                  : (approvalStatus === "pending" ? "submit" : "upload");
+                const actionLabel = editingMaterialId
+                  ? "Updated"
+                  : (approvalStatus === "pending" ? "Submitted for approval" : "Ingested");
+                addActivity({
+                  user: me?.name || "Admin",
+                  actionType,
+                  description: `${actionLabel} material: ${newMaterial.title} (Hierarchy: ${hierarchyLabel})`,
+                  materialId: newMaterial.uniqueId
+                });
+
+                if (approvalStatus === "pending") {
+                  addIngestRequest({
+                    id: newMaterial.id,
+                    materialId: newMaterial.uniqueId,
+                    materialTitle: newMaterial.title || newMaterial.uniqueId,
+                    hierarchyPath,
+                    requestedBy: me?.name || "Archivist",
+                    requestedAt: new Date().toISOString(),
+                    status: "pending",
+                  });
+                }
+
+                const toastTitle = editingMaterialId
+                  ? "Updated"
+                  : (approvalStatus === "pending" ? "Submitted for Approval" : "Ingestion Confirmed");
+                const toastDesc = approvalStatus === "pending"
+                  ? "Material is pending admin approval before publication."
+                  : "Material saved successfully.";
+                toast({ title: toastTitle, description: toastDesc }); 
+                setChecklistOpen(false);
+                setEditingMaterialId(null);
+              } catch (e) {
+                toast({ title: "Storage Error", description: "Failed to store material data.", variant: "destructive" });
+              }
             }} className="bg-emerald-600 hover:bg-emerald-700">
               {editingMaterialId ? "Update Item" : "Finalize Ingest"}
             </Button>

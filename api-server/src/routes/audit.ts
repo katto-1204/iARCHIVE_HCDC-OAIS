@@ -30,20 +30,14 @@ export async function logAudit(data: {
 router.get("/audit", requireAuth, requireRole("admin", "archivist"), async (req, res) => {
   const page = Math.max(1, parseInt(req.query.page as string) || 1);
   const limit = Math.min(100, parseInt(req.query.limit as string) || 20);
-  
-  try {
-    const db = getFirestoreDb();
-    const snapshot = await db.collection("auditLogs").orderBy("createdAt", "desc").get();
-    const logs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    const total = logs.length;
-    const totalPages = Math.ceil(total / limit);
-    const offset = (page - 1) * limit;
-    const pageItems = logs.slice(offset, offset + limit);
-    res.json({ logs: pageItems, total, page, totalPages });
-  } catch (err) {
-    // If Firebase fails, return empty logs instead of 500
-    res.json({ logs: [], total: 0, page, totalPages: 0 });
-  }
+  const db = getFirestoreDb();
+  const snapshot = await db.collection("auditLogs").orderBy("createdAt", "desc").get();
+  const logs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  const total = logs.length;
+  const totalPages = Math.ceil(total / limit);
+  const offset = (page - 1) * limit;
+  const pageItems = logs.slice(offset, offset + limit);
+  res.json({ logs: pageItems, total, page, totalPages });
 });
 
 export default router;

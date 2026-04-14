@@ -70,20 +70,9 @@ export function useLogin() {
         const idToken = await cred.user.getIdToken();
         return apiRequest<{ token: string; user: any }>("/api/auth/login", {
           method: "POST",
-          body: JSON.stringify({ idToken, email, password }),
+          body: JSON.stringify({ idToken }),
         });
       } catch (err: any) {
-        if (import.meta.env.VITE_USE_REAL_API === "true") {
-           try {
-             return await apiRequest<{ token: string; user: any }>("/api/auth/login", {
-               method: "POST",
-               body: JSON.stringify({ email, password }),
-             });
-           } catch (apiErr) {
-             // Fall through to existing error handlers if api also fails
-           }
-        }
-
         const code = err?.code || "";
         if (code === "auth/user-not-found") {
           throw new Error("Account not found");
@@ -100,20 +89,6 @@ export function useLogin() {
   });
 }
 
-export function useUpdateMe() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (data: { name?: string; institution?: string; purpose?: string }) =>
-      apiRequest("/api/auth/me", {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-    },
-  });
-}
-
 export function useRegister() {
   return useMutation({
     mutationFn: async (args: MutationArgs<any>) => {
@@ -121,7 +96,6 @@ export function useRegister() {
       const email = payload.email || "";
       const password = payload.password || "";
       try {
-        // Attempt client-side Firebase registration first
         const cred = await createUserWithEmailAndPassword(firebaseAuth, email, password);
         const idToken = await cred.user.getIdToken();
         await apiRequest("/api/auth/register", {
@@ -133,36 +107,11 @@ export function useRegister() {
             role: payload.role,
             institution: payload.institution,
             purpose: payload.purpose,
-            password: password,
           }),
         });
         await signOut(firebaseAuth);
         return { ok: true };
       } catch (err: any) {
-        // If it's a known Firebase error that suggests we should try local registration
-        // (like 400 Bad Request, auth/operation-not-allowed, etc.)
-        // or if VITE_USE_REAL_API is true, we attempt the backend call directly.
-        const isFirebaseError = err?.code?.startsWith("auth/");
-        const isRealApi = import.meta.env.VITE_USE_REAL_API === "true";
-
-        if (isRealApi && (isFirebaseError || !err.code)) {
-           try {
-             return await apiRequest("/api/auth/register", {
-               method: "POST",
-               body: JSON.stringify({
-                 name: payload.name,
-                 email,
-                 password,
-                 role: payload.role,
-                 institution: payload.institution,
-                 purpose: payload.purpose,
-               }),
-             });
-           } catch (apiErr: any) {
-             throw apiErr;
-           }
-        }
-        
         const code = err?.code || "";
         if (code === "auth/email-already-in-use") {
           throw new Error("Email already registered");
@@ -266,66 +215,18 @@ export function useDeleteCategory() {
   });
 }
 
-export function useGetMaterials(params?: { limit?: number; page?: number; access?: string; category?: string; search?: string }) {
+export function useGetMaterials(params?: { limit?: number; access?: string }) {
   return useQuery({
     queryKey: ["/api/materials", params || {}],
     queryFn: () => {
       const searchParams = new URLSearchParams();
       if (params?.limit) searchParams.set("limit", String(params.limit));
-      if (params?.page) searchParams.set("page", String(params.page));
       if (params?.access) searchParams.set("access", params.access);
-      if (params?.category) searchParams.set("category", params.category);
-      if (params?.search) searchParams.set("search", params.search);
       const query = searchParams.toString();
-      return apiRequest<{ materials: any[]; total: number; totalPages?: number }>(`/api/materials${query ? `?${query}` : ""}`);
+      return apiRequest<{ materials: any[]; total: number }>(`/api/materials${query ? `?${query}` : ""}`);
     },
   });
 }
-
-export function useCreateMaterial() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (args: MutationArgs<any>) =>
-      apiRequest("/api/materials", {
-        method: "POST",
-        body: JSON.stringify(args.data || {}),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
-    },
-  });
-}
-
-export function useUpdateMaterial() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (args: MutationArgs<any>) =>
-      apiRequest(`/api/materials/${args.id}`, {
-        method: "PATCH",
-        body: JSON.stringify(args.data || {}),
-      }),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/materials", variables.id] });
-    },
-  });
-}
-
-export function useDeleteMaterial() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (args: MutationArgs) =>
-      apiRequest(`/api/materials/${args.id}`, {
-        method: "DELETE",
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
-    },
-  });
-}
-
 
 export function useGetAnnouncements() {
   return useQuery({
@@ -431,9 +332,7 @@ export function useApproveUser() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (args: MutationArgs) =>
-      apiRequest(`/api/users/${args.id}/approve`, {
-        method: "POST",
-      }),
+      apiRequest(`/api/users/${args.id}/approve`, { method: "POST" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
     },
@@ -444,9 +343,7 @@ export function useRejectUser() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (args: MutationArgs) =>
-      apiRequest(`/api/users/${args.id}/reject`, {
-        method: "POST",
-      }),
+      apiRequest(`/api/users/${args.id}/reject`, { method: "POST" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
     },
@@ -461,7 +358,8 @@ export function useDeleteUser() {
       try {
         return await apiRequest(`/api/users/${args.id}`, { method: "DELETE" });
       } catch {
-        return { ok: true };
+        if (import.meta.env.DEV) return { ok: true };
+        throw new Error("Failed to delete user");
       }
     },
     onSuccess: () => {
@@ -470,10 +368,9 @@ export function useDeleteUser() {
   });
 }
 
-export function useGetAuditLogs(params?: { limit?: number }, options?: any) {
-  return useQuery<{ logs: any[] }>({
+export function useGetAuditLogs(params?: { limit?: number }) {
+  return useQuery({
     queryKey: ["/api/audit", params || {}],
-    ...options,
     queryFn: async () => {
       const searchParams = new URLSearchParams();
       if (params?.limit) searchParams.set("limit", String(params.limit));

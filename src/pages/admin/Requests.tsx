@@ -4,8 +4,6 @@ import { format } from "date-fns";
 import { AdminLayout } from "@/components/layout";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Badge, Button } from "@/components/ui-components";
 import { useGetAccessRequests, useApproveRequest, useRejectRequest, useGetMe } from "@workspace/api-client-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 import { getIngestRequests, updateIngestRequest, getMaterialById, saveMaterial, addActivity } from "@/data/storage";
 import { useToast } from "@/hooks/use-toast";
 
@@ -15,34 +13,40 @@ export default function AdminRequests() {
   const [tab, setTab] = React.useState<"pending" | "approved" | "rejected">("pending");
   const { data, isLoading, refetch } = useGetAccessRequests({ status: tab });
   const [ingestRequests, setIngestRequests] = React.useState(() => getIngestRequests());
-  const [rejectingId, setRejectingId] = React.useState<string | null>(null);
-  const [rejectReason, setRejectReason] = React.useState("");
   
   const { mutate: approve, isPending: isApproving } = useApproveRequest();
   const { mutate: reject, isPending: isRejecting } = useRejectRequest();
+  const [actionId, setActionId] = React.useState<string | null>(null);
   const { toast } = useToast();
 
   const handleApprove = (id: string) => {
+    setActionId(id);
     approve({ id }, {
       onSuccess: () => {
         toast({ title: "Approved", description: "Request granted." });
         refetch();
+        setActionId(null);
+      },
+      onError: () => {
+        toast({ title: "Approval Failed", description: "Could not approve this request.", variant: "destructive" });
+        setActionId(null);
       }
     });
   };
 
   const handleReject = (id: string) => {
-    setRejectingId(id);
-    setRejectReason("");
-  };
-
-  const confirmReject = () => {
-    if (rejectingId) {
-      reject({ id: rejectingId, data: { reason: rejectReason } }, {
+    const reason = prompt("Enter rejection reason:");
+    if (reason !== null) {
+      setActionId(id);
+      reject({ id, data: { reason } }, {
         onSuccess: () => {
           toast({ title: "Rejected", description: "Request denied." });
-          setRejectingId(null);
           refetch();
+          setActionId(null);
+        },
+        onError: () => {
+          toast({ title: "Rejection Failed", description: "Could not reject this request.", variant: "destructive" });
+          setActionId(null);
         }
       });
     }
@@ -101,6 +105,8 @@ export default function AdminRequests() {
   }, []);
 
   const filteredIngest = ingestRequests.filter((req) => req.status === tab);
+  const accessRequests = data?.requests ?? [];
+  const requestRows = mode === "access" ? accessRequests : filteredIngest;
 
   return (
     <AdminLayout>
@@ -147,12 +153,12 @@ export default function AdminRequests() {
           <TableBody>
             {mode === "access" && isLoading ? (
               <TableRow><TableCell colSpan={6} className="text-center h-24">Loading...</TableCell></TableRow>
-            ) : mode === "access" && data?.requests.length === 0 ? (
+            ) : mode === "access" && accessRequests.length === 0 ? (
               <TableRow><TableCell colSpan={6} className="text-center h-24 text-muted-foreground">No {tab} requests found.</TableCell></TableRow>
             ) : mode === "ingest" && filteredIngest.length === 0 ? (
               <TableRow><TableCell colSpan={6} className="text-center h-24 text-muted-foreground">No {tab} ingest approvals found.</TableCell></TableRow>
             ) : (
-              (mode === "access" ? (data?.requests || []) : filteredIngest).map((req: any) => (
+              requestRows.map((req: any) => (
                 <TableRow key={req.id}>
                   <TableCell className="whitespace-nowrap">{format(new Date(mode === "access" ? req.createdAt : req.requestedAt), 'MMM d, yyyy')}</TableCell>
                   <TableCell>
@@ -168,28 +174,28 @@ export default function AdminRequests() {
                   </TableCell>
                   {tab === 'pending' && (
                     <TableCell className="text-right space-x-2 flex justify-end">
-                      <Link href={"/materials/" + (mode === "access" ? req.materialId : req.materialId)}>
+                      <Link href={"/collections/" + (mode === "access" ? req.materialId : req.materialId)}>
                          <Button size="sm" variant="outline" className="text-[#4169E1] border-[#4169E1]/30 hover:bg-[#4169E1]/10">Preview Item</Button>
                       </Link>
                       {mode === "access" ? (
                         <>
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            className="text-emerald-600 border-emerald-200 hover:bg-emerald-50" 
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-emerald-600 border-emerald-200 hover:bg-emerald-50"
                             onClick={() => handleApprove(req.id)}
-                            disabled={isApproving || isRejecting}
+                            disabled={isApproving || isRejecting || actionId === req.id}
                           >
-                            {isApproving ? <span className="animate-spin mr-1">...</span> : "Approve"}
+                            {actionId === req.id && isApproving ? "Approving..." : "Approve"}
                           </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            className="text-destructive border-destructive/20 hover:bg-destructive/10" 
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-destructive border-destructive/20 hover:bg-destructive/10"
                             onClick={() => handleReject(req.id)}
-                            disabled={isApproving || isRejecting}
+                            disabled={isApproving || isRejecting || actionId === req.id}
                           >
-                            Reject
+                            {actionId === req.id && isRejecting ? "Rejecting..." : "Reject"}
                           </Button>
                         </>
                       ) : (
@@ -206,35 +212,6 @@ export default function AdminRequests() {
           </TableBody>
         </Table>
       </div>
-
-      <Dialog open={!!rejectingId} onOpenChange={(open) => !open && setRejectingId(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reject Request</DialogTitle>
-            <DialogDescription>
-              Please provide a reason for rejecting this access request.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <Textarea
-              placeholder="Reason for rejection..."
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              className="resize-none h-24"
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setRejectingId(null)} disabled={isRejecting}>Cancel</Button>
-            <Button 
-              className="bg-red-600 text-white hover:bg-red-700" 
-              onClick={confirmReject} 
-              disabled={isRejecting}
-            >
-              {isRejecting ? "Denying..." : "Deny Request"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </AdminLayout>
   );
 }

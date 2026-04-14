@@ -34,8 +34,10 @@ export default function Login() {
           setLocation('/admin');
         } else if (res.user.role === 'archivist') {
           setLocation('/archivist');
-        } else {
+        } else if (res.user.role === 'student') {
           setLocation('/student');
+        } else {
+          setLocation('/collections');
         }
       },
       onError: (err) => {
@@ -127,7 +129,34 @@ export default function Login() {
         </Link>
         
         <div className="w-full max-w-md">
+          {/* Quick-login cards */}
+          <div className="mb-6">
+            <p className="text-white/40 text-xs font-semibold uppercase tracking-widest mb-3">Quick Sign In</p>
+            <div className="grid grid-cols-3 gap-2">
+              {demoUsers.map((u) => (
+                <button
+                  key={u.email}
+                  type="button"
+                  onClick={() => fillAndSubmit(u.email)}
+                  disabled={isPending}
+                  className={`group relative overflow-hidden rounded-xl border border-white/10 p-3 text-center transition-all duration-300 hover:border-white/25 hover:scale-[1.02] ${activeDemo === u.email ? 'ring-2 ring-white/30 bg-white/10' : 'bg-white/5'}`}
+                >
+                  <div className={`w-9 h-9 rounded-lg ${u.color} flex items-center justify-center mx-auto mb-2`}>
+                    <u.icon className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="text-white text-xs font-bold">{u.label}</div>
+                  <div className="text-white/35 text-[10px] mt-0.5">{u.role}</div>
+                </button>
+              ))}
+            </div>
+          </div>
 
+          {/* Divider */}
+          <div className="flex items-center gap-3 mb-6">
+            <div className="flex-1 h-px bg-white/10" />
+            <span className="text-white/30 text-xs font-medium">or sign in manually</span>
+            <div className="flex-1 h-px bg-white/10" />
+          </div>
 
           {/* Form */}
           <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-7">

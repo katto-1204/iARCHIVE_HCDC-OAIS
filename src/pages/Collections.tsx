@@ -339,8 +339,16 @@ export default function Collections() {
           </div>
         </div>
 
+        {isLoading && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="h-[360px] bg-white border border-border/60 rounded-2xl animate-pulse" />
+            ))}
+          </div>
+        )}
+
         {/* Empty State */}
-        {displayMaterials.length === 0 && (
+        {!isLoading && displayMaterials.length === 0 && (
           <div className="flex flex-col items-center justify-center py-28 text-center">
             <div className="w-24 h-24 bg-gradient-to-br from-[#4169E1]/10 to-[#960000]/10 rounded-3xl flex items-center justify-center mb-6 rotate-6">
               <Search className="w-10 h-10 text-muted-foreground/30 -rotate-6" />
@@ -359,7 +367,7 @@ export default function Collections() {
         )}
 
         {/* ═══ GRID VIEW ═══ */}
-        {displayMaterials.length > 0 && viewMode === "grid" && (
+        {!isLoading && displayMaterials.length > 0 && viewMode === "grid" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {displayMaterials.map((mat: any, i: number) => {
               const acc = ACCESS_CONFIG[mat.access as keyof typeof ACCESS_CONFIG] || ACCESS_CONFIG.public;
@@ -392,6 +400,8 @@ export default function Collections() {
                             src={coverImg}
                             alt={mat.title}
                             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                            loading="lazy"
+                            decoding="async"
                           />
                           {/* Overlay gradient */}
                           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
@@ -507,7 +517,7 @@ export default function Collections() {
         )}
 
         {/* ═══ LIST VIEW ═══ */}
-        {displayMaterials.length > 0 && viewMode === "list" && (
+        {!isLoading && displayMaterials.length > 0 && viewMode === "list" && (
           <div className="space-y-3">
             {displayMaterials.map((mat: any, i: number) => {
               const acc = ACCESS_CONFIG[mat.access as keyof typeof ACCESS_CONFIG] || ACCESS_CONFIG.public;
@@ -530,7 +540,7 @@ export default function Collections() {
                       {mat.pageImages && mat.pageImages.length > 0 ? (
                         <>
                            <div className="flex-1 relative overflow-hidden">
-                             <img src={mat.pageImages[0]} alt={mat.title} className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105" />
+                             <img src={mat.pageImages[0]} alt={mat.title} className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105" loading="lazy" decoding="async" />
                              <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-2">
                                <span className="text-[9px] font-bold text-white uppercase tracking-widest">{mat.pageImages.length} Pages</span>
                              </div>
@@ -539,7 +549,7 @@ export default function Collections() {
                            <div className="h-10 bg-white border-t border-border/50 flex gap-1 p-1 overflow-x-auto invisible group-hover:visible bg-slate-50 shadow-inner custom-scrollbar-mini">
                               {mat.pageImages.slice(1, 10).map((img: string, idx: number) => (
                                 <div key={idx} className="w-8 h-full shrink-0 border border-slate-200 rounded overflow-hidden">
-                                   <img src={img} alt={`Page ${idx+2}`} className="w-full h-full object-cover" />
+                                   <img src={img} alt={`Page ${idx+2}`} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                                 </div>
                               ))}
                               {mat.pageImages.length > 10 && (
@@ -551,7 +561,7 @@ export default function Collections() {
                         </>
                       ) : coverImg ? (
                         <>
-                          <img src={coverImg} alt={mat.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                          <img src={coverImg} alt={mat.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" loading="lazy" decoding="async" />
                           <div className="absolute inset-0 bg-gradient-to-r from-transparent to-black/10" />
                         </>
                       ) : (

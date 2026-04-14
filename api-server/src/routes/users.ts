@@ -1,4 +1,5 @@
 import { Router } from "express";
+import type { Query } from "firebase-admin/firestore";
 import { requireAuth, requireRole } from "../middlewares/auth.js";
 import { logAudit } from "./audit.js";
 import { jsonStoreApproveUser, jsonStoreDeleteUser, jsonStoreGetUsers, jsonStoreRejectUser } from "../lib/jsonStore.js";
@@ -16,18 +17,13 @@ router.get("/users", requireAuth, requireRole("admin", "archivist"), async (req,
   const status = req.query.status as string;
   try {
     const db = getFirestoreDb();
-    let query = db.collection("users");
+    let query: Query = db.collection("users");
     if (status && ["pending", "active", "inactive", "rejected"].includes(status)) {
       query = query.where("status", "==", status);
     }
+    query = query.orderBy("createdAt", "desc");
     const snapshot = await query.get();
     const users = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    // Sort in memory to avoid composite index requirement
-    users.sort((a: any, b: any) => {
-      const dateA = new Date(a.createdAt || 0).getTime();
-      const dateB = new Date(b.createdAt || 0).getTime();
-      return dateB - dateA;
-    });
     const total = users.length;
     const totalPages = Math.ceil(total / limit);
     const offset = (page - 1) * limit;

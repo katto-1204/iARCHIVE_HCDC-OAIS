@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { signToken } from "../lib/auth.js";
 import { requireAuth } from "../middlewares/auth.js";
 import { jsonStoreGetUserByEmail, jsonStoreGetUserById, jsonStoreRegisterUser } from "../lib/jsonStore.js";
-import { getFirebaseAuth, getFirestoreDb, isFirebaseConfigured } from "../lib/firebase.js";
+import { getFirebaseAuth, getFirestoreDb } from "../lib/firebase.js";
 
 const router = Router();
 
@@ -46,8 +46,8 @@ router.post("/auth/login", async (req, res) => {
     return;
   }
 
-  // FORCE DEMO ACCOUNTS - Bypass everything else
-  const DEMO_PASSWORD = "admin123";
+  // Demo accounts should always work, even if the DB is unreachable
+  // or the demo users are not present in Postgres.
   const demoUser = getDemoUserByEmail(email);
   if (demoUser && password === DEMO_PASSWORD) {
     const token = signToken({ userId: demoUser.id, email: demoUser.email, role: demoUser.role, name: demoUser.name });
@@ -68,9 +68,6 @@ router.post("/auth/login", async (req, res) => {
   }
 
   try {
-    if (!isFirebaseConfigured()) {
-       throw new Error("Firebase skip");
-    }
     const auth = getFirebaseAuth();
     let firebaseToken = idToken as string | undefined;
     if (!firebaseToken && email && password) {
@@ -120,8 +117,7 @@ router.post("/auth/login", async (req, res) => {
         createdAt: profile.createdAt || new Date().toISOString(),
       },
     });
-  } catch (err) {
-    console.error("Login error:", err);
+  } catch {
     // If it's one of the demo accounts, never attempt bcrypt compare
     // with an absent/blank DB password hash.
     const demoUser = getDemoUserByEmail(email);
@@ -135,7 +131,7 @@ router.post("/auth/login", async (req, res) => {
       res.status(401).json({ error: "Invalid credentials" });
       return;
     }
-    const valid = (password && jsonUser.passwordHash) ? await bcrypt.compare(password, jsonUser.passwordHash) : false;
+    const valid = await bcrypt.compare(password, jsonUser.passwordHash);
     if (!valid) {
       res.status(401).json({ error: "Invalid credentials" });
       return;
@@ -163,15 +159,12 @@ router.post("/auth/login", async (req, res) => {
 });
 
 router.post("/auth/register", async (req, res) => {
-  const { name, email, password, role, userCategory, institution, purpose, idToken } = req.body;
-  if (!name || (!role && !userCategory) || (!idToken && (!email || !password))) {
-    res.status(400).json({ error: "Name, credentials, and user role/category are required" });
+  const { name, email, password, role, institution, purpose, idToken } = req.body;
+  if (!name || !role || (!idToken && (!email || !password))) {
+    res.status(400).json({ error: "Name, role, and credentials are required" });
     return;
   }
   try {
-    if (!isFirebaseConfigured()) {
-       throw new Error("Firebase not configured");
-    }
     const auth = getFirebaseAuth();
     let uid = "";
     let resolvedEmail = email as string | undefined;
@@ -200,8 +193,8 @@ router.post("/auth/register", async (req, res) => {
       id: uid,
       name,
       email: resolvedEmail || email,
-      role: role || "student",
-      userCategory: userCategory || role || "student",
+      role,
+      userCategory: role,
       institution: institution ?? null,
       purpose: purpose ?? null,
       status: "pending",
@@ -209,46 +202,13 @@ router.post("/auth/register", async (req, res) => {
       updatedAt: now,
     });
     res.status(201).json({ message: "Registration submitted. Awaiting admin approval." });
-  } catch (err) {
-    console.error("Firebase registration failed, falling back to JSON store:", err);
-    try {
-      const result = jsonStoreRegisterUser({ name, email, password, role: role || "student", userCategory: userCategory || role || "student", institution, purpose });
-      if (!result.ok) {
-        res.status(400).json({ error: result.error });
-        return;
-      }
-      res.status(201).json({ message: "Registration submitted. Awaiting admin approval." });
-    } catch (jsonErr) {
-      console.error("JSON store registration failed:", jsonErr);
-      res.status(500).json({ error: "Registration failed. Internal server error." });
-    }
-  }
-});
-
-router.patch("/auth/me", requireAuth, async (req, res) => {
-  const { name, institution, purpose } = req.body;
-  try {
-    const db = getFirestoreDb();
-    const updateData: any = {};
-    if (name) updateData.name = name;
-    if (institution !== undefined) updateData.institution = institution;
-    if (purpose !== undefined) updateData.purpose = purpose;
-    updateData.updatedAt = new Date().toISOString();
-    
-    await db.collection("users").doc(req.user!.userId).update(updateData);
-    const snap = await db.collection("users").doc(req.user!.userId).get();
-    res.json({ ...snap.data(), id: snap.id });
-  } catch (err) {
-    const jsonUser = jsonStoreGetUserById(req.user!.userId);
-    if (!jsonUser) {
-      res.status(404).json({ error: "User not found" });
+  } catch {
+    const result = jsonStoreRegisterUser({ name, email, password, role, institution, purpose });
+    if (!result.ok) {
+      res.status(400).json({ error: result.error });
       return;
     }
-    if (name) jsonUser.name = name;
-    if (institution !== undefined) jsonUser.institution = institution;
-    if (purpose !== undefined) jsonUser.purpose = purpose;
-    jsonUser.updatedAt = new Date().toISOString();
-    res.json({ ...jsonUser });
+    res.status(201).json({ message: "Registration submitted. Awaiting admin approval." });
   }
 });
 

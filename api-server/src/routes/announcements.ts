@@ -7,14 +7,10 @@ import { getFirestoreDb } from "../lib/firebase.js";
 const router = Router();
 
 router.get("/announcements", async (_req, res) => {
-  try {
-    const db = getFirestoreDb();
-    const snap = await db.collection("announcements").orderBy("createdAt", "desc").get();
-    const announcements = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    res.json(announcements);
-  } catch (err) {
-    res.json([]);
-  }
+  const db = getFirestoreDb();
+  const snap = await db.collection("announcements").orderBy("createdAt", "desc").get();
+  const announcements = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  res.json(announcements);
 });
 
 router.post("/announcements", requireAuth, requireRole("admin"), async (req, res) => {

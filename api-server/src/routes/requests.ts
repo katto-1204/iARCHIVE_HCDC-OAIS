@@ -1,4 +1,5 @@
 import { Router } from "express";
+import type { Query } from "firebase-admin/firestore";
 import { requireAuth, requireRole } from "../middlewares/auth.js";
 import { generateId } from "../lib/id.js";
 import { logAudit } from "./audit.js";
@@ -49,21 +50,16 @@ router.get("/requests", requireAuth, async (req, res) => {
 
   try {
     const db = getFirestoreDb();
-    let query = db.collection("accessRequests");
+    let query: Query = db.collection("accessRequests");
     if (status && ["pending", "approved", "rejected"].includes(status)) {
       query = query.where("status", "==", status);
     }
     if (user.role === "student" || user.role === "researcher" || user.role === "alumni" || user.role === "public") {
       query = query.where("userId", "==", user.userId);
     }
+    query = query.orderBy("createdAt", "desc");
     const snapshot = await query.get();
     const rows = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    // Sort in memory to avoid composite index requirement
-    rows.sort((a: any, b: any) => {
-      const dateA = new Date(a.createdAt || 0).getTime();
-      const dateB = new Date(b.createdAt || 0).getTime();
-      return dateB - dateA;
-    });
     const total = rows.length;
     const totalPages = Math.ceil(total / limit);
     const offset = (page - 1) * limit;

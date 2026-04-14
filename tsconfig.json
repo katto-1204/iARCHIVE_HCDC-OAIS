@@ -30,12 +30,12 @@
     "allowImportingTsExtensions": true,
     "types": [
       "node",
-      "vite/client",
-      "bcryptjs"
+      "vite/client"
     ],
     "customConditions": [
       "workspace"
     ],
+    "ignoreDeprecations": "6.0",
     "baseUrl": ".",
     "paths": {
       "@/*": [
