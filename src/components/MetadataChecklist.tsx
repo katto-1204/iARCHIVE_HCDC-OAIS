@@ -14,16 +14,24 @@ interface MetadataChecklistProps {
   values?: Record<string, string>;
   onValueChange?: (fieldKey: string, value: string) => void;
   className?: string;
+  allowedFieldIds?: string[]; // New prop for dynamic filtering
 }
 
 export function MetadataChecklist({
   values = {},
   onValueChange,
   className = "",
+  allowedFieldIds,
 }: MetadataChecklistProps) {
   
-  const totalFields = COMBINED_FIELDS.length;
-  const filledFieldsCount = Object.values(values).filter(v => !!v).length;
+  // Filter fields if allowedFieldIds is provided
+  const displayedFields = React.useMemo(() => {
+    if (!allowedFieldIds || allowedFieldIds.length === 0) return COMBINED_FIELDS;
+    return COMBINED_FIELDS.filter(f => allowedFieldIds.includes(f.fieldKey));
+  }, [allowedFieldIds]);
+
+  const totalFields = displayedFields.length;
+  const filledFieldsCount = displayedFields.filter(f => !!values[f.fieldKey]).length;
 
   return (
     <div className={cn("w-full bg-[#fafbfc] rounded-2xl", className)}>
@@ -34,7 +42,7 @@ export function MetadataChecklist({
             <FileText className="w-4 h-4 text-[#0a1628]" />
           </div>
           <h3 className="text-sm font-black uppercase tracking-widest text-[#0a1628]">
-            FULL METADATA ({filledFieldsCount}/{totalFields} FIELDS)
+            {allowedFieldIds ? "RELEVANT SERIES METADATA" : "FULL METADATA"} ({filledFieldsCount}/{totalFields} FIELDS)
           </h3>
         </div>
 
@@ -52,7 +60,7 @@ export function MetadataChecklist({
               
               {/* Table Body (No Scrollbar, fit content) */}
               <div className="divide-y divide-slate-100">
-                {COMBINED_FIELDS.map(field => {
+                {displayedFields.map(field => {
                   const val = values[field.fieldKey] || "";
                   return (
                     <div 

@@ -32,7 +32,7 @@ router.get("/categories", async (_req, res) => {
 
 router.post("/categories", requireAuth, requireRole("admin", "archivist"), async (req, res) => {
   const user = req.user!;
-  const { name, description, level, parentId } = req.body;
+  const { name, description, level, parentId, metadataSchema } = req.body;
   if (!name || !level) { res.status(400).json({ error: "Name and level required" }); return; }
   try {
     const db = getFirestoreDb();
@@ -46,12 +46,13 @@ router.post("/categories", requireAuth, requireRole("admin", "archivist"), async
       description: description ?? null,
       level,
       parentId: parentId ?? null,
+      metadataSchema: metadataSchema ?? null,
       categoryNo,
       createdAt: now,
       updatedAt: now,
     });
     await logAudit({ action: "CREATE_CATEGORY", entityType: "category", entityId: id, userId: user.userId, userName: user.name, details: `Created category: ${name}` });
-    res.status(201).json({ id, name, description: description ?? null, level, parentId: parentId ?? null, categoryNo, createdAt: now, updatedAt: now, materialCount: 0 });
+    res.status(201).json({ id, name, description: description ?? null, level, parentId: parentId ?? null, metadataSchema: metadataSchema ?? null, categoryNo, createdAt: now, updatedAt: now, materialCount: 0 });
   } catch {
     const created = jsonStoreCreateCategory({ name, description, level, parentId });
     res.status(201).json(created);
@@ -89,7 +90,7 @@ router.put("/categories/:id", requireAuth, requireRole("admin", "archivist"), as
 router.patch("/categories/:id", requireAuth, requireRole("admin", "archivist"), async (req, res) => {
   const user = req.user!;
   const id = String(req.params.id);
-  const { name, description, level, parentId } = req.body;
+  const { name, description, level, parentId, metadataSchema } = req.body;
   try {
     const db = getFirestoreDb();
     const snap = await db.collection("categories").doc(id).get();
@@ -100,6 +101,7 @@ router.patch("/categories/:id", requireAuth, requireRole("admin", "archivist"), 
       description: description ?? cat.description ?? null,
       level: level ?? cat.level,
       parentId: parentId ?? cat.parentId ?? null,
+      metadataSchema: metadataSchema ?? cat.metadataSchema ?? null,
       updatedAt: new Date().toISOString(),
     });
     await logAudit({ action: "UPDATE_CATEGORY", entityType: "category", entityId: id, userId: user.userId, userName: user.name, details: `Updated category: ${name}` });

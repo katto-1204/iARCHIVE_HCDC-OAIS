@@ -36,7 +36,7 @@ import {
   getAllFieldValues, downloadMetadataExcel,
 } from "@/data/metadataUtils";
 import { useToast } from "@/hooks/use-toast";
-import { useGetMe } from "@workspace/api-client-react";
+import { useGetMe, useGetCategories } from "@workspace/api-client-react";
 
 type ViewMode = "table" | "detail";
 
@@ -99,6 +99,11 @@ export default function AdminMaterials() {
   const [materials, setMaterials] = React.useState<ArchivalMaterial[]>([]);
   const [materialsLoading, setMaterialsLoading] = React.useState(true);
   const { data: me } = useGetMe();
+  
+  // Real Category Data
+  const { data: categories = [] } = useGetCategories();
+  const [activeSchema, setActiveSchema] = React.useState<string[] | undefined>(undefined);
+
   const fallbackRole = typeof window !== "undefined" && window.location.pathname.startsWith("/archivist") ? "archivist" : "admin";
   const currentRole = (me?.role || fallbackRole) as "admin" | "archivist";
   const isAdmin = currentRole === "admin";
@@ -219,6 +224,23 @@ export default function AdminMaterials() {
     uploadForm.referenceCode, uploadForm.fonds, uploadForm.subfonds, uploadForm.program, uploadForm.series,
     generatedRefCode
   ]);
+
+  // Sync activeSchema when series changes
+  React.useEffect(() => {
+    if (uploadForm.series && categories.length > 0) {
+      const seriesNode = categories.find(c => c.name === uploadForm.series);
+      if (seriesNode?.metadataSchema?.fieldIds) {
+        setActiveSchema(seriesNode.metadataSchema.fieldIds);
+        // Also auto-select these fields for the checklist
+        setSelectedChecklistFields(new Set(seriesNode.metadataSchema.fieldIds));
+      } else {
+        setActiveSchema(undefined);
+      }
+    } else {
+      setActiveSchema(undefined);
+    }
+  }, [uploadForm.series, categories]);
+
 
   const [processingState, setProcessingState] = React.useState<"idle" | "scanning" | "compressing" | "done">("idle");
   const [metadataProcessingState, setMetadataProcessingState] = React.useState<"idle" | "scanning" | "done">("idle");
@@ -1141,6 +1163,7 @@ export default function AdminMaterials() {
                                   setMaterials(updated);
                                 }}
                                 className="shadow-none border border-border/60"
+                                allowedFieldIds={activeSchema}
                              />
                           </div>
                         )}
@@ -1240,21 +1263,10 @@ export default function AdminMaterials() {
                   <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5 focus-within:text-[#0a1628] transition-colors font-mono">
                     Department (Sub-fonds)
                   </label>
-                  <Select value={uploadForm.subfonds} onValueChange={v => setUploadForm(p => ({ ...p, subfonds: v, program: "" }))}>
+                  <Select value={uploadForm.subfonds} onValueChange={v => setUploadForm(p => ({ ...p, subfonds: v, program: "", series: "" }))}>
                     <SelectTrigger className="h-10 bg-white border-border/60 hover:border-[#4169E1]/50 focus:ring-[#4169E1]/20 transition-all font-semibold text-[#0a1628]"><SelectValue placeholder="Select Department" /></SelectTrigger>
                     <SelectContent>
-                      {fondsList.map((f: any) => <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5 focus-within:text-[#0a1628] transition-colors font-mono">
-                    Program
-                  </label>
-                  <Select value={uploadForm.program} onValueChange={v => setUploadForm(p => ({ ...p, program: v }))} disabled={!uploadForm.subfonds}>
-                    <SelectTrigger className="h-10 bg-white border-border/60 hover:border-[#4169E1]/50 focus:ring-[#4169E1]/20 transition-all font-semibold text-[#0a1628]"><SelectValue placeholder="Select Program" /></SelectTrigger>
-                    <SelectContent>
-                      {programList.map((p: any) => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
+                      {categories.filter(c => c.parentId === "hcdc_root" || !c.parentId).map((f: any) => <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1262,7 +1274,15 @@ export default function AdminMaterials() {
                   <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5 focus-within:text-[#0a1628] transition-colors font-mono">
                     Series Label
                   </label>
-                  <Input placeholder="Series Title..." value={uploadForm.series} onChange={e => setUploadForm(p => ({ ...p, series: e.target.value }))} className="h-10 bg-white border-border/60" />
+                  <Select value={uploadForm.series} onValueChange={v => setUploadForm(p => ({ ...p, series: v }))} disabled={!uploadForm.subfonds}>
+                    <SelectTrigger className="h-10 bg-white border-border/60 hover:border-[#4169E1]/50 focus:ring-[#4169E1]/20 transition-all font-semibold text-[#0a1628]"><SelectValue placeholder="Select Series" /></SelectTrigger>
+                    <SelectContent>
+                      {categories.filter(c => {
+                        const parent = categories.find(p => p.name === uploadForm.subfonds);
+                        return c.parentId === parent?.id;
+                      }).map((s: any) => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -1592,10 +1612,11 @@ export default function AdminMaterials() {
               n.has(fieldKey)? n.delete(fieldKey) : n.add(fieldKey); 
               return n;
             })} 
-            onSelectAll={() => setSelectedChecklistFields(new Set(COMBINED_FIELDS.map(f => f.fieldKey)))} 
+            onSelectAll={() => setSelectedChecklistFields(new Set(activeSchema || COMBINED_FIELDS.map(f => f.fieldKey)))} 
             onClearAll={() => setSelectedChecklistFields(new Set())}
             values={checklistValues}
             onValueChange={(fieldKey, value) => setChecklistValues(prev => ({ ...prev, [fieldKey]: value }))}
+            allowedFieldIds={activeSchema}
           />
           <DialogFooter>
             <Button variant="ghost" onClick={() => setChecklistOpen(false)}>Cancel</Button>

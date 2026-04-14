@@ -11,10 +11,22 @@ function getServiceAccountJson() {
   const raw = process.env["FIREBASE_SERVICE_ACCOUNT_JSON"];
   if (raw) {
     try {
-      const sa = JSON.parse(raw);
+      // Fix potential extra escaping if the variable was wrapped in unnecessary quotes in Vercel UI
+      let sanitizedRaw = raw.trim();
+      if (sanitizedRaw.startsWith("'") && sanitizedRaw.endsWith("'")) sanitizedRaw = sanitizedRaw.slice(1, -1);
+      
+      const sa = JSON.parse(sanitizedRaw);
       if (sa.private_key && typeof sa.private_key === "string") {
         // Fix potential escaped newline issues in env vars
         sa.private_key = sa.private_key.replace(/\\n/g, "\n");
+        // Also handle double-escaped actual backslashes if present
+        sa.private_key = sa.private_key.replace(/\\/g, "\n").replace(/\n"/g, '"'); 
+        // Better: standard approach for private keys
+        if (!sa.private_key.includes("\n") && sa.private_key.includes("-----BEGIN PRIVATE KEY-----")) {
+             // If it has no newlines but is long, it's definitely escaped
+             sa.private_key = sa.private_key.split("-----BEGIN PRIVATE KEY-----")[1].split("-----END PRIVATE KEY-----")[0].trim().replace(/\s/g, "\n");
+             sa.private_key = `-----BEGIN PRIVATE KEY-----\n${sa.private_key}\n-----END PRIVATE KEY-----`;
+        }
       }
       return sa;
     } catch (err: any) {

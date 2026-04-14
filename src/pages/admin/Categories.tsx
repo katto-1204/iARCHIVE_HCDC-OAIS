@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { MetadataConfigDialog } from "@/components/admin/MetadataConfigDialog";
+import { Settings2 } from "lucide-react";
 
 interface CategoryNode {
   id: string;
@@ -42,6 +44,9 @@ export default function AdminCategories() {
 
   // Deletion State
   const [deleteDialog, setDeleteDialog] = React.useState<{id: string, name: string} | null>(null);
+
+  // Metadata Config State
+  const [configCategory, setConfigCategory] = React.useState<any | null>(null);
 
   const toggleNode = (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -221,6 +226,11 @@ export default function AdminCategories() {
                           <PlusCircle className="w-3.5 h-3.5" /> Add {nextLevel}
                         </Button>
                       )}
+                      {node.level === 'series' && (
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-indigo-600 hover:bg-indigo-50" onClick={() => setConfigCategory(node)}>
+                          <Settings2 className="w-4 h-4" />
+                        </Button>
+                      )}
                       <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => setEditingId(node.id)}>
                         <Edit className="w-4 h-4" />
                       </Button>
@@ -334,6 +344,13 @@ export default function AdminCategories() {
           </div>
         )}
       </Card>
+
+      <MetadataConfigDialog 
+        isOpen={!!configCategory}
+        category={configCategory}
+        onClose={() => setConfigCategory(null)}
+        onSaved={refetch}
+      />
 
       <Dialog open={!!deleteDialog} onOpenChange={(open) => !open && setDeleteDialog(null)}>
         <DialogContent>
