@@ -2,10 +2,11 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
-    "moduleResolution": "bundler",
+    "moduleResolution": "node",
     "strict": true,
     "skipLibCheck": true,
     "noEmit": false,
+    "types": ["node", "bcryptjs"],
     "baseUrl": "..",
     "typeRoots": ["../node_modules/@types"],
     "paths": {
