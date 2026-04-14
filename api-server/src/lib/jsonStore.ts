@@ -2,7 +2,8 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { generateId, generateMaterialId } from "./id.js";
-import { hashSync } from "bcryptjs";
+import bcrypt from "bcryptjs";
+const { hashSync } = bcrypt;
 
 type JsonCategory = {
   id: string;
