@@ -9,3 +9,8 @@ Thumbs.db
 *.tsbuildinfo
 coverage/
 pnpm-lock.yaml
+
+# Firebase / Secrets
+api-server/service-account.json
+*.json.bak
+.firebase/
