@@ -1,11 +1,11 @@
-import express, { type Express } from "express";
+import express from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import jwt from "jsonwebtoken";
 import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
 
-const app: Express = express();
+const app = express();
 
 console.log("iArchive Backend Initializing...");
 console.log("NODE_ENV:", process.env.NODE_ENV);

@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express from "express";
 import cors from "cors";
 import jwt from "jsonwebtoken";
 // Note: We import from the original location, but Vercel will now see them 
@@ -6,7 +6,7 @@ import jwt from "jsonwebtoken";
 import router from "./src/routes/index.js";
 import { logger } from "./src/lib/logger.js";
 
-const app: Express = express();
+const app = express();
 
 console.log("iArchive Vercel Edge-Safe Backend Initializing...");
 

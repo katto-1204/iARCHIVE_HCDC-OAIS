@@ -1,17 +1,9 @@
-import { Request, Response, NextFunction } from "express";
-import { extractToken, JwtPayload, verifyToken } from "../lib/auth.js";
+import express from "express";
+import { extractToken, type JwtPayload, verifyToken } from "../lib/auth.js";
 import { getFirebaseAuth } from "../lib/firebase.js";
 import { getFirestoreDb } from "../lib/firebase.js";
 
-declare global {
-  namespace Express {
-    interface Request {
-      user?: JwtPayload;
-    }
-  }
-}
-
-export async function requireAuth(req: Request, res: Response, next: NextFunction) {
+export async function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
   const token = extractToken(req.headers.authorization);
   if (!token) {
     res.status(401).json({ error: "Unauthorized" });
@@ -58,7 +50,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 }
 
 export function requireRole(...roles: string[]) {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
     if (!req.user) {
       res.status(401).json({ error: "Unauthorized" });
       return;
