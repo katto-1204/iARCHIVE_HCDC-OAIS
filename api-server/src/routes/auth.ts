@@ -46,8 +46,8 @@ router.post("/auth/login", async (req, res) => {
     return;
   }
 
-  // Demo accounts should always work, even if the DB is unreachable
-  // or the demo users are not present in Postgres.
+  // FORCE DEMO ACCOUNTS - Bypass everything else
+  const DEMO_PASSWORD = "admin123";
   const demoUser = getDemoUserByEmail(email);
   if (demoUser && password === DEMO_PASSWORD) {
     const token = signToken({ userId: demoUser.id, email: demoUser.email, role: demoUser.role, name: demoUser.name });

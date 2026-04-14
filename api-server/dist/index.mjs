@@ -19076,7 +19076,7 @@ var require_view = __commonJS({
     var debug = require_src()("express:view");
     var path3 = __require("node:path");
     var fs3 = __require("node:fs");
-    var dirname = path3.dirname;
+    var dirname2 = path3.dirname;
     var basename = path3.basename;
     var extname = path3.extname;
     var join = path3.join;
@@ -19115,7 +19115,7 @@ var require_view = __commonJS({
       for (var i = 0; i < roots.length && !path4; i++) {
         var root = roots[i];
         var loc = resolve(root, name);
-        var dir = dirname(loc);
+        var dir = dirname2(loc);
         var file = basename(loc);
         path4 = this.resolve(dir, file);
       }
@@ -34375,11 +34375,12 @@ import fs from "fs";
 import path from "path";
 function getServiceAccountJson() {
   const raw = process.env["FIREBASE_SERVICE_ACCOUNT_JSON"];
-  if (raw) {
+  if (raw && raw.trim()) {
     try {
       return JSON.parse(raw);
-    } catch {
-      throw new Error("Invalid FIREBASE_SERVICE_ACCOUNT_JSON");
+    } catch (e) {
+      console.error("Firebase JSON Parse Error:", e.message);
+      return null;
     }
   }
   const filePath = process.env["FIREBASE_SERVICE_ACCOUNT_PATH"];
@@ -34508,7 +34509,7 @@ function generateMaterialId(categoryNo, sequentialNo) {
 }
 
 // src/lib/jsonStore.ts
-var __dirname2 = path2.dirname(fileURLToPath(import.meta.url));
+import { dirname } from "path";
 var DEMO_USERS = [
   { id: "demo-admin", name: "Demo Admin", email: "admin@hcdc.edu.ph", role: "admin", userCategory: "administrator", institution: "HCDC", status: "active" },
   { id: "demo-archivist", name: "Demo Archivist", email: "archivist@hcdc.edu.ph", role: "archivist", userCategory: "staff", institution: "HCDC", status: "active" },
@@ -34520,7 +34521,9 @@ function getDemoUserByEmail(email) {
 function getDemoUserById(id) {
   return DEMO_USERS.find((u) => u.id === id);
 }
-var DATA_BASE = path2.resolve(__dirname2, "..", "..", "..");
+var __filename = fileURLToPath(import.meta.url);
+var __dirname2 = dirname(__filename);
+var DATA_BASE = process.env.VERCEL ? process.cwd() : path2.resolve(__dirname2, "../../..");
 var CATEGORIES_PATH = path2.join(DATA_BASE, "categories.json");
 var MATERIALS_PATH = path2.join(DATA_BASE, "materials.json");
 var USERS_PATH = path2.join(DATA_BASE, "users.json");
@@ -34966,9 +34969,9 @@ function jsonStoreRegisterUser(input) {
     email: input.email,
     passwordHash,
     role: input.role,
-    userCategory: input.role,
-    institution: input.institution ?? null,
-    purpose: input.purpose ?? null,
+    userCategory: input.userCategory || input.role,
+    institution: input.institution || null,
+    purpose: input.purpose || null,
     status: "pending",
     createdAt: now,
     updatedAt: now
@@ -35000,6 +35003,7 @@ function jsonStoreGetUsers(params) {
       role: u.role,
       userCategory: u.userCategory,
       institution: u.institution,
+      purpose: u.purpose,
       status: u.status,
       createdAt: u.createdAt
     })),
@@ -35324,9 +35328,9 @@ router2.post("/auth/login", async (req, res) => {
   }
 });
 router2.post("/auth/register", async (req, res) => {
-  const { name, email, password, role, institution, purpose, idToken } = req.body;
-  if (!name || !role || !idToken && (!email || !password)) {
-    res.status(400).json({ error: "Name, role, and credentials are required" });
+  const { name, email, password, role, userCategory, institution, purpose, idToken } = req.body;
+  if (!name || !role && !userCategory || !idToken && (!email || !password)) {
+    res.status(400).json({ error: "Name, credentials, and user role/category are required" });
     return;
   }
   try {
@@ -35360,8 +35364,8 @@ router2.post("/auth/register", async (req, res) => {
       id: uid,
       name,
       email: resolvedEmail || email,
-      role,
-      userCategory: role,
+      role: role || "student",
+      userCategory: userCategory || role || "student",
       institution: institution ?? null,
       purpose: purpose ?? null,
       status: "pending",
@@ -35372,7 +35376,7 @@ router2.post("/auth/register", async (req, res) => {
   } catch (err) {
     console.error("Firebase registration failed, falling back to JSON store:", err);
     try {
-      const result = jsonStoreRegisterUser({ name, email, password, role, institution, purpose });
+      const result = jsonStoreRegisterUser({ name, email, password, role: role || "student", userCategory: userCategory || role || "student", institution, purpose });
       if (!result.ok) {
         res.status(400).json({ error: result.error });
         return;
@@ -35382,6 +35386,31 @@ router2.post("/auth/register", async (req, res) => {
       console.error("JSON store registration failed:", jsonErr);
       res.status(500).json({ error: "Registration failed. Internal server error." });
     }
+  }
+});
+router2.patch("/auth/me", requireAuth, async (req, res) => {
+  const { name, institution, purpose } = req.body;
+  try {
+    const db = getFirestoreDb();
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (institution !== void 0) updateData.institution = institution;
+    if (purpose !== void 0) updateData.purpose = purpose;
+    updateData.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
+    await db.collection("users").doc(req.user.userId).update(updateData);
+    const snap = await db.collection("users").doc(req.user.userId).get();
+    res.json({ ...snap.data(), id: snap.id });
+  } catch (err) {
+    const jsonUser = jsonStoreGetUserById(req.user.userId);
+    if (!jsonUser) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+    if (name) jsonUser.name = name;
+    if (institution !== void 0) jsonUser.institution = institution;
+    if (purpose !== void 0) jsonUser.purpose = purpose;
+    jsonUser.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
+    res.json({ ...jsonUser });
   }
 });
 router2.get("/auth/me", requireAuth, async (req, res) => {
@@ -35491,14 +35520,18 @@ async function logAudit(data) {
 router3.get("/audit", requireAuth, requireRole("admin", "archivist"), async (req, res) => {
   const page = Math.max(1, parseInt(req.query.page) || 1);
   const limit = Math.min(100, parseInt(req.query.limit) || 20);
-  const db = getFirestoreDb();
-  const snapshot = await db.collection("auditLogs").orderBy("createdAt", "desc").get();
-  const logs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-  const total = logs.length;
-  const totalPages = Math.ceil(total / limit);
-  const offset = (page - 1) * limit;
-  const pageItems = logs.slice(offset, offset + limit);
-  res.json({ logs: pageItems, total, page, totalPages });
+  try {
+    const db = getFirestoreDb();
+    const snapshot = await db.collection("auditLogs").orderBy("createdAt", "desc").get();
+    const logs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const total = logs.length;
+    const totalPages = Math.ceil(total / limit);
+    const offset = (page - 1) * limit;
+    const pageItems = logs.slice(offset, offset + limit);
+    res.json({ logs: pageItems, total, page, totalPages });
+  } catch (err) {
+    res.json({ logs: [], total: 0, page, totalPages: 0 });
+  }
 });
 var audit_default = router3;
 
@@ -36181,10 +36214,14 @@ var users_default = router7;
 var import_express8 = __toESM(require_express2(), 1);
 var router8 = (0, import_express8.Router)();
 router8.get("/announcements", async (_req, res) => {
-  const db = getFirestoreDb();
-  const snap = await db.collection("announcements").orderBy("createdAt", "desc").get();
-  const announcements = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-  res.json(announcements);
+  try {
+    const db = getFirestoreDb();
+    const snap = await db.collection("announcements").orderBy("createdAt", "desc").get();
+    const announcements = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    res.json(announcements);
+  } catch (err) {
+    res.json([]);
+  }
 });
 router8.post("/announcements", requireAuth, requireRole("admin"), async (req, res) => {
   const user = req.user;
@@ -36278,6 +36315,9 @@ app.use(
 app.use((0, import_cors.default)());
 app.use(import_express10.default.json());
 app.use(import_express10.default.urlencoded({ extended: true }));
+app.get("/api/test", (req, res) => {
+  res.json({ message: "API is working", cwd: process.cwd(), node_env: process.env.NODE_ENV });
+});
 app.use("/api", routes_default);
 app.use((err, req, res, next) => {
   logger.error(err);
