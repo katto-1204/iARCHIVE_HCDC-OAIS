@@ -6,11 +6,12 @@ import path from "path";
 
 function getServiceAccountJson() {
   const raw = process.env["FIREBASE_SERVICE_ACCOUNT_JSON"];
-  if (raw) {
+  if (raw && raw.trim()) {
     try {
       return JSON.parse(raw);
-    } catch {
-      throw new Error("Invalid FIREBASE_SERVICE_ACCOUNT_JSON");
+    } catch (e: any) {
+      console.error("Firebase JSON Parse Error:", e.message);
+      return null;
     }
   }
   const filePath = process.env["FIREBASE_SERVICE_ACCOUNT_PATH"];
