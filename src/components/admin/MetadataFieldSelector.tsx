@@ -14,89 +14,89 @@ export interface MetadataField {
   isCustom?: boolean;
 }
 
-export const STANDARD_METADATA_CATEGORIES = [
+export const STANDARD_METADATA_CATEGORIES: { id: string; name: string; fields: MetadataField[] }[] = [
   {
     id: "A",
     name: "IDENTITY STATEMENT",
     fields: [
-      { id: "ref_code", name: "Reference code" },
-      { id: "alt_title", name: "Alternative title" },
-      { id: "level_desc", name: "Level of description" },
-      { id: "identifier", name: "Identifier" },
-      { id: "title", name: "Title" },
-      { id: "dates", name: "Dates" },
-      { id: "extent_medium", name: "Extent and medium" },
-      { id: "url", name: "URL" },
+      { id: "ref_code", name: "Reference code", category: "A" },
+      { id: "alt_title", name: "Alternative title", category: "A" },
+      { id: "level_desc", name: "Level of description", category: "A" },
+      { id: "identifier", name: "Identifier", category: "A" },
+      { id: "title", name: "Title", category: "A" },
+      { id: "dates", name: "Dates", category: "A" },
+      { id: "extent_medium", name: "Extent and medium", category: "A" },
+      { id: "url", name: "URL", category: "A" },
     ]
   },
   {
     id: "B",
     name: "CONTEXT",
     fields: [
-      { id: "creator", name: "Name of creator" },
-      { id: "archival_history", name: "Archival history" },
-      { id: "publisher", name: "Publisher" },
-      { id: "admin_history", name: "Administrative/biographical history" },
-      { id: "source", name: "Source / acquisition" },
-      { id: "contributor", name: "Contributor" },
+      { id: "creator", name: "Name of creator", category: "B" },
+      { id: "archival_history", name: "Archival history", category: "B" },
+      { id: "publisher", name: "Publisher", category: "B" },
+      { id: "admin_history", name: "Administrative/biographical history", category: "B" },
+      { id: "source", name: "Source / acquisition", category: "B" },
+      { id: "contributor", name: "Contributor", category: "B" },
     ]
   },
   {
     id: "C",
     name: "CONTENT AND STRUCTURE",
     fields: [
-      { id: "scope", name: "Scope and content" },
-      { id: "accruals", name: "Accruals" },
-      { id: "keywords", name: "Subject/keywords" },
-      { id: "format", name: "Format" },
-      { id: "appraisal", name: "Appraisal / destruction info" },
-      { id: "arrangement", name: "System of arrangement" },
-      { id: "type", name: "Type" },
+      { id: "scope", name: "Scope and content", category: "C" },
+      { id: "accruals", name: "Accruals", category: "C" },
+      { id: "keywords", name: "Subject/keywords", category: "C" },
+      { id: "format", name: "Format", category: "C" },
+      { id: "appraisal", name: "Appraisal / destruction info", category: "C" },
+      { id: "arrangement", name: "System of arrangement", category: "C" },
+      { id: "type", name: "Type", category: "C" },
     ]
   },
   {
     id: "D",
     name: "ACCESS AND USE",
     fields: [
-      { id: "access_cond", name: "Conditions governing access" },
-      { id: "language", name: "Language/scripts of material" },
-      { id: "finding_aids", name: "Finding aids" },
-      { id: "rights", name: "Conditions governing reproduction/rights" },
-      { id: "physical_chars", name: "Physical characteristics" },
+      { id: "access_cond", name: "Conditions governing access", category: "D" },
+      { id: "language", name: "Language/scripts of material", category: "D" },
+      { id: "finding_aids", name: "Finding aids", category: "D" },
+      { id: "rights", name: "Conditions governing reproduction/rights", category: "D" },
+      { id: "physical_chars", name: "Physical characteristics", category: "D" },
     ]
   },
   {
     id: "E",
     name: "ALLIED MATERIALS",
     fields: [
-      { id: "originals_existence", name: "Existence of originals" },
-      { id: "related_units", name: "Related units of description" },
-      { id: "copies_existence", name: "Existence of copies" },
-      { id: "pub_note", name: "Publication note" },
+      { id: "originals_existence", name: "Existence of originals", category: "E" },
+      { id: "related_units", name: "Related units of description", category: "E" },
+      { id: "copies_existence", name: "Existence of copies", category: "E" },
+      { id: "pub_note", name: "Publication note", category: "E" },
     ]
   },
   {
     id: "F",
     name: "COVERAGE",
     fields: [
-      { id: "temporal", name: "Temporal coverage" },
-      { id: "geographic", name: "Geographic coverage" },
+      { id: "temporal", name: "Temporal coverage", category: "F" },
+      { id: "geographic", name: "Geographic coverage", category: "F" },
     ]
   },
   {
     id: "G",
     name: "NOTES",
     fields: [
-      { id: "general_note", name: "General note" },
+      { id: "general_note", name: "General note", category: "G" },
     ]
   },
   {
     id: "H",
     name: "DESCRIPTION CONTROL",
     fields: [
-      { id: "archivist_note", name: "Archivist's note" },
-      { id: "desc_rules", name: "Rules or conventions" },
-      { id: "desc_date", name: "Date of description" },
+      { id: "archivist_note", name: "Archivist's note", category: "H" },
+      { id: "desc_rules", name: "Rules or conventions", category: "H" },
+      { id: "desc_date", name: "Date of description", category: "H" },
     ]
   }
 ];

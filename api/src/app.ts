@@ -10,11 +10,11 @@ const app = express();
 console.log("iArchive Backend Initializing...");
 
 // @ts-ignore
-const pino = pinoHttp.default || pinoHttp;
+const pino = (pinoHttp as any).default || pinoHttp;
 
 if (process.env.NODE_ENV !== "production") {
   app.use(
-    pino({
+    (pino as any)({
       logger,
       serializers: {
         req(req) {

@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from "express";
+import type { Request, Response, NextFunction } from "express";
 import { extractToken, type JwtPayload, verifyToken } from "../lib/auth.js";
 import { getFirebaseAuth } from "../lib/firebase.js";
 import { getFirestoreDb } from "../lib/firebase.js";
