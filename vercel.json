@@ -1,19 +1,24 @@
 {
-  "buildCommand": "node node_modules/vite/bin/vite.js build --config vite.config.ts",
-  "outputDirectory": "dist/public",
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": { "distDir": "dist/public" }
+    },
+    {
+      "src": "api/index.ts",
+      "use": "@vercel/node"
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/index.ts"
+      "destination": "api/index.ts"
     },
     {
       "source": "/(.*)",
       "destination": "/index.html"
     }
-  ],
-  "functions": {
-    "api/index.ts": {
-      "includeFiles": "api/src/**"
-    }
-  }
+  ]
 }

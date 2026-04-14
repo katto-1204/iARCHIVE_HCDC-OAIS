@@ -72,16 +72,36 @@ export function ensureFirebaseApp() {
   }
 
   try {
-    initializeApp({
-      credential: cert(serviceAccount),
-      projectId,
-    });
+    const projectId = getProjectId();
+    const serviceAccount = getServiceAccountJson();
+
+    if (!projectId || !serviceAccount) {
+      _firebaseInitError = `Firebase not configured correctly. ProjectID: ${!!projectId}, ServiceAccount: ${!!serviceAccount}`;
+      console.warn(_firebaseInitError);
+      throw new Error(_firebaseInitError);
+    }
+
+    console.log("Attempting to initialize Firebase Admin for project:", projectId);
+    
+    // Check if some apps already exist to avoid double-init
+    if (getApps().length === 0) {
+      initializeApp({
+        credential: cert(serviceAccount),
+        projectId,
+      });
+      console.log("Firebase Admin initialized successfully.");
+    } else {
+      console.log("Firebase Admin already initialized (app exists).");
+    }
+    
     _firebaseInitialized = true;
-    console.log("Firebase Admin initialized successfully for project:", projectId);
   } catch (err: any) {
     _firebaseInitError = `Firebase init failed: ${err.message}`;
-    console.error(_firebaseInitError);
-    throw new Error(_firebaseInitError);
+    console.error("FATAL FIREBASE ERROR:", _firebaseInitError);
+    // Log the stack for more context in Vercel logs
+    console.error(err.stack);
+    _firebaseInitialized = false;
+    throw err;
   }
 }
 
