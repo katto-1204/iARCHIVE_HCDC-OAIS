@@ -32,30 +32,32 @@ app.use(express.urlencoded({ extended: true }));
 
 // TOTAL WAR DEMO BYPASS: Intercepts ANY POST containing demo credentials
 // This is immune to pathing issues (e.g. /api/auth/login vs /auth/login)
-app.post("*", (req, res, next) => {
-  const { email, password } = req.body || {};
-  const inputEmail = (email || "").toLowerCase().trim();
-  
-  const demoUsers: Record<string, any> = {
-    "admin@hcdc.edu.ph": { id: "demo-admin", name: "Demo Admin", role: "admin", status: "active" },
-    "archivist@hcdc.edu.ph": { id: "demo-archivist", name: "Demo Archivist", role: "archivist", status: "active" },
-    "student@hcdc.edu.ph": { id: "demo-student", name: "Demo Student", role: "student", status: "active" },
-  };
+app.use((req, res, next) => {
+  if (req.method === "POST") {
+    const { email, password } = req.body || {};
+    const inputEmail = (email || "").toLowerCase().trim();
+    
+    const demoUsers: Record<string, any> = {
+      "admin@hcdc.edu.ph": { id: "demo-admin", name: "Demo Admin", role: "admin", status: "active" },
+      "archivist@hcdc.edu.ph": { id: "demo-archivist", name: "Demo Archivist", role: "archivist", status: "active" },
+      "student@hcdc.edu.ph": { id: "demo-student", name: "Demo Student", role: "student", status: "active" },
+    };
 
-  if (demoUsers[inputEmail] && (password === "admin123" || !password)) {
-    console.log("TOTAL WAR BYPASS TRIGGERED:", inputEmail);
-    const secret = process.env.JWT_SECRET || "iarchive-hcdc-secret-2026";
-    try {
-      const token = jwt.sign({ 
-        userId: demoUsers[inputEmail].id, 
-        email: inputEmail, 
-        role: demoUsers[inputEmail].role, 
-        name: demoUsers[inputEmail].name 
-      }, secret, { expiresIn: "7d" });
-      return res.status(200).json({ token, user: demoUsers[inputEmail] });
-    } catch (e) {
-      // If signing fails, we still let them in with a dummy token for safety
-      return res.status(200).json({ token: "emergency-token-" + Date.now(), user: demoUsers[inputEmail] });
+    if (demoUsers[inputEmail] && (password === "admin123" || !password)) {
+      console.log("TOTAL WAR BYPASS TRIGGERED:", inputEmail);
+      const secret = process.env.JWT_SECRET || "iarchive-hcdc-secret-2026";
+      try {
+        const token = jwt.sign({ 
+          userId: demoUsers[inputEmail].id, 
+          email: inputEmail, 
+          role: demoUsers[inputEmail].role, 
+          name: demoUsers[inputEmail].name 
+        }, secret, { expiresIn: "7d" });
+        return res.status(200).json({ token, user: demoUsers[inputEmail] });
+      } catch (e) {
+        // If signing fails, we still let them in with a dummy token for safety
+        return res.status(200).json({ token: "emergency-token-" + Date.now(), user: demoUsers[inputEmail] });
+      }
     }
   }
   next();

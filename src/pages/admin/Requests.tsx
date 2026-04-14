@@ -4,6 +4,8 @@ import { format } from "date-fns";
 import { AdminLayout } from "@/components/layout";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Badge, Button } from "@/components/ui-components";
 import { useGetAccessRequests, useApproveRequest, useRejectRequest, useGetMe } from "@workspace/api-client-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { getIngestRequests, updateIngestRequest, getMaterialById, saveMaterial, addActivity } from "@/data/storage";
 import { useToast } from "@/hooks/use-toast";
 
@@ -13,6 +15,8 @@ export default function AdminRequests() {
   const [tab, setTab] = React.useState<"pending" | "approved" | "rejected">("pending");
   const { data, isLoading, refetch } = useGetAccessRequests({ status: tab });
   const [ingestRequests, setIngestRequests] = React.useState(() => getIngestRequests());
+  const [rejectingId, setRejectingId] = React.useState<string | null>(null);
+  const [rejectReason, setRejectReason] = React.useState("");
   
   const { mutate: approve } = useApproveRequest();
   const { mutate: reject } = useRejectRequest();
@@ -28,11 +32,16 @@ export default function AdminRequests() {
   };
 
   const handleReject = (id: string) => {
-    const reason = prompt("Enter rejection reason:");
-    if (reason !== null) {
-      reject({ id, data: { reason } }, {
+    setRejectingId(id);
+    setRejectReason("");
+  };
+
+  const confirmReject = () => {
+    if (rejectingId) {
+      reject({ id: rejectingId, data: { reason: rejectReason } }, {
         onSuccess: () => {
           toast({ title: "Rejected", description: "Request denied." });
+          setRejectingId(null);
           refetch();
         }
       });
@@ -159,7 +168,7 @@ export default function AdminRequests() {
                   </TableCell>
                   {tab === 'pending' && (
                     <TableCell className="text-right space-x-2 flex justify-end">
-                      <Link href={"/collections/" + (mode === "access" ? req.materialId : req.materialId)}>
+                      <Link href={"/materials/" + (mode === "access" ? req.materialId : req.materialId)}>
                          <Button size="sm" variant="outline" className="text-[#4169E1] border-[#4169E1]/30 hover:bg-[#4169E1]/10">Preview Item</Button>
                       </Link>
                       {mode === "access" ? (
@@ -181,6 +190,29 @@ export default function AdminRequests() {
           </TableBody>
         </Table>
       </div>
+
+      <Dialog open={!!rejectingId} onOpenChange={(open) => !open && setRejectingId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject Request</DialogTitle>
+            <DialogDescription>
+              Please provide a reason for rejecting this access request.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea
+              placeholder="Reason for rejection..."
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              className="resize-none h-24"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRejectingId(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmReject}>Deny Request</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 }
