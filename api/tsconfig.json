@@ -4,10 +4,9 @@
     "module": "ESNext",
     "moduleResolution": "node",
     "strict": true,
-    "ignoreDeprecations": "6.0",
     "skipLibCheck": true,
     "noEmit": false,
-    "types": ["node", "bcryptjs"],
+    "types": ["node"],
     "baseUrl": "..",
     "typeRoots": ["../node_modules/@types"],
     "paths": {

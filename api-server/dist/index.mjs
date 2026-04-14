@@ -34374,55 +34374,65 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import fs from "fs";
 import path from "path";
+var _firebaseInitialized = false;
+var _firebaseInitError = null;
 function getServiceAccountJson() {
   const raw = process.env["FIREBASE_SERVICE_ACCOUNT_JSON"];
-  if (raw && raw.trim()) {
+  if (raw) {
     try {
       return JSON.parse(raw);
-    } catch (e) {
-      console.error("Firebase JSON Parse Error:", e.message);
-      return null;
+    } catch {
+      console.error("Invalid FIREBASE_SERVICE_ACCOUNT_JSON \u2014 ignoring");
     }
   }
-  const filePath = process.env["FIREBASE_SERVICE_ACCOUNT_PATH"];
-  if (!filePath) return null;
-  try {
-    const resolvedPath = pathResolve(filePath);
-    if (!fs.existsSync(resolvedPath)) {
-      throw new Error(`Service account file not found: ${resolvedPath}`);
+  const possiblePaths = [
+    process.env["FIREBASE_SERVICE_ACCOUNT_PATH"],
+    path.join(process.cwd(), "service-account.json"),
+    path.join(process.cwd(), "api-server", "service-account.json")
+  ].filter(Boolean);
+  for (const saPath of possiblePaths) {
+    try {
+      const resolvedPath = path.resolve(saPath);
+      if (fs.existsSync(resolvedPath)) {
+        const fileRaw = fs.readFileSync(resolvedPath, "utf8");
+        return JSON.parse(fileRaw);
+      }
+    } catch {
     }
-    const fileRaw = fs.readFileSync(resolvedPath, "utf8");
-    return JSON.parse(fileRaw);
-  } catch {
-    throw new Error("Invalid service account JSON file");
   }
-}
-function pathResolve(inputPath) {
-  return path.resolve(inputPath);
+  console.warn("No valid service account JSON found \u2014 falling back to JSON store where handled");
+  return null;
 }
 function getProjectId() {
   return process.env["FIREBASE_PROJECT_ID"] || getServiceAccountJson()?.project_id || void 0;
 }
-function isFirebaseConfigured() {
-  try {
-    const projectId = getProjectId();
-    const serviceAccount = getServiceAccountJson();
-    return !!(projectId && serviceAccount);
-  } catch {
-    return false;
-  }
-}
 function ensureFirebaseApp() {
-  if (getApps().length > 0) return;
+  if (_firebaseInitError) {
+    throw new Error(_firebaseInitError);
+  }
+  if (_firebaseInitialized || getApps().length > 0) {
+    _firebaseInitialized = true;
+    return;
+  }
   const projectId = getProjectId();
   const serviceAccount = getServiceAccountJson();
   if (!projectId || !serviceAccount) {
-    throw new Error("Firebase not configured properly (Missing project ID or service account)");
+    _firebaseInitError = "Firebase not configured \u2014 missing FIREBASE_PROJECT_ID or service account credentials. Using JSON file storage fallback.";
+    console.warn(_firebaseInitError);
+    throw new Error(_firebaseInitError);
   }
-  initializeApp({
-    credential: cert(serviceAccount),
-    projectId
-  });
+  try {
+    initializeApp({
+      credential: cert(serviceAccount),
+      projectId
+    });
+    _firebaseInitialized = true;
+    console.log("Firebase Admin initialized successfully for project:", projectId);
+  } catch (err) {
+    _firebaseInitError = `Firebase init failed: ${err.message}`;
+    console.error(_firebaseInitError);
+    throw new Error(_firebaseInitError);
+  }
 }
 function getFirestoreDb() {
   ensureFirebaseApp();
@@ -34521,7 +34531,8 @@ function getDemoUserByEmail(email) {
 function getDemoUserById(id) {
   return DEMO_USERS.find((u) => u.id === id);
 }
-var DATA_BASE = process.cwd();
+var isVercel = process.env.VERCEL === "1" || !!process.env.VERCEL_ENV;
+var DATA_BASE = isVercel ? "/tmp" : process.cwd();
 var CATEGORIES_PATH = path2.join(DATA_BASE, "categories.json");
 var MATERIALS_PATH = path2.join(DATA_BASE, "materials.json");
 var USERS_PATH = path2.join(DATA_BASE, "users.json");
@@ -34963,7 +34974,7 @@ function jsonStoreRegisterUser(input) {
     return { ok: false, error: "Email already registered" };
   }
   const now = (/* @__PURE__ */ new Date()).toISOString();
-  const passwordHash = hashSync2(input.password, 12);
+  const passwordHash = input.password ? hashSync2(input.password, 12) : "";
   const id = generateId();
   const user = {
     id,
@@ -35186,6 +35197,7 @@ function jsonStoreRejectAccessRequest(input) {
 
 // src/routes/auth.ts
 var router2 = (0, import_express2.Router)();
+var DEMO_PASSWORD = "admin123";
 var DEMO_USERS2 = [
   { id: "demo-admin", name: "Demo Admin", email: "admin@hcdc.edu.ph", role: "admin", userCategory: "administrator", institution: "HCDC", status: "active" },
   { id: "demo-archivist", name: "Demo Archivist", email: "archivist@hcdc.edu.ph", role: "archivist", userCategory: "staff", institution: "HCDC", status: "active" },
@@ -35214,13 +35226,33 @@ async function signInWithPassword(email, password) {
   }
   return await res.json();
 }
+async function verifyIdTokenRestFallback(idToken) {
+  const apiKey = process.env["FIREBASE_API_KEY"];
+  if (!apiKey) {
+    throw new Error("Missing FIREBASE_API_KEY for token lookup");
+  }
+  const res = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken })
+    }
+  );
+  if (!res.ok) {
+    throw new Error("Invalid idToken via REST");
+  }
+  const data = await res.json();
+  const user = data.users?.[0];
+  if (!user) throw new Error("No user found for idToken");
+  return { uid: user.localId, email: user.email, name: user.displayName };
+}
 router2.post("/auth/login", async (req, res) => {
   const { email, password, idToken } = req.body;
   if ((!email || !password) && !idToken) {
     res.status(400).json({ error: "Email and password or idToken required" });
     return;
   }
-  const DEMO_PASSWORD = "admin123";
   const demoUser = getDemoUserByEmail2(email);
   if (demoUser && password === DEMO_PASSWORD) {
     const token = signToken({ userId: demoUser.id, email: demoUser.email, role: demoUser.role, name: demoUser.name });
@@ -35240,10 +35272,6 @@ router2.post("/auth/login", async (req, res) => {
     return;
   }
   try {
-    if (!isFirebaseConfigured()) {
-      throw new Error("Firebase skip");
-    }
-    const auth = getFirebaseAuth();
     let firebaseToken = idToken;
     if (!firebaseToken && email && password) {
       const result = await signInWithPassword(email, password);
@@ -35253,27 +35281,48 @@ router2.post("/auth/login", async (req, res) => {
       res.status(401).json({ error: "Invalid credentials" });
       return;
     }
-    const decoded = await auth.verifyIdToken(firebaseToken);
-    const db = getFirestoreDb();
-    const profileSnap = await db.collection("users").doc(decoded.uid).get();
+    let decoded;
+    try {
+      const auth = getFirebaseAuth();
+      decoded = await auth.verifyIdToken(firebaseToken);
+    } catch {
+      decoded = await verifyIdTokenRestFallback(firebaseToken);
+    }
     let profile = null;
-    if (!profileSnap.exists) {
-      const now = (/* @__PURE__ */ new Date()).toISOString();
-      profile = {
-        id: decoded.uid,
-        name: decoded.name || decoded.email || "User",
-        email: decoded.email || "",
-        role: "student",
-        userCategory: "student",
-        institution: null,
-        purpose: null,
-        status: "active",
-        createdAt: now,
-        updatedAt: now
-      };
-      await db.collection("users").doc(decoded.uid).set(profile, { merge: true });
-    } else {
-      profile = profileSnap.data();
+    try {
+      const db = getFirestoreDb();
+      const profileSnap = await db.collection("users").doc(decoded.uid).get();
+      if (!profileSnap.exists) {
+        const now = (/* @__PURE__ */ new Date()).toISOString();
+        profile = {
+          id: decoded.uid,
+          name: decoded.name || decoded.email || "User",
+          email: decoded.email || "",
+          role: "student",
+          userCategory: "student",
+          institution: null,
+          purpose: null,
+          status: "pending",
+          // Fixed: Default to pending for admin approval
+          createdAt: now,
+          updatedAt: now
+        };
+        await db.collection("users").doc(decoded.uid).set(profile, { merge: true });
+        res.status(403).json({ error: "Account is not active. Please wait for approval." });
+        return;
+      } else {
+        profile = profileSnap.data();
+        if (profile.status !== "active") {
+          res.status(403).json({ error: "Account is not active. Please wait for approval." });
+          return;
+        }
+      }
+    } catch {
+      profile = jsonStoreGetUserByEmail(decoded.email || email);
+      if (!profile) {
+        res.status(403).json({ error: "Account profile missing or not active. Please wait for approval." });
+        return;
+      }
       if (profile.status !== "active") {
         res.status(403).json({ error: "Account is not active. Please wait for approval." });
         return;
@@ -35289,11 +35338,10 @@ router2.post("/auth/login", async (req, res) => {
         userCategory: profile?.userCategory || profile?.role || "student",
         institution: profile?.institution || null,
         status: profile?.status || "active",
-        createdAt: profile.createdAt || (/* @__PURE__ */ new Date()).toISOString()
+        createdAt: profile?.createdAt || (/* @__PURE__ */ new Date()).toISOString()
       }
     });
-  } catch (err) {
-    console.error("Login error:", err);
+  } catch (outerErr) {
     const demoUser2 = getDemoUserByEmail2(email);
     if (demoUser2) {
       res.status(401).json({ error: "Invalid credentials" });
@@ -35304,7 +35352,7 @@ router2.post("/auth/login", async (req, res) => {
       res.status(401).json({ error: "Invalid credentials" });
       return;
     }
-    const valid = password && jsonUser.passwordHash ? await bcryptjs_default.compare(password, jsonUser.passwordHash) : false;
+    const valid = await bcryptjs_default.compare(password, jsonUser.passwordHash);
     if (!valid) {
       res.status(401).json({ error: "Invalid credentials" });
       return;
@@ -35330,23 +35378,26 @@ router2.post("/auth/login", async (req, res) => {
   }
 });
 router2.post("/auth/register", async (req, res) => {
-  const { name, email, password, role, userCategory, institution, purpose, idToken } = req.body;
-  if (!name || !role && !userCategory || !idToken && (!email || !password)) {
-    res.status(400).json({ error: "Name, credentials, and user role/category are required" });
+  const { name, email, password, role, institution, purpose, idToken } = req.body;
+  if (!name || !role || !idToken && (!email || !password)) {
+    res.status(400).json({ error: "Name, role, and credentials are required" });
     return;
   }
   try {
-    if (!isFirebaseConfigured()) {
-      throw new Error("Firebase not configured");
-    }
-    const auth = getFirebaseAuth();
     let uid = "";
     let resolvedEmail = email;
     if (idToken) {
-      const decoded = await auth.verifyIdToken(idToken);
+      let decoded;
+      try {
+        const auth = getFirebaseAuth();
+        decoded = await auth.verifyIdToken(idToken);
+      } catch {
+        decoded = await verifyIdTokenRestFallback(idToken);
+      }
       uid = decoded.uid;
       resolvedEmail = decoded.email || resolvedEmail;
     } else {
+      const auth = getFirebaseAuth();
       const created = await auth.createUser({
         email,
         password,
@@ -35355,7 +35406,12 @@ router2.post("/auth/register", async (req, res) => {
       uid = created.uid;
       resolvedEmail = created.email || resolvedEmail;
     }
-    const db = getFirestoreDb();
+    let db;
+    try {
+      db = getFirestoreDb();
+    } catch {
+      throw new Error("No Firestore DB");
+    }
     const existing = await db.collection("users").doc(uid).get();
     if (existing.exists) {
       res.status(400).json({ error: "User already registered" });
@@ -35366,8 +35422,8 @@ router2.post("/auth/register", async (req, res) => {
       id: uid,
       name,
       email: resolvedEmail || email,
-      role: role || "student",
-      userCategory: userCategory || role || "student",
+      role,
+      userCategory: role,
       institution: institution ?? null,
       purpose: purpose ?? null,
       status: "pending",
@@ -35375,44 +35431,13 @@ router2.post("/auth/register", async (req, res) => {
       updatedAt: now
     });
     res.status(201).json({ message: "Registration submitted. Awaiting admin approval." });
-  } catch (err) {
-    console.error("Firebase registration failed, falling back to JSON store:", err);
-    try {
-      const result = jsonStoreRegisterUser({ name, email, password, role: role || "student", userCategory: userCategory || role || "student", institution, purpose });
-      if (!result.ok) {
-        res.status(400).json({ error: result.error });
-        return;
-      }
-      res.status(201).json({ message: "Registration submitted. Awaiting admin approval." });
-    } catch (jsonErr) {
-      console.error("JSON store registration failed:", jsonErr);
-      res.status(500).json({ error: "Registration failed. Internal server error." });
-    }
-  }
-});
-router2.patch("/auth/me", requireAuth, async (req, res) => {
-  const { name, institution, purpose } = req.body;
-  try {
-    const db = getFirestoreDb();
-    const updateData = {};
-    if (name) updateData.name = name;
-    if (institution !== void 0) updateData.institution = institution;
-    if (purpose !== void 0) updateData.purpose = purpose;
-    updateData.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
-    await db.collection("users").doc(req.user.userId).update(updateData);
-    const snap = await db.collection("users").doc(req.user.userId).get();
-    res.json({ ...snap.data(), id: snap.id });
-  } catch (err) {
-    const jsonUser = jsonStoreGetUserById(req.user.userId);
-    if (!jsonUser) {
-      res.status(404).json({ error: "User not found" });
+  } catch {
+    const result = jsonStoreRegisterUser({ name, email, password, role, institution, purpose });
+    if (!result.ok) {
+      res.status(400).json({ error: result.error });
       return;
     }
-    if (name) jsonUser.name = name;
-    if (institution !== void 0) jsonUser.institution = institution;
-    if (purpose !== void 0) jsonUser.purpose = purpose;
-    jsonUser.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
-    res.json({ ...jsonUser });
+    res.status(201).json({ message: "Registration submitted. Awaiting admin approval." });
   }
 });
 router2.get("/auth/me", requireAuth, async (req, res) => {
@@ -35506,18 +35531,22 @@ var import_express4 = __toESM(require_express2(), 1);
 var import_express3 = __toESM(require_express2(), 1);
 var router3 = (0, import_express3.Router)();
 async function logAudit(data) {
-  const db = getFirestoreDb();
-  const id = generateId();
-  await db.collection("auditLogs").doc(id).set({
-    id,
-    action: data.action,
-    entityType: data.entityType,
-    entityId: data.entityId ?? null,
-    userId: data.userId ?? null,
-    userName: data.userName ?? null,
-    details: data.details ?? null,
-    createdAt: (/* @__PURE__ */ new Date()).toISOString()
-  });
+  try {
+    const db = getFirestoreDb();
+    const id = generateId();
+    await db.collection("auditLogs").doc(id).set({
+      id,
+      action: data.action,
+      entityType: data.entityType,
+      entityId: data.entityId ?? null,
+      userId: data.userId ?? null,
+      userName: data.userName ?? null,
+      details: data.details ?? null,
+      createdAt: (/* @__PURE__ */ new Date()).toISOString()
+    });
+  } catch (err) {
+    console.warn("Audit log skipped (fallback not configured):", data.action, err.message);
+  }
 }
 router3.get("/audit", requireAuth, requireRole("admin", "archivist"), async (req, res) => {
   const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -35532,7 +35561,7 @@ router3.get("/audit", requireAuth, requireRole("admin", "archivist"), async (req
     const pageItems = logs.slice(offset, offset + limit);
     res.json({ logs: pageItems, total, page, totalPages });
   } catch (err) {
-    res.json({ logs: [], total: 0, page, totalPages: 0 });
+    res.json({ logs: [], total: 0, page: 1, totalPages: 1 });
   }
 });
 var audit_default = router3;
@@ -35803,6 +35832,48 @@ router4.put("/materials/:id", requireAuth, async (req, res) => {
     res.json(updated);
   }
 });
+router4.patch("/materials/:id", requireAuth, async (req, res) => {
+  const user = req.user;
+  const id = String(req.params.id);
+  const body = req.body;
+  try {
+    const db = getFirestoreDb();
+    const snap = await db.collection("materials").doc(id).get();
+    if (!snap.exists) {
+      res.status(404).json({ error: "Material not found" });
+      return;
+    }
+    const m = snap.data();
+    await db.collection("materials").doc(id).update({
+      title: body.title ?? m.title,
+      altTitle: body.altTitle ?? m.altTitle ?? null,
+      creator: body.creator ?? m.creator ?? null,
+      description: body.description ?? m.description ?? null,
+      date: body.date ?? m.date ?? null,
+      categoryId: body.categoryId !== void 0 ? body.categoryId : m.categoryId,
+      access: body.access ?? m.access,
+      format: body.format ?? m.format ?? null,
+      fileSize: body.fileSize ?? m.fileSize ?? null,
+      pages: body.pages ?? m.pages ?? null,
+      language: body.language ?? m.language ?? null,
+      publisher: body.publisher ?? m.publisher ?? null,
+      fileUrl: body.fileUrl !== void 0 ? body.fileUrl : m.fileUrl ?? null,
+      thumbnailUrl: body.thumbnailUrl !== void 0 ? body.thumbnailUrl : m.thumbnailUrl ?? null,
+      status: body.status ?? m.status,
+      updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+    });
+    await logAudit({ action: "UPDATE_MATERIAL", entityType: "material", entityId: id, userId: user.userId, userName: user.name, details: `Updated material: ${m.title}` });
+    const updated = await db.collection("materials").doc(id).get();
+    res.json(formatMaterial({ id, ...updated.data() }));
+  } catch {
+    const updated = jsonStoreUpdateMaterial(id, body, { userId: user.userId, name: user.name });
+    if (!updated) {
+      res.status(404).json({ error: "Material not found" });
+      return;
+    }
+    res.json(updated);
+  }
+});
 router4.delete("/materials/:id", requireAuth, async (req, res) => {
   const user = req.user;
   const id = String(req.params.id);
@@ -35901,6 +35972,38 @@ router5.post("/categories", requireAuth, requireRole("admin", "archivist"), asyn
   }
 });
 router5.put("/categories/:id", requireAuth, requireRole("admin", "archivist"), async (req, res) => {
+  const user = req.user;
+  const id = String(req.params.id);
+  const { name, description, level, parentId } = req.body;
+  try {
+    const db = getFirestoreDb();
+    const snap = await db.collection("categories").doc(id).get();
+    if (!snap.exists) {
+      res.status(404).json({ error: "Category not found" });
+      return;
+    }
+    const cat = snap.data();
+    await db.collection("categories").doc(id).update({
+      name: name ?? cat.name,
+      description: description ?? cat.description ?? null,
+      level: level ?? cat.level,
+      parentId: parentId ?? cat.parentId ?? null,
+      updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+    });
+    await logAudit({ action: "UPDATE_CATEGORY", entityType: "category", entityId: id, userId: user.userId, userName: user.name, details: `Updated category: ${name}` });
+    const countSnap = await db.collection("materials").where("categoryId", "==", id).count().get();
+    const updated = await db.collection("categories").doc(id).get();
+    res.json({ id, ...updated.data(), materialCount: Number(countSnap.data().count) });
+  } catch {
+    const updated = jsonStoreUpdateCategory({ id, name, description, level, parentId });
+    if (!updated) {
+      res.status(404).json({ error: "Category not found" });
+      return;
+    }
+    res.json(updated);
+  }
+});
+router5.patch("/categories/:id", requireAuth, requireRole("admin", "archivist"), async (req, res) => {
   const user = req.user;
   const id = String(req.params.id);
   const { name, description, level, parentId } = req.body;
@@ -36216,14 +36319,10 @@ var users_default = router7;
 var import_express8 = __toESM(require_express2(), 1);
 var router8 = (0, import_express8.Router)();
 router8.get("/announcements", async (_req, res) => {
-  try {
-    const db = getFirestoreDb();
-    const snap = await db.collection("announcements").orderBy("createdAt", "desc").get();
-    const announcements = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    res.json(announcements);
-  } catch (err) {
-    res.json([]);
-  }
+  const db = getFirestoreDb();
+  const snap = await db.collection("announcements").orderBy("createdAt", "desc").get();
+  const announcements = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  res.json(announcements);
 });
 router8.post("/announcements", requireAuth, requireRole("admin"), async (req, res) => {
   const user = req.user;

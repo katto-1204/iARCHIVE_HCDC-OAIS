@@ -611,17 +611,28 @@ export default function AdminMaterials() {
     });
   };
 
+  const [isDeleting, setIsDeleting] = React.useState(false);
+
   const confirmDeleteMaterial = async () => {
-    if (materialToDelete) {
-      const target = materials.find((m) => m.id === materialToDelete);
-      const updated = await deleteMaterial(materialToDelete);
-      setMaterials(updated);
-      addActivity({
-        user: me?.name || "Admin",
-        actionType: "delete",
-        description: `Deleted material: ${target?.title || materialToDelete}`
-      });
-      toast({ title: "Deleted", description: "Material removed from repository." });
+    if (materialToDelete && !isDeleting) {
+      setIsDeleting(true);
+      try {
+        const target = materials.find((m) => m.id === materialToDelete);
+        // Defer heavy work to next frame to avoid blocking UI
+        await new Promise((r) => requestAnimationFrame(r));
+        const updated = await deleteMaterial(materialToDelete);
+        setMaterials(updated);
+        addActivity({
+          user: me?.name || "Admin",
+          actionType: "delete",
+          description: `Deleted material: ${target?.title || materialToDelete}`
+        });
+        toast({ title: "Deleted", description: "Material removed from repository." });
+      } catch (err) {
+        toast({ title: "Error", description: "Failed to delete material.", variant: "destructive" });
+      } finally {
+        setIsDeleting(false);
+      }
     }
     setDeleteDialogOpen(false);
     setMaterialToDelete(null);
@@ -629,8 +640,12 @@ export default function AdminMaterials() {
 
   const handleDeleteMaterial = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setMaterialToDelete(id);
-    setDeleteDialogOpen(true);
+    e.preventDefault();
+    // Defer state update to next tick to avoid blocking click handler
+    requestAnimationFrame(() => {
+      setMaterialToDelete(id);
+      setDeleteDialogOpen(true);
+    });
   };
 
   const handleEditMaterial = (mat: ArchivalMaterial, e: React.MouseEvent) => {

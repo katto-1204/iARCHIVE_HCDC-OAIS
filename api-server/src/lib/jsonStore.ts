@@ -645,7 +645,7 @@ export function jsonStoreGetUserById(id: string) {
 export function jsonStoreRegisterUser(input: {
   name: string;
   email: string;
-  password: string;
+  password?: string;
   role: string;
   userCategory?: string;
   institution?: string;
@@ -658,7 +658,7 @@ export function jsonStoreRegisterUser(input: {
   }
 
   const now = new Date().toISOString();
-  const passwordHash = hashSync(input.password, 12);
+  const passwordHash = input.password ? hashSync(input.password, 12) : "";
   const id = generateId();
   const user: JsonUser = {
     id,

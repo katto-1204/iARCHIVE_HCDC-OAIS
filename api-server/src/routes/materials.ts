@@ -261,6 +261,44 @@ router.put("/materials/:id", requireAuth, async (req, res) => {
   }
 });
 
+// PATCH alias for partial updates
+router.patch("/materials/:id", requireAuth, async (req, res) => {
+  const user = req.user!;
+  const id = String(req.params.id);
+  const body = req.body;
+  try {
+    const db = getFirestoreDb();
+    const snap = await db.collection("materials").doc(id).get();
+    if (!snap.exists) { res.status(404).json({ error: "Material not found" }); return; }
+    const m = snap.data() as any;
+    await db.collection("materials").doc(id).update({
+      title: body.title ?? m.title,
+      altTitle: body.altTitle ?? m.altTitle ?? null,
+      creator: body.creator ?? m.creator ?? null,
+      description: body.description ?? m.description ?? null,
+      date: body.date ?? m.date ?? null,
+      categoryId: body.categoryId !== undefined ? body.categoryId : m.categoryId,
+      access: body.access ?? m.access,
+      format: body.format ?? m.format ?? null,
+      fileSize: body.fileSize ?? m.fileSize ?? null,
+      pages: body.pages ?? m.pages ?? null,
+      language: body.language ?? m.language ?? null,
+      publisher: body.publisher ?? m.publisher ?? null,
+      fileUrl: body.fileUrl !== undefined ? body.fileUrl : m.fileUrl ?? null,
+      thumbnailUrl: body.thumbnailUrl !== undefined ? body.thumbnailUrl : m.thumbnailUrl ?? null,
+      status: body.status ?? m.status,
+      updatedAt: new Date().toISOString(),
+    });
+    await logAudit({ action: "UPDATE_MATERIAL", entityType: "material", entityId: id, userId: user.userId, userName: user.name, details: `Updated material: ${m.title}` });
+    const updated = await db.collection("materials").doc(id).get();
+    res.json(formatMaterial({ id, ...updated.data() }));
+  } catch {
+    const updated = jsonStoreUpdateMaterial(id, body, { userId: user.userId, name: user.name });
+    if (!updated) { res.status(404).json({ error: "Material not found" }); return; }
+    res.json(updated);
+  }
+});
+
 router.delete("/materials/:id", requireAuth, async (req, res) => {
   const user = req.user!;
   const id = String(req.params.id);

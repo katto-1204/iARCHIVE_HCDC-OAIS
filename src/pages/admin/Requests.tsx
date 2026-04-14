@@ -35,21 +35,26 @@ export default function AdminRequests() {
   };
 
   const handleReject = (id: string) => {
-    const reason = prompt("Enter rejection reason:");
-    if (reason !== null) {
-      setActionId(id);
-      reject({ id, data: { reason } }, {
-        onSuccess: () => {
-          toast({ title: "Rejected", description: "Request denied." });
-          refetch();
-          setActionId(null);
-        },
-        onError: () => {
-          toast({ title: "Rejection Failed", description: "Could not reject this request.", variant: "destructive" });
-          setActionId(null);
-        }
-      });
-    }
+    setActionId(id);
+    // Use setTimeout to avoid blocking the main thread (prompt is synchronous)
+    setTimeout(() => {
+      const reason = prompt("Enter rejection reason:");
+      if (reason !== null) {
+        reject({ id, data: { reason } }, {
+          onSuccess: () => {
+            toast({ title: "Rejected", description: "Request denied." });
+            refetch();
+            setActionId(null);
+          },
+          onError: () => {
+            toast({ title: "Rejection Failed", description: "Could not reject this request.", variant: "destructive" });
+            setActionId(null);
+          }
+        });
+      } else {
+        setActionId(null);
+      }
+    }, 50);
   };
 
   const handleApproveIngest = async (id: string) => {
@@ -152,7 +157,12 @@ export default function AdminRequests() {
           </TableHeader>
           <TableBody>
             {mode === "access" && isLoading ? (
-              <TableRow><TableCell colSpan={6} className="text-center h-24">Loading...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="text-center h-24">
+                <div className="flex items-center justify-center gap-3">
+                  <span className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                  <span className="text-muted-foreground">Loading requests...</span>
+                </div>
+              </TableCell></TableRow>
             ) : mode === "access" && accessRequests.length === 0 ? (
               <TableRow><TableCell colSpan={6} className="text-center h-24 text-muted-foreground">No {tab} requests found.</TableCell></TableRow>
             ) : mode === "ingest" && filteredIngest.length === 0 ? (

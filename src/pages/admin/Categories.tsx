@@ -20,10 +20,11 @@ interface CategoryNode {
 
 export default function AdminCategories() {
   const { data: categories, isLoading, refetch } = useGetCategories();
-  const { mutate: create } = useCreateCategory();
-  const { mutate: update } = useUpdateCategory();
-  const { mutate: remove } = useDeleteCategory();
+  const { mutate: create, isPending: isCreating } = useCreateCategory();
+  const { mutate: update, isPending: isUpdating } = useUpdateCategory();
+  const { mutate: remove, isPending: isRemoving } = useDeleteCategory();
   const { toast } = useToast();
+  const isMutating = isCreating || isUpdating || isRemoving;
 
   const [search, setSearch] = React.useState("");
   
@@ -292,8 +293,8 @@ export default function AdminCategories() {
               </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
-              <Button onClick={handleCreate} disabled={!newName.trim()} className="gap-2 sm:w-auto w-full px-6">
-                <Save className="w-4 h-4" /> Save {addLevel}
+              <Button onClick={handleCreate} disabled={!newName.trim() || isCreating} className="gap-2 sm:w-auto w-full px-6">
+                {isCreating ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save className="w-4 h-4" />} {isCreating ? 'Saving...' : `Save ${addLevel}`}
               </Button>
               <Button variant="ghost" onClick={() => setIsAdding(false)} className="sm:w-auto w-full">
                 <X className="w-4 h-4 mr-1" /> Cancel
@@ -313,7 +314,10 @@ export default function AdminCategories() {
         </div>
 
         {isLoading ? (
-          <div className="h-32 flex items-center justify-center text-muted-foreground">Loading structural data...</div>
+          <div className="h-32 flex flex-col items-center justify-center text-muted-foreground gap-3">
+            <span className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+            <span className="text-sm">Loading structural data...</span>
+          </div>
         ) : categoryTree.length === 0 ? (
           <div className="py-16 text-center">
             <div className="w-16 h-16 rounded-3xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
@@ -340,8 +344,10 @@ export default function AdminCategories() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setDeleteDialog(null)}>Cancel</Button>
-            <Button className="bg-red-600 text-white hover:bg-red-700" onClick={confirmDelete}>Delete</Button>
+            <Button variant="ghost" onClick={() => setDeleteDialog(null)} disabled={isRemoving}>Cancel</Button>
+            <Button className="bg-red-600 text-white hover:bg-red-700" onClick={confirmDelete} disabled={isRemoving}>
+              {isRemoving ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />Deleting...</> : 'Delete'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

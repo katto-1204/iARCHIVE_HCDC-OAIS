@@ -85,6 +85,34 @@ router.put("/categories/:id", requireAuth, requireRole("admin", "archivist"), as
   }
 });
 
+// PATCH alias — the frontend sends PATCH for category updates
+router.patch("/categories/:id", requireAuth, requireRole("admin", "archivist"), async (req, res) => {
+  const user = req.user!;
+  const id = String(req.params.id);
+  const { name, description, level, parentId } = req.body;
+  try {
+    const db = getFirestoreDb();
+    const snap = await db.collection("categories").doc(id).get();
+    if (!snap.exists) { res.status(404).json({ error: "Category not found" }); return; }
+    const cat = snap.data() as any;
+    await db.collection("categories").doc(id).update({
+      name: name ?? cat.name,
+      description: description ?? cat.description ?? null,
+      level: level ?? cat.level,
+      parentId: parentId ?? cat.parentId ?? null,
+      updatedAt: new Date().toISOString(),
+    });
+    await logAudit({ action: "UPDATE_CATEGORY", entityType: "category", entityId: id, userId: user.userId, userName: user.name, details: `Updated category: ${name}` });
+    const countSnap = await db.collection("materials").where("categoryId", "==", id).count().get();
+    const updated = await db.collection("categories").doc(id).get();
+    res.json({ id, ...updated.data(), materialCount: Number(countSnap.data().count) });
+  } catch {
+    const updated = jsonStoreUpdateCategory({ id, name, description, level, parentId });
+    if (!updated) { res.status(404).json({ error: "Category not found" }); return; }
+    res.json(updated);
+  }
+});
+
 router.delete("/categories/:id", requireAuth, requireRole("admin"), async (req, res) => {
   const user = req.user!;
   const id = String(req.params.id);

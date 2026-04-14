@@ -4,31 +4,40 @@ import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import fs from "fs";
 import path from "path";
 
+let _firebaseInitialized = false;
+let _firebaseInitError: string | null = null;
+
 function getServiceAccountJson() {
   const raw = process.env["FIREBASE_SERVICE_ACCOUNT_JSON"];
   if (raw) {
     try {
       return JSON.parse(raw);
     } catch {
-      throw new Error("Invalid FIREBASE_SERVICE_ACCOUNT_JSON");
+      console.error("Invalid FIREBASE_SERVICE_ACCOUNT_JSON — ignoring");
     }
   }
-  const path = process.env["FIREBASE_SERVICE_ACCOUNT_PATH"];
-  if (!path) return null;
-  try {
-    const resolvedPath = pathResolve(path);
-    if (!fs.existsSync(resolvedPath)) {
-      throw new Error(`Service account file not found: ${resolvedPath}`);
-    }
-    const fileRaw = fs.readFileSync(resolvedPath, "utf8");
-    return JSON.parse(fileRaw);
-  } catch {
-    throw new Error("Invalid service account JSON file");
-  }
-}
+  
+  // Try FIREBASE_SERVICE_ACCOUNT_PATH or local service-account.json
+  const possiblePaths = [
+    process.env["FIREBASE_SERVICE_ACCOUNT_PATH"],
+    path.join(process.cwd(), "service-account.json"),
+    path.join(process.cwd(), "api-server", "service-account.json"),
+  ].filter(Boolean) as string[];
 
-function pathResolve(inputPath: string) {
-  return path.resolve(inputPath);
+  for (const saPath of possiblePaths) {
+    try {
+      const resolvedPath = path.resolve(saPath);
+      if (fs.existsSync(resolvedPath)) {
+        const fileRaw = fs.readFileSync(resolvedPath, "utf8");
+        return JSON.parse(fileRaw);
+      }
+    } catch {
+      // Ignore parse errors from files and try the next path
+    }
+  }
+
+  console.warn("No valid service account JSON found — falling back to JSON store where handled");
+  return null;
 }
 
 function getProjectId() {
@@ -36,21 +45,35 @@ function getProjectId() {
 }
 
 export function ensureFirebaseApp() {
-  if (getApps().length > 0) return;
+  if (_firebaseInitError) {
+    throw new Error(_firebaseInitError);
+  }
+  if (_firebaseInitialized || getApps().length > 0) {
+    _firebaseInitialized = true;
+    return;
+  }
+
   const projectId = getProjectId();
   const serviceAccount = getServiceAccountJson();
 
-  if (!projectId) {
-    throw new Error("Missing FIREBASE_PROJECT_ID (or FIREBASE_SERVICE_ACCOUNT_JSON with project_id)");
-  }
-  if (!serviceAccount) {
-    throw new Error("Missing FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_SERVICE_ACCOUNT_PATH");
+  if (!projectId || !serviceAccount) {
+    _firebaseInitError = "Firebase not configured — missing FIREBASE_PROJECT_ID or service account credentials. Using JSON file storage fallback.";
+    console.warn(_firebaseInitError);
+    throw new Error(_firebaseInitError);
   }
 
-  initializeApp({
-    credential: cert(serviceAccount),
-    projectId,
-  });
+  try {
+    initializeApp({
+      credential: cert(serviceAccount),
+      projectId,
+    });
+    _firebaseInitialized = true;
+    console.log("Firebase Admin initialized successfully for project:", projectId);
+  } catch (err: any) {
+    _firebaseInitError = `Firebase init failed: ${err.message}`;
+    console.error(_firebaseInitError);
+    throw new Error(_firebaseInitError);
+  }
 }
 
 export function getFirestoreDb() {
@@ -61,6 +84,15 @@ export function getFirestoreDb() {
 export function getFirebaseAuth() {
   ensureFirebaseApp();
   return getAuth();
+}
+
+export function isFirebaseAvailable(): boolean {
+  try {
+    ensureFirebaseApp();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export { Timestamp };

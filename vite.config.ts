@@ -131,21 +131,63 @@ function mockAuthPlugin(): Plugin {
 
         res.setHeader("Content-Type", "application/json");
 
-        // User Management (Admin)
+        // User Management (Admin) — merge all user stores
         if (url.startsWith("/users")) {
+          const idActionMatch = url.match(/^\/users\/([^/]+)\/(approve|reject)/);
+          if (idActionMatch && method === "POST") {
+            const [_, uid, action] = idActionMatch;
+            // Search in pendingAccounts first, then active users
+            const pidx = pendingAccounts.findIndex(u => u.id === uid);
+            if (pidx >= 0) {
+              if (action === "approve") {
+                const u = pendingAccounts.splice(pidx, 1)[0];
+                users.push({ ...u, status: "active", role: u.role || "student" });
+              } else {
+                pendingAccounts[pidx].status = "rejected";
+              }
+              res.end(JSON.stringify({ message: "Success" }));
+              return;
+            }
+            const uidx = users.findIndex(u => u.id === uid);
+            if (uidx >= 0) {
+              if (action === "approve") {
+                users[uidx].status = "active";
+              } else {
+                users[uidx].status = "rejected";
+              }
+              res.end(JSON.stringify({ message: "Success" }));
+              return;
+            }
+            res.statusCode = 404; res.end(JSON.stringify({ error: "Not found" }));
+            return;
+          }
+
+          // DELETE /users/:id
+          const deleteMatch = url.match(/^\/users\/([^/?]+)$/);
+          if (method === "DELETE" && deleteMatch) {
+            const uid = deleteMatch[1];
+            const pidx = pendingAccounts.findIndex(u => u.id === uid);
+            if (pidx >= 0) { pendingAccounts.splice(pidx, 1); res.end(JSON.stringify({ message: "Deleted" })); return; }
+            const uidx = users.findIndex(u => u.id === uid);
+            if (uidx >= 0) { users.splice(uidx, 1); res.end(JSON.stringify({ message: "Deleted" })); return; }
+            res.statusCode = 404; res.end(JSON.stringify({ error: "Not found" })); return;
+          }
+
           const parsedUrl = new URL(req.url || "", "http://localhost/");
           const statusFilter = parsedUrl.searchParams.get("status");
           
-          if (statusFilter === "pending") {
-            res.end(JSON.stringify({ users: pendingAccounts.filter(p => !statusFilter || p.status === statusFilter) }));
-            return;
-          }
-          
-          res.end(JSON.stringify({ users: users.filter(u => !statusFilter || u.status === statusFilter) }));
+          // Merge all users from different stores for listing
+          const allUsers = [
+            ...users.map(u => ({ ...u, status: u.status || "active" })),
+            ...pendingAccounts,
+          ];
+          const deduped = Array.from(new Map(allUsers.map(u => [u.id, u])).values());
+          const filtered = statusFilter ? deduped.filter(u => u.status === statusFilter) : deduped;
+          res.end(JSON.stringify({ users: filtered }));
           return;
         }
 
-        // Catch-all for approve/reject user
+        // Legacy admin approve/reject endpoint (kept for compat but users route handles it now)
         const userActionMatch = url.match(/^\/admin\/(approve|reject)-user/);
         if (userActionMatch) {
           let body = ""; req.on("data", (c) => (body += c.toString()));
@@ -153,13 +195,13 @@ function mockAuthPlugin(): Plugin {
             try {
               const { id } = JSON.parse(body);
               const action = userActionMatch[1];
-              const idx = pendingAccounts.findIndex(u => u.id === id);
-              if (idx >= 0) {
+              const pidx = pendingAccounts.findIndex(u => u.id === id);
+              if (pidx >= 0) {
                 if (action === "approve") {
-                  const u = pendingAccounts.splice(idx, 1)[0];
-                  users.push({ ...u, id: `user-${Date.now()}`, status: "active", role: u.role || "student" });
+                  const u = pendingAccounts.splice(pidx, 1)[0];
+                  users.push({ ...u, status: "active", role: u.role || "student" });
                 } else {
-                  pendingAccounts[idx].status = "rejected";
+                  pendingAccounts[pidx].status = "rejected";
                 }
                 res.end(JSON.stringify({ message: "Success" }));
               } else {
@@ -173,15 +215,25 @@ function mockAuthPlugin(): Plugin {
         // Material Requests Management
         if (url.startsWith("/requests")) {
           const idActionMatch = url.match(/^\/requests\/([^/]+)\/(approve|reject)/);
-          if (idActionMatch) {
+          if (idActionMatch && method === "POST") {
             const [_, id, action] = idActionMatch;
-            const reqIdx = materialRequests.findIndex(r => r.id === id);
-            if (reqIdx >= 0) {
-              materialRequests[reqIdx].status = action === "approve" ? "approved" : "rejected";
-              res.end(JSON.stringify({ message: "Success" }));
-            } else {
-              res.statusCode = 404; res.end(JSON.stringify({ error: "Not found" }));
-            }
+            let body = ""; req.on("data", (c) => (body += c.toString()));
+            req.on("end", () => {
+              const reqIdx = materialRequests.findIndex(r => r.id === id);
+              if (reqIdx >= 0) {
+                materialRequests[reqIdx].status = action === "approve" ? "approved" : "rejected";
+                materialRequests[reqIdx].updatedAt = new Date().toISOString();
+                if (action === "reject") {
+                  try {
+                    const parsed = JSON.parse(body);
+                    materialRequests[reqIdx].rejectionReason = parsed.reason || "No reason provided";
+                  } catch { materialRequests[reqIdx].rejectionReason = "No reason provided"; }
+                }
+                res.end(JSON.stringify({ message: "Success", request: materialRequests[reqIdx] }));
+              } else {
+                res.statusCode = 404; res.end(JSON.stringify({ error: "Not found" }));
+              }
+            });
             return;
           }
 

@@ -39,6 +39,28 @@ async function signInWithPassword(email: string, password: string) {
   return (await res.json()) as { idToken: string };
 }
 
+async function verifyIdTokenRestFallback(idToken: string) {
+  const apiKey = process.env["FIREBASE_API_KEY"];
+  if (!apiKey) {
+    throw new Error("Missing FIREBASE_API_KEY for token lookup");
+  }
+  const res = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken }),
+    },
+  );
+  if (!res.ok) {
+    throw new Error("Invalid idToken via REST");
+  }
+  const data = await res.json();
+  const user = data.users?.[0];
+  if (!user) throw new Error("No user found for idToken");
+  return { uid: user.localId, email: user.email, name: user.displayName };
+}
+
 router.post("/auth/login", async (req, res) => {
   const { email, password, idToken } = req.body;
   if ((!email || !password) && !idToken) {
@@ -68,7 +90,6 @@ router.post("/auth/login", async (req, res) => {
   }
 
   try {
-    const auth = getFirebaseAuth();
     let firebaseToken = idToken as string | undefined;
     if (!firebaseToken && email && password) {
       const result = await signInWithPassword(email, password);
@@ -78,32 +99,58 @@ router.post("/auth/login", async (req, res) => {
       res.status(401).json({ error: "Invalid credentials" });
       return;
     }
-    const decoded = await auth.verifyIdToken(firebaseToken);
-    const db = getFirestoreDb();
-    const profileSnap = await db.collection("users").doc(decoded.uid).get();
+    
+    let decoded: { uid: string, email?: string, name?: string };
+    try {
+      const auth = getFirebaseAuth();
+      decoded = await auth.verifyIdToken(firebaseToken);
+    } catch {
+      decoded = await verifyIdTokenRestFallback(firebaseToken);
+    }
+    
     let profile: any = null;
-    if (!profileSnap.exists) {
-      const now = new Date().toISOString();
-      profile = {
-        id: decoded.uid,
-        name: decoded.name || decoded.email || "User",
-        email: decoded.email || "",
-        role: "student",
-        userCategory: "student",
-        institution: null,
-        purpose: null,
-        status: "active",
-        createdAt: now,
-        updatedAt: now,
-      };
-      await db.collection("users").doc(decoded.uid).set(profile, { merge: true });
-    } else {
-      profile = profileSnap.data() as any;
+    try {
+      const db = getFirestoreDb();
+      const profileSnap = await db.collection("users").doc(decoded.uid).get();
+      if (!profileSnap.exists) {
+        const now = new Date().toISOString();
+        profile = {
+          id: decoded.uid,
+          name: decoded.name || decoded.email || "User",
+          email: decoded.email || "",
+          role: "student",
+          userCategory: "student",
+          institution: null,
+          purpose: null,
+          status: "pending", // Fixed: Default to pending for admin approval
+          createdAt: now,
+          updatedAt: now,
+        };
+        await db.collection("users").doc(decoded.uid).set(profile, { merge: true });
+        res.status(403).json({ error: "Account is not active. Please wait for approval." });
+        return;
+      } else {
+        profile = profileSnap.data() as any;
+        if (profile.status !== "active") {
+          res.status(403).json({ error: "Account is not active. Please wait for approval." });
+          return;
+        }
+      }
+    } catch {
+      // Firebase DB failed (SA error). Let's check jsonStore for approval state.
+      profile = jsonStoreGetUserByEmail(decoded.email || email);
+      if (!profile) {
+        // If they don't even exist in the JSON store fallback, they are unapproved.
+        res.status(403).json({ error: "Account profile missing or not active. Please wait for approval." });
+        return;
+      }
       if (profile.status !== "active") {
         res.status(403).json({ error: "Account is not active. Please wait for approval." });
         return;
       }
+      // Validated active JSON fallback user
     }
+
     res.json({
       token: firebaseToken,
       user: {
@@ -114,10 +161,10 @@ router.post("/auth/login", async (req, res) => {
         userCategory: profile?.userCategory || profile?.role || "student",
         institution: profile?.institution || null,
         status: profile?.status || "active",
-        createdAt: profile.createdAt || new Date().toISOString(),
+        createdAt: profile?.createdAt || new Date().toISOString(),
       },
     });
-  } catch {
+  } catch (outerErr) {
     // If it's one of the demo accounts, never attempt bcrypt compare
     // with an absent/blank DB password hash.
     const demoUser = getDemoUserByEmail(email);
@@ -165,14 +212,21 @@ router.post("/auth/register", async (req, res) => {
     return;
   }
   try {
-    const auth = getFirebaseAuth();
     let uid = "";
     let resolvedEmail = email as string | undefined;
+    
     if (idToken) {
-      const decoded = await auth.verifyIdToken(idToken);
+      let decoded: { uid: string, email?: string, name?: string };
+      try {
+        const auth = getFirebaseAuth();
+        decoded = await auth.verifyIdToken(idToken);
+      } catch {
+        decoded = await verifyIdTokenRestFallback(idToken);
+      }
       uid = decoded.uid;
       resolvedEmail = decoded.email || resolvedEmail;
     } else {
+      const auth = getFirebaseAuth();
       const created = await auth.createUser({
         email,
         password,
@@ -182,7 +236,12 @@ router.post("/auth/register", async (req, res) => {
       resolvedEmail = created.email || resolvedEmail;
     }
 
-    const db = getFirestoreDb();
+    let db;
+    try {
+      db = getFirestoreDb();
+    } catch {
+      throw new Error("No Firestore DB");
+    }
     const existing = await db.collection("users").doc(uid).get();
     if (existing.exists) {
       res.status(400).json({ error: "User already registered" });
