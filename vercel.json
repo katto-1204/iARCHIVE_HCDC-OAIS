@@ -13,13 +13,7 @@
   ],
   "functions": {
     "api/index.ts": {
-      "includeFiles": [
-        "categories.json",
-        "materials.json",
-        "users.json",
-        "users copy.json",
-        "access_requests.json"
-      ]
+      "includeFiles": "*.json"
     }
   }
 }
