@@ -17,16 +17,23 @@ function getServiceAccountJson() {
       
       const sa = JSON.parse(sanitizedRaw);
       if (sa.private_key && typeof sa.private_key === "string") {
-        // Fix potential escaped newline issues in env vars
-        sa.private_key = sa.private_key.replace(/\\n/g, "\n");
-        // Also handle double-escaped actual backslashes if present
-        sa.private_key = sa.private_key.replace(/\\/g, "\n").replace(/\n"/g, '"'); 
-        // Better: standard approach for private keys
-        if (!sa.private_key.includes("\n") && sa.private_key.includes("-----BEGIN PRIVATE KEY-----")) {
-             // If it has no newlines but is long, it's definitely escaped
-             sa.private_key = sa.private_key.split("-----BEGIN PRIVATE KEY-----")[1].split("-----END PRIVATE KEY-----")[0].trim().replace(/\s/g, "\n");
-             sa.private_key = `-----BEGIN PRIVATE KEY-----\n${sa.private_key}\n-----END PRIVATE KEY-----`;
+        // Standard Firebase Private Key repair for Environment Variables
+        // 1. Handle literal "\n" strings that JSON.parse might have missed or were double-escaped
+        let key = sa.private_key.replace(/\\n/g, "\n");
+        
+        // 2. If it's a single line with no newlines but HAS the headers, it needs re-formatting
+        if (!key.includes("\n") && key.includes("-----BEGIN PRIVATE KEY-----")) {
+          // Extract the base64 part
+          const match = key.match(/-----BEGIN PRIVATE KEY-----([^-]+)-----END PRIVATE KEY-----/);
+          if (match) {
+             const base64 = match[1].replace(/\s/g, "");
+             // Break it into 64-character lines as expected by some parsers
+             const lines = base64.match(/.{1,64}/g) || [];
+             key = `-----BEGIN PRIVATE KEY-----\n${lines.join("\n")}\n-----END PRIVATE KEY-----\n`;
+          }
         }
+        
+        sa.private_key = key;
       }
       return sa;
     } catch (err: any) {

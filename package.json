@@ -6,6 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "node node_modules/vite/bin/vite.js --config vite.config.ts --host 0.0.0.0",
+    "dev:api": "cd api && npx tsx --watch src/index.ts",
+    "dev:all": "pnpm run dev & pnpm run dev:api",
     "build": "node node_modules/vite/bin/vite.js build --config vite.config.ts",
     "serve": "node node_modules/vite/bin/vite.js preview --config vite.config.ts --host 0.0.0.0",
     "typecheck": "tsc -p tsconfig.json --noEmit"
