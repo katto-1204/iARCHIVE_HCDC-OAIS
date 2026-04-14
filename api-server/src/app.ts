@@ -29,6 +29,9 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.get("/api/test", (req, res) => {
+  res.json({ message: "API is working", cwd: process.cwd(), node_env: process.env.NODE_ENV });
+});
 app.use("/api", router);
 // @ts-ignore
 app.use((err, req, res, next) => {
