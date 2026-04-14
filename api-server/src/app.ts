@@ -7,6 +7,11 @@ import { logger } from "./lib/logger.js";
 
 const app: Express = express();
 
+console.log("iArchive Backend Initializing...");
+console.log("NODE_ENV:", process.env.NODE_ENV);
+console.log("VERCEL:", process.env.VERCEL);
+console.log("PROJECT_ID:", process.env.FIREBASE_PROJECT_ID || "Not set");
+
 if (process.env.NODE_ENV !== "production") {
   app.use(
     pinoHttp({

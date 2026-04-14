@@ -11,9 +11,14 @@ function getServiceAccountJson() {
   const raw = process.env["FIREBASE_SERVICE_ACCOUNT_JSON"];
   if (raw) {
     try {
-      return JSON.parse(raw);
-    } catch {
-      console.error("Invalid FIREBASE_SERVICE_ACCOUNT_JSON — ignoring");
+      const sa = JSON.parse(raw);
+      if (sa.private_key && typeof sa.private_key === "string") {
+        // Fix potential escaped newline issues in env vars
+        sa.private_key = sa.private_key.replace(/\\n/g, "\n");
+      }
+      return sa;
+    } catch (err: any) {
+      console.error(`Invalid FIREBASE_SERVICE_ACCOUNT_JSON: ${err.message}`);
     }
   }
   
