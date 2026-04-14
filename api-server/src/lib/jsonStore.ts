@@ -4,8 +4,6 @@ import { fileURLToPath } from "url";
 import { generateId, generateMaterialId } from "./id.js";
 import { hashSync } from "bcryptjs";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
 type JsonCategory = {
   id: string;
   name: string;
@@ -120,7 +118,7 @@ function getDemoUserById(id?: string) {
   return DEMO_USERS.find((u) => u.id === id);
 }
 
-const DATA_BASE = path.resolve(__dirname, "..", "..", "..");
+const DATA_BASE = process.cwd();
 const CATEGORIES_PATH = path.join(DATA_BASE, "categories.json");
 const MATERIALS_PATH = path.join(DATA_BASE, "materials.json");
 const USERS_PATH = path.join(DATA_BASE, "users.json");
