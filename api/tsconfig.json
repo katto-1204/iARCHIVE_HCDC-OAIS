@@ -9,10 +9,10 @@
     "noEmit": false,
     "baseUrl": "..",
     "typeRoots": ["../node_modules/@types"],
-    "types": ["node", "express", "cors", "jsonwebtoken"],
+    "types": ["node", "express", "cors", "jsonwebtoken", "express-serve-static-core"],
     "paths": {
       "@/*": ["./src/*"]
     }
   },
-  "include": ["index.ts", "src/**/*.ts"]
+  "include": ["index.ts", "src/**/*.ts", "src/**/*.d.ts"]
 }
