@@ -2,7 +2,7 @@ import * as React from "react";
 import { format } from "date-fns";
 import { AdminLayout } from "@/components/layout";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Badge, Button, Input, Card, CardContent, CardHeader, CardTitle } from "@/components/ui-components";
-import { Search, UserCheck, UserX, Trash2, Users, Clock, ShieldCheck, Shield, Eye, Upload, Edit, Settings, UserPlus, FileText } from "lucide-react";
+import { Search, UserCheck, UserX, Trash2, Users, Clock, ShieldCheck, Shield, Eye, Upload, Edit, Settings, UserPlus, FileText, Loader2 } from "lucide-react";
 import { useGetUsers, useApproveUser, useRejectUser, useDeleteUser } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -294,7 +294,12 @@ export default function AdminUsers() {
                             onClick={() => handleDelete(user.id, user.name)}
                             disabled={isDeleting}
                           >
-                            <Trash2 className="w-3.5 h-3.5" /> {isDeleting ? "..." : "Remove"}
+                            {isDeleting ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-3.5 h-3.5" />
+                            )}
+                            Remove
                           </Button>
                         </>
                       )}
@@ -307,7 +312,12 @@ export default function AdminUsers() {
                             onClick={() => handleApprove(user.id)}
                             disabled={isApproving || isRejecting}
                           >
-                            <UserCheck className="w-3.5 h-3.5" /> {isApproving ? "..." : "Approve"}
+                            {isApproving ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <UserCheck className="w-3.5 h-3.5" />
+                            )}
+                            Approve
                           </Button>
                           <Button
                             size="sm"
@@ -316,7 +326,12 @@ export default function AdminUsers() {
                             onClick={() => handleReject(user.id)}
                             disabled={isApproving || isRejecting}
                           >
-                            <UserX className="w-3.5 h-3.5" /> {isRejecting ? "..." : "Reject"}
+                            {isRejecting ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <UserX className="w-3.5 h-3.5" />
+                            )}
+                            Reject
                           </Button>
                         </>
                       )}
@@ -465,14 +480,18 @@ export default function AdminUsers() {
                     variant="outline" 
                     className="flex-1 text-red-600 border-red-200 hover:bg-red-50 font-bold h-12 rounded-xl transition-all active:scale-[0.98]"
                     onClick={() => { handleReject(editingUser.id); setEditingUser(null); }}
+                    disabled={isRejecting}
                   >
-                    <UserX className="w-4 h-4 mr-2" /> Deny
+                    {isRejecting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <UserX className="w-4 h-4 mr-2" />}
+                    Deny
                   </Button>
                   <Button 
                     className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-12 rounded-xl shadow-lg shadow-emerald-600/20 transition-all active:scale-[0.98]"
                     onClick={() => { handleApprove(editingUser.id); setEditingUser(null); }}
+                    disabled={isApproving}
                   >
-                    <UserCheck className="w-4 h-4 mr-2" /> Approve
+                    {isApproving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <UserCheck className="w-4 h-4 mr-2" />}
+                    Approve
                   </Button>
                 </div>
               )}
@@ -540,9 +559,22 @@ export default function AdminUsers() {
               Are you sure you want to permanently remove {deleteDialog?.name}? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setDeleteDialog(null)}>Cancel</Button>
-            <Button className="bg-red-600 text-white hover:bg-red-700" onClick={confirmDelete}>Delete User</Button>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="ghost" onClick={() => setDeleteDialog(null)} disabled={isDeleting}>Cancel</Button>
+            <Button 
+              className="bg-red-600 text-white hover:bg-red-700 font-bold" 
+              onClick={confirmDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Removing...
+                </>
+              ) : (
+                "Delete User"
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

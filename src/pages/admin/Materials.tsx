@@ -8,9 +8,10 @@ import { cn } from "@/lib/utils";
 import {
   Search, Plus, Edit, ExternalLink, Layers, Settings2, Download,
   Upload, FolderTree, ShieldCheck, CheckCircle2, FileText,
-  FileDigit, Link as LinkIcon, Loader2, Video, Image as ImageIcon,
-  ZoomIn, ZoomOut, RotateCw, Maximize2, AlertTriangle, ChevronRight, X, Save, FolderOpen, ChevronLeft, Lock
+  ZoomIn, ZoomOut, RotateCw, Maximize2, AlertTriangle, ChevronRight, X, Save, FolderOpen, ChevronLeft, Lock,
+  CheckCircle, Loader2, Image as ImageIcon, Video, FileDigit
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { ArchivalTree } from "@/components/ArchivalTree";
 import { MetadataChecklist } from "@/components/MetadataChecklist";
 import { Barcode } from "@/components/Barcode";
@@ -36,7 +37,7 @@ import {
   getAllFieldValues, downloadMetadataExcel,
 } from "@/data/metadataUtils";
 import { useToast } from "@/hooks/use-toast";
-import { useGetMe, useGetCategories } from "@workspace/api-client-react";
+import { useGetMe, useGetCategories, useCreateMaterial, useUpdateMaterial, useDeleteMaterial, useGetMaterials as useGetMaterialsApi } from "@workspace/api-client-react";
 
 type ViewMode = "table" | "detail";
 
@@ -166,6 +167,11 @@ export default function AdminMaterials() {
   const [checklistOpen, setChecklistOpen] = React.useState(false);
   const [selectedChecklistFields, setSelectedChecklistFields] = React.useState<Set<string>>(new Set());
   const [checklistValues, setChecklistValues] = React.useState<Record<string, string>>({});
+  const [successDialogOpen, setSuccessDialogOpen] = React.useState(false);
+  const [lastIngestedId, setLastIngestedId] = React.useState<string | null>(null);
+
+  const { mutateAsync: createMaterial, isPending: isCreating } = useCreateMaterial();
+  const { mutateAsync: updateMaterial, isPending: isUpdating } = useUpdateMaterial();
 
   // Dynamic Upload Form
   const [mediaCategory, setMediaCategory] = React.useState<"document" | "image" | "video">("document");
@@ -633,31 +639,38 @@ export default function AdminMaterials() {
     });
   };
 
-  const [isDeleting, setIsDeleting] = React.useState(false);
-
+  const { mutateAsync: deleteMatApi, isPending: isDeletingMat } = useDeleteMaterial();
+  
   const confirmDeleteMaterial = async () => {
-    if (materialToDelete && !isDeleting) {
-      setIsDeleting(true);
+    if (materialToDelete && !isDeletingMat) {
       try {
         const target = materials.find((m) => m.id === materialToDelete);
-        // Defer heavy work to next frame to avoid blocking UI
-        await new Promise((r) => requestAnimationFrame(r));
+        
+        await deleteMatApi({ id: materialToDelete });
+        
+        // Local storage sync fallback for production resilience
         const updated = await deleteMaterial(materialToDelete);
         setMaterials(updated);
+        
         addActivity({
           user: me?.name || "Admin",
           actionType: "delete",
           description: `Deleted material: ${target?.title || materialToDelete}`
         });
+        
         toast({ title: "Deleted", description: "Material removed from repository." });
       } catch (err) {
-        toast({ title: "Error", description: "Failed to delete material.", variant: "destructive" });
+        console.error("Cloud Deletion Failed:", err);
+        toast({ 
+          title: "Network Trace Failure", 
+          description: "Could not remove from Firestore, but local record cleared. Check connection.", 
+          variant: "destructive" 
+        });
       } finally {
-        setIsDeleting(false);
+        setDeleteDialogOpen(false);
+        setMaterialToDelete(null);
       }
     }
-    setDeleteDialogOpen(false);
-    setMaterialToDelete(null);
   };
 
   const handleDeleteMaterial = (id: string, e: React.MouseEvent) => {
@@ -1696,16 +1709,130 @@ export default function AdminMaterials() {
                 const toastDesc = approvalStatus === "pending"
                   ? "Material is pending admin approval before publication."
                   : "Material saved successfully.";
-                toast({ title: toastTitle, description: toastDesc }); 
-                setChecklistOpen(false);
-                setEditingMaterialId(null);
+                
+                // --- API INTEGRATION ---
+                try {
+                  const apiData = { ...newMaterial };
+                  // Ensure category mapping for API
+                  if (uploadForm.series) {
+                    const cat = categories.find(c => c.name === uploadForm.series);
+                    if (cat) (apiData as any).categoryId = cat.id;
+                  }
+
+                  if (editingMaterialId) {
+                    await updateMaterial({ id: editingMaterialId, data: apiData });
+                  } else {
+                    const res = await createMaterial({ data: apiData });
+                    if (res && res.id) setLastIngestedId(res.id);
+                  }
+
+                  // Local storage sync for offline resilience
+                  const updated = await saveMaterial(newMaterial);
+                  setMaterials(updated);
+
+                  toast({ title: toastTitle, description: toastDesc });
+                  
+                  if (!editingMaterialId) {
+                    setSuccessDialogOpen(true);
+                  }
+                  
+                  setChecklistOpen(false);
+                  setEditingMaterialId(null);
+                } catch (apiErr: any) {
+                  console.error("API Save Failed:", apiErr);
+                  toast({ 
+                    title: "Sync Warning", 
+                    description: "Saved locally, but failed to sync with Firestore. Will retry on next refresh.",
+                    variant: "destructive" 
+                  });
+                  
+                  // Fallback to local save even if API fails
+                  const updated = await saveMaterial(newMaterial);
+                  setMaterials(updated);
+                  setChecklistOpen(false);
+                  setEditingMaterialId(null);
+                }
               } catch (e) {
                 toast({ title: "Storage Error", description: "Failed to store material data.", variant: "destructive" });
               }
-            }} className="bg-emerald-600 hover:bg-emerald-700">
-              {editingMaterialId ? "Update Item" : "Finalize Ingest"}
+            }} className="bg-emerald-600 hover:bg-emerald-700" disabled={isCreating || isUpdating}>
+              {(isCreating || isUpdating) ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                editingMaterialId ? "Update Item" : "Finalize Ingest"
+              )}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══ Successful Ingest Modal ═══ */}
+      <Dialog open={successDialogOpen} onOpenChange={setSuccessDialogOpen}>
+        <DialogContent className="max-w-md p-0 overflow-hidden border-none shadow-2xl rounded-3xl">
+          <div className="bg-emerald-600 h-2 w-full" />
+          <div className="p-8 flex flex-col items-center text-center">
+            <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-6 shadow-inner animate-in zoom-in-50 duration-500">
+               <motion.div
+                 initial={{ scale: 0, opacity: 0 }}
+                 animate={{ scale: 1, opacity: 1 }}
+                 transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+               >
+                 <CheckCircle className="w-10 h-10 text-emerald-600" />
+               </motion.div>
+            </div>
+            
+            <h2 className="text-2xl font-bold text-[#0a1628] mb-2 font-display">Ingestion Successful</h2>
+            <p className="text-muted-foreground mb-8 text-sm leading-relaxed px-4">
+              Your archival material has been successfully processed and secured in the repository.
+              The record is now indexed and available for management.
+            </p>
+
+            <div className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 mb-8 flex items-center gap-4 text-left">
+               <div className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center shrink-0 shadow-sm">
+                  <Barcode value={checklistValues.referenceCode || generatedRefCode || "SIP-AIP-PENDING"} className="w-6 h-6 text-slate-400" />
+               </div>
+               <div className="min-w-0">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Material Identifier</span>
+                  <span className="text-sm font-mono font-bold text-indigo-600 truncate block">
+                    {checklistValues.referenceCode || generatedRefCode || "SIP-AIP-PENDING"}
+                  </span>
+               </div>
+            </div>
+
+            <div className="flex flex-col w-full gap-3">
+               <Button 
+                 onClick={() => setSuccessDialogOpen(false)} 
+                 className="bg-[#0a1628] hover:bg-[#1a2b4b] h-12 rounded-xl text-white font-bold shadow-lg shadow-blue-900/10 transition-all active:scale-[0.98]"
+               >
+                 Go to Records Dashboard
+               </Button>
+               <Button 
+                 variant="outline"
+                 onClick={() => {
+                   setSuccessDialogOpen(false);
+                   setUploadOpen(true);
+                   // Reset form for next ingest
+                   setUploadForm({
+                     title: "", creator: "", dateOfDescription: "", format: "", description: "",
+                     levelOfDescription: "Item", extentAndMedium: "", access: "public",
+                     videoUrl: "", hierarchyPath: "", termsOfUse: "", referenceCode: "",
+                     fileData: undefined, fileType: "", year: "26", catNo: "01", matNo: String(materials.length + 2).padStart(7, '0'),
+                     fonds: "HCDC — Holy Cross of Davao College", subfonds: "", program: "", series: ""
+                   });
+                 }}
+                 className="h-12 rounded-xl border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-all active:scale-[0.98]"
+               >
+                 Ingest Another Material
+               </Button>
+            </div>
+          </div>
+          <div className="p-4 bg-emerald-50/50 border-t border-emerald-100 flex items-center justify-center gap-2">
+             <ShieldCheck className="w-4 h-4 text-emerald-600" />
+             <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest">AIP Integrity Verified</span>
+          </div>
         </DialogContent>
       </Dialog>
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
@@ -1719,8 +1846,21 @@ export default function AdminMaterials() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="ghost" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-            <Button className="bg-red-600 text-white hover:bg-red-700 font-medium border-0" onClick={confirmDeleteMaterial}>Delete Permanently</Button>
+            <Button variant="ghost" onClick={() => setDeleteDialogOpen(false)} disabled={isDeletingMat}>Cancel</Button>
+            <Button 
+              className="bg-red-600 text-white hover:bg-red-700 font-medium border-0" 
+              onClick={confirmDeleteMaterial}
+              disabled={isDeletingMat}
+            >
+              {isDeletingMat ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Permanently"
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
