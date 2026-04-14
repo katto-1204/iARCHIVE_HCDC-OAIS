@@ -55,28 +55,23 @@ export default function AdminUsers() {
   };
 
   const handleReject = (id: string) => {
-    const reason = prompt("Enter reason for rejection (optional):");
-    if (reason !== null) {
-      reject({ id }, {
-        onSuccess: () => {
-          toast({ title: "User Rejected", description: "The registration has been denied." });
-          refetch();
-        },
-        onError: () => toast({ title: "Error", description: "Failed to reject user.", variant: "destructive" })
-      });
-    }
+    reject({ id }, {
+      onSuccess: () => {
+        toast({ title: "User Rejected", description: "The registration has been denied." });
+        refetch();
+      },
+      onError: () => toast({ title: "Error", description: "Failed to reject user.", variant: "destructive" })
+    });
   };
 
   const handleDelete = (id: string, name: string) => {
-    if (confirm(`Permanently delete user "${name}"? This cannot be undone.`)) {
-      remove({ id }, {
-        onSuccess: () => {
-          toast({ title: "Deleted", description: "User has been removed." });
-          refetch();
-        },
-        onError: () => toast({ title: "Error", description: "Failed to delete user.", variant: "destructive" })
-      });
-    }
+    remove({ id }, {
+      onSuccess: () => {
+        toast({ title: "Deleted", description: "User has been removed." });
+        refetch();
+      },
+      onError: () => toast({ title: "Error", description: "Failed to delete user.", variant: "destructive" })
+    });
   };
 
   const openPermissions = (user: any) => {

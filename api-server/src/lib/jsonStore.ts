@@ -138,8 +138,13 @@ function safeReadJson<T>(filePath: string, fallback: T): T {
 }
 
 function safeWriteJson(filePath: string, value: unknown) {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+  try {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+  } catch (error: any) {
+    // On Vercel (read-only), we purely log and continue to let the app function in-memory
+    console.warn(`Could not save to ${filePath}:`, error.message);
+  }
 }
 
 function safeReadUserCopyRecords(): JsonUserCopyRecord[] {

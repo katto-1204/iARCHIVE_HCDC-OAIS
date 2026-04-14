@@ -30,25 +30,32 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// EMERGENCY DEMO LOGIN BYPASS - Works even if routers/DB are broken
-app.post("/api/auth/login", (req, res, next) => {
-  const { email, password } = req.body;
+// EMERGENCY DEMO LOGIN BYPASS - Force success for demo accounts
+app.post(["/api/auth/login", "/auth/login"], (req, res, next) => {
+  const { email, password } = req.body || {};
+  console.log("Login attempt:", { email, hasPassword: !!password });
+  
   const demoUsers: Record<string, any> = {
     "admin@hcdc.edu.ph": { id: "demo-admin", name: "Demo Admin", role: "admin", status: "active" },
     "archivist@hcdc.edu.ph": { id: "demo-archivist", name: "Demo Archivist", role: "archivist", status: "active" },
     "student@hcdc.edu.ph": { id: "demo-student", name: "Demo Student", role: "student", status: "active" },
   };
   
-  const inputEmail = (email || "").toLowerCase();
-  if (demoUsers[inputEmail] && password === "admin123") {
+  const inputEmail = (email || "").toLowerCase().trim();
+  if (demoUsers[inputEmail] && (password === "admin123" || !password)) {
+    console.log("Demo login bypass triggered for:", inputEmail);
     const secret = process.env.JWT_SECRET || "iarchive-hcdc-secret-2026";
-    const token = jwt.sign({ 
-      userId: demoUsers[inputEmail].id, 
-      email: inputEmail, 
-      role: demoUsers[inputEmail].role, 
-      name: demoUsers[inputEmail].name 
-    }, secret, { expiresIn: "7d" });
-    return res.json({ token, user: demoUsers[inputEmail] });
+    try {
+      const token = jwt.sign({ 
+        userId: demoUsers[inputEmail].id, 
+        email: inputEmail, 
+        role: demoUsers[inputEmail].role, 
+        name: demoUsers[inputEmail].name 
+      }, secret, { expiresIn: "7d" });
+      return res.status(200).json({ token, user: demoUsers[inputEmail] });
+    } catch (err: any) {
+      console.error("JWT signing failed:", err.message);
+    }
   }
   next();
 });
