@@ -118,7 +118,7 @@ function getDemoUserById(id?: string) {
   return DEMO_USERS.find((u) => u.id === id);
 }
 
-const DATA_BASE = process.cwd();
+const DATA_BASE = process.env.VERCEL ? process.cwd() : path.resolve(fileURLToPath(import.meta.url), "../../..");
 const CATEGORIES_PATH = path.join(DATA_BASE, "categories.json");
 const MATERIALS_PATH = path.join(DATA_BASE, "materials.json");
 const USERS_PATH = path.join(DATA_BASE, "users.json");
@@ -127,11 +127,16 @@ const ACCESS_REQUESTS_PATH = path.join(DATA_BASE, "access_requests.json");
 
 function safeReadJson<T>(filePath: string, fallback: T): T {
   try {
-    if (!fs.existsSync(filePath)) return fallback;
+    console.log(`Attempting to read JSON from: ${filePath}`);
+    if (!fs.existsSync(filePath)) {
+      console.warn(`File does not exist: ${filePath}`);
+      return fallback;
+    }
     const raw = fs.readFileSync(filePath, "utf8").trim();
     if (!raw) return fallback;
     return JSON.parse(raw) as T;
-  } catch {
+  } catch (error: any) {
+    console.error(`Error reading JSON from ${filePath}:`, error.message);
     return fallback;
   }
 }
