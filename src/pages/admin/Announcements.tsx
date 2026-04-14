@@ -4,6 +4,7 @@ import { AdminLayout } from "@/components/layout";
 import { Card, CardHeader, CardTitle, CardContent, Button, Input } from "@/components/ui-components";
 import { Plus, Megaphone, Trash2, X, Save, Eye, EyeOff } from "lucide-react";
 import { useGetAnnouncements, useCreateAnnouncement, useDeleteAnnouncement } from "@workspace/api-client-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 
 export default function AdminAnnouncements() {
@@ -16,6 +17,9 @@ export default function AdminAnnouncements() {
   const [title, setTitle] = React.useState("");
   const [content, setContent] = React.useState("");
   const [isActive, setIsActive] = React.useState(true);
+
+  // Deletion State
+  const [deleteDialog, setDeleteDialog] = React.useState<{id: string, title: string} | null>(null);
 
   const handleCreate = () => {
     if (!title.trim() || !content.trim()) return;
@@ -34,12 +38,17 @@ export default function AdminAnnouncements() {
   };
 
   const handleDelete = (id: string, announcementTitle: string) => {
-    if (confirm(`Delete announcement "${announcementTitle}"?`)) {
+    setDeleteDialog({ id, title: announcementTitle });
+  };
+
+  const confirmDelete = () => {
+    if (deleteDialog) {
       remove(
-        { id },
+        { id: deleteDialog.id },
         {
           onSuccess: () => {
             toast({ title: "Deleted", description: "Announcement removed." });
+            setDeleteDialog(null);
             refetch();
           },
           onError: () => toast({ title: "Error", description: "Failed to delete.", variant: "destructive" })
@@ -165,6 +174,21 @@ export default function AdminAnnouncements() {
           ))
         )}
       </div>
+
+      <Dialog open={!!deleteDialog} onOpenChange={(open) => !open && setDeleteDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Deletion</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete the announcement "{deleteDialog?.title}"?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeleteDialog(null)}>Cancel</Button>
+            <Button className="bg-red-600 text-white hover:bg-red-700" onClick={confirmDelete}>Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 }

@@ -34,15 +34,18 @@ export default function AdminUsers() {
   const [tab, setTab] = React.useState<"active" | "pending" | "rejected">("active");
   const [search, setSearch] = React.useState("");
   const { data, isLoading, refetch } = useGetUsers({ status: tab as any });
-  const { mutate: approve } = useApproveUser();
-  const { mutate: reject } = useRejectUser();
-  const { mutate: remove } = useDeleteUser();
+  const { mutate: approve, isPending: isApproving } = useApproveUser();
+  const { mutate: reject, isPending: isRejecting } = useRejectUser();
+  const { mutate: remove, isPending: isDeleting } = useDeleteUser();
   const { toast } = useToast();
 
   // Permissions management
   const [permissionsOpen, setPermissionsOpen] = React.useState(false);
   const [editingUser, setEditingUser] = React.useState<any>(null);
   const [userPerms, setUserPerms] = React.useState<AdminPermissions>(DEFAULT_PERMISSIONS.admin);
+
+  // Deletion State
+  const [deleteDialog, setDeleteDialog] = React.useState<{id: string, name: string} | null>(null);
 
   const handleApprove = (id: string) => {
     approve({ id }, {
@@ -65,13 +68,20 @@ export default function AdminUsers() {
   };
 
   const handleDelete = (id: string, name: string) => {
-    remove({ id }, {
-      onSuccess: () => {
-        toast({ title: "Deleted", description: "User has been removed." });
-        refetch();
-      },
-      onError: () => toast({ title: "Error", description: "Failed to delete user.", variant: "destructive" })
-    });
+    setDeleteDialog({ id, name });
+  };
+
+  const confirmDelete = () => {
+    if (deleteDialog) {
+      remove({ id: deleteDialog.id }, {
+        onSuccess: () => {
+          toast({ title: "Deleted", description: "User has been removed." });
+          setDeleteDialog(null);
+          refetch();
+        },
+        onError: () => toast({ title: "Error", description: "Failed to delete user.", variant: "destructive" })
+      });
+    }
   };
 
   const openPermissions = (user: any) => {
@@ -272,8 +282,9 @@ export default function AdminUsers() {
                             variant="ghost"
                             className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-1"
                             onClick={() => handleDelete(user.id, user.name)}
+                            disabled={isDeleting}
                           >
-                            <Trash2 className="w-3.5 h-3.5" /> Remove
+                            <Trash2 className="w-3.5 h-3.5" /> {isDeleting ? "..." : "Remove"}
                           </Button>
                         </>
                       )}
@@ -284,16 +295,18 @@ export default function AdminUsers() {
                             variant="outline"
                             className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 gap-1"
                             onClick={() => handleApprove(user.id)}
+                            disabled={isApproving || isRejecting}
                           >
-                            <UserCheck className="w-3.5 h-3.5" /> Approve
+                            <UserCheck className="w-3.5 h-3.5" /> {isApproving ? "..." : "Approve"}
                           </Button>
                           <Button
                             size="sm"
                             variant="outline"
                             className="text-destructive border-destructive/20 hover:bg-destructive/10 gap-1"
                             onClick={() => handleReject(user.id)}
+                            disabled={isApproving || isRejecting}
                           >
-                            <UserX className="w-3.5 h-3.5" /> Reject
+                            <UserX className="w-3.5 h-3.5" /> {isRejecting ? "..." : "Reject"}
                           </Button>
                         </>
                       )}
@@ -504,6 +517,22 @@ export default function AdminUsers() {
             <Button onClick={savePermissions} className="gap-2">
               <ShieldCheck className="w-4 h-4" /> Save Permissions
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══ Confirm Deletion Modal ═══ */}
+      <Dialog open={!!deleteDialog} onOpenChange={(open) => !open && setDeleteDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Deletion</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to permanently remove {deleteDialog?.name}? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeleteDialog(null)}>Cancel</Button>
+            <Button className="bg-red-600 text-white hover:bg-red-700" onClick={confirmDelete}>Delete User</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

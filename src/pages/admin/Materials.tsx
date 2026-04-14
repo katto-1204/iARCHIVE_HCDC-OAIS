@@ -19,8 +19,15 @@ import {
   type ArchivalMaterial
 } from "@/data/sampleData";
 import { 
-  getMaterials, saveMaterial, deleteMaterial, addActivity 
+  addActivity 
 } from "@/data/storage";
+import { 
+  useGetMaterials, 
+  useCreateMaterial, 
+  useUpdateMaterial, 
+  useDeleteMaterial 
+} from "@/lib/api-client-react";
+
 
 declare global {
   interface Window {
@@ -42,25 +49,29 @@ type ViewMode = "table" | "detail";
 export default function AdminMaterials() {
   const [search, setSearch] = React.useState("");
   const [selectedHierarchyItem, setSelectedHierarchyItem] = React.useState<string | null>(null);
-  const [materials, setMaterials] = React.useState<ArchivalMaterial[]>([]);
-
-  // Pagination
   const [currentPage, setCurrentPage] = React.useState(1);
   const itemsPerPage = 8;
 
-  React.useEffect(() => {
-    setCurrentPage(1);
-  }, [search, selectedHierarchyItem]);
+  const { data: materialsData, isLoading: isLoadingMaterials, refetch: refetchMaterials } = useGetMaterials({
+    limit: itemsPerPage,
+    page: currentPage,
+    search: search || undefined,
+    category: selectedHierarchyItem || undefined
+  });
 
-  React.useEffect(() => {
-    setMaterials(getMaterials());
-  }, []);
+  const materials = materialsData?.materials || [];
+  const totalItems = materialsData?.total || 0;
+  const totalPages = materialsData?.totalPages || 1;
 
-  // Material detail expansion
+  const { mutate: deleteMat, isPending: isDeleting } = useDeleteMaterial();
+  const { mutate: createMat, isPending: isCreating } = useCreateMaterial();
+  const { mutate: updateMat, isPending: isUpdating } = useUpdateMaterial();
+
   const [selectedMaterial, setSelectedMaterial] = React.useState<ArchivalMaterial | null>(null);
   const [editingMaterialId, setEditingMaterialId] = React.useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [materialToDelete, setMaterialToDelete] = React.useState<string | null>(null);
+
 
   // Upload dialog state
   const [uploadOpen, setUploadOpen] = React.useState(false);
@@ -444,22 +455,8 @@ export default function AdminMaterials() {
     await extractMetadataFile(files[0]);
   };
 
-  const filteredMaterials = React.useMemo(() => {
-    let result = [...materials];
-    if (search) {
-      const s = search.toLowerCase();
-      result = result.filter(m =>
-        m.title?.toLowerCase().includes(s) || m.uniqueId.toLowerCase().includes(s) || m.creator?.toLowerCase().includes(s)
-      );
-    }
-    if (selectedHierarchyItem) {
-      result = result.filter(m => m.hierarchyPath?.includes(selectedHierarchyItem) || m.uniqueId === selectedHierarchyItem);
-    }
-    return result;
-  }, [materials, search, selectedHierarchyItem]);
-
-  const totalPages = Math.ceil(filteredMaterials.length / itemsPerPage);
-  const paginatedMaterials = filteredMaterials.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const filteredMaterials = materials;
+  const paginatedMaterials = materials;
 
   const toggleMaterialDetail = async (mat: ArchivalMaterial) => {
     if (selectedMaterial?.uniqueId === mat.uniqueId) {
@@ -494,17 +491,23 @@ export default function AdminMaterials() {
 
   const confirmDeleteMaterial = async () => {
     if (materialToDelete) {
-      const updated = await deleteMaterial(materialToDelete);
-      setMaterials(updated);
-      addActivity({
-        user: "Admin",
-        actionType: "delete",
-        description: `Deleted material: ${materialToDelete}`
+      deleteMat({ id: materialToDelete }, {
+        onSuccess: () => {
+          addActivity({
+            user: "Admin",
+            actionType: "delete",
+            description: `Deleted material: ${materialToDelete}`
+          });
+          toast({ title: "Deleted", description: "Material removed from repository." });
+          refetchMaterials();
+          setDeleteDialogOpen(false);
+          setMaterialToDelete(null);
+        },
+        onError: () => {
+          toast({ title: "Error", description: "Failed to delete material.", variant: "destructive" });
+        }
       });
-      toast({ title: "Deleted", description: "Material removed from repository." });
     }
-    setDeleteDialogOpen(false);
-    setMaterialToDelete(null);
   };
 
   const handleDeleteMaterial = (id: string, e: React.MouseEvent) => {
@@ -765,15 +768,18 @@ export default function AdminMaterials() {
               <div className="text-sm text-muted-foreground flex items-center gap-2 shrink-0">
                 <Layers className="w-4 h-4" /> {filteredMaterials.length} items
               </div>
-            </div>
-
             <div className="overflow-x-auto">
               <div className="min-w-full divide-y divide-border/40">
                 <div className="grid grid-cols-[1fr_100px] md:grid-cols-[120px_60px_1fr_100px_70px_80px_60px] gap-2 px-4 py-2.5 bg-muted/30 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                   <span className="hidden md:inline text-left">Unique ID</span><span className="hidden md:inline text-left">Barcode</span><span className="text-left">Title</span><span className="hidden md:inline text-left">Progress</span><span className="hidden md:inline text-right">%</span><span className="text-center">Status</span><span className="hidden md:inline"></span>
                 </div>
 
-                {filteredMaterials.length === 0 ? (
+                {isLoadingMaterials ? (
+                   <div className="p-12 text-center text-muted-foreground bg-white/50 rounded-xl border border-dashed flex flex-col items-center gap-3">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                      <p className="text-sm font-medium">Archiving access to repository...</p>
+                   </div>
+                ) : filteredMaterials.length === 0 ? (
                   <div className="py-16 text-center text-muted-foreground">
                     <FileText className="w-10 h-10 mx-auto mb-3 opacity-20" />
                     <p className="font-semibold">No materials found.</p>
@@ -1409,30 +1415,38 @@ export default function AdminMaterials() {
                   fileType: (uploadForm as any).fileType || uploadForm.format,
               } as any;
 
-              try {
-                const updated = await saveMaterial(newMaterial);
-                setMaterials(updated);
-                
-                // Clear filters after successful ingest to make it visible
-                if (!editingMaterialId) {
-                  setSelectedHierarchyItem(null);
-                  setSearch("");
-                  setCurrentPage(1);
-                }
-                
-                addActivity({
-                  user: "Admin",
-                  actionType: editingMaterialId ? "edit" : "upload",
-                  description: `${editingMaterialId ? 'Updated' : 'Ingested'} material: ${newMaterial.title}`,
-                  materialId: newMaterial.uniqueId
-                });
+              const mutation = editingMaterialId ? updateMat : createMat;
+              
+              // Prepare payload (exclude large binary data for now to avoid Firestore limits, 
+              // but we should eventually use Storage)
+              const payload = { ...newMaterial };
+              delete payload.fileData; // Don't send local blob to API in JSON
 
-                toast({ title: editingMaterialId ? "Updated" : "Ingestion Confirmed", description: "Material saved successfully." }); 
-                setChecklistOpen(false);
-                setEditingMaterialId(null);
-              } catch (e) {
-                toast({ title: "Storage Error", description: "Failed to store material data.", variant: "destructive" });
-              }
+              mutation({ id: editingMaterialId || undefined, data: payload }, {
+                onSuccess: () => {
+                  refetchMaterials();
+                  
+                  if (!editingMaterialId) {
+                    setSelectedHierarchyItem(null);
+                    setSearch("");
+                    setCurrentPage(1);
+                  }
+                  
+                  addActivity({
+                    user: "Admin",
+                    actionType: editingMaterialId ? "edit" : "upload",
+                    description: `${editingMaterialId ? 'Updated' : 'Ingested'} material: ${newMaterial.title}`,
+                    materialId: newMaterial.uniqueId
+                  });
+
+                  toast({ title: editingMaterialId ? "Updated" : "Ingestion Confirmed", description: "Material saved successfully." }); 
+                  setChecklistOpen(false);
+                  setEditingMaterialId(null);
+                },
+                onError: (err: any) => {
+                  toast({ title: "Error", description: err.message || "Failed to save material.", variant: "destructive" });
+                }
+              });
             }} className="bg-emerald-600 hover:bg-emerald-700">
               {editingMaterialId ? "Update Item" : "Finalize Ingest"}
             </Button>

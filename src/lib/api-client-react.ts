@@ -266,18 +266,66 @@ export function useDeleteCategory() {
   });
 }
 
-export function useGetMaterials(params?: { limit?: number; access?: string }) {
+export function useGetMaterials(params?: { limit?: number; page?: number; access?: string; category?: string; search?: string }) {
   return useQuery({
     queryKey: ["/api/materials", params || {}],
     queryFn: () => {
       const searchParams = new URLSearchParams();
       if (params?.limit) searchParams.set("limit", String(params.limit));
+      if (params?.page) searchParams.set("page", String(params.page));
       if (params?.access) searchParams.set("access", params.access);
+      if (params?.category) searchParams.set("category", params.category);
+      if (params?.search) searchParams.set("search", params.search);
       const query = searchParams.toString();
-      return apiRequest<{ materials: any[]; total: number }>(`/api/materials${query ? `?${query}` : ""}`);
+      return apiRequest<{ materials: any[]; total: number; totalPages?: number }>(`/api/materials${query ? `?${query}` : ""}`);
     },
   });
 }
+
+export function useCreateMaterial() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (args: MutationArgs<any>) =>
+      apiRequest("/api/materials", {
+        method: "POST",
+        body: JSON.stringify(args.data || {}),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
+    },
+  });
+}
+
+export function useUpdateMaterial() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (args: MutationArgs<any>) =>
+      apiRequest(`/api/materials/${args.id}`, {
+        method: "PATCH",
+        body: JSON.stringify(args.data || {}),
+      }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/materials", variables.id] });
+    },
+  });
+}
+
+export function useDeleteMaterial() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (args: MutationArgs) =>
+      apiRequest(`/api/materials/${args.id}`, {
+        method: "DELETE",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
+    },
+  });
+}
+
 
 export function useGetAnnouncements() {
   return useQuery({

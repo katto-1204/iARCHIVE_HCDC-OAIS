@@ -13,7 +13,7 @@
   ],
   "functions": {
     "api/index.ts": {
-      "includeFiles": "{api-server/src/**,*.json}"
+      "includeFiles": "{api-server/src/**,api-server/service-account.json,*.json}"
     }
   }
 }

@@ -20,9 +20,14 @@ router.get("/users", requireAuth, requireRole("admin", "archivist"), async (req,
     if (status && ["pending", "active", "inactive", "rejected"].includes(status)) {
       query = query.where("status", "==", status);
     }
-    query = query.orderBy("createdAt", "desc");
     const snapshot = await query.get();
     const users = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    // Sort in memory to avoid composite index requirement
+    users.sort((a: any, b: any) => {
+      const dateA = new Date(a.createdAt || 0).getTime();
+      const dateB = new Date(b.createdAt || 0).getTime();
+      return dateB - dateA;
+    });
     const total = users.length;
     const totalPages = Math.ceil(total / limit);
     const offset = (page - 1) * limit;

@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 
 interface CategoryNode {
   id: string;
@@ -37,6 +38,9 @@ export default function AdminCategories() {
 
   // Tree Expansion State
   const [expandedNodes, setExpandedNodes] = React.useState<Set<string>>(new Set());
+
+  // Deletion State
+  const [deleteDialog, setDeleteDialog] = React.useState<{id: string, name: string} | null>(null);
 
   const toggleNode = (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -103,9 +107,17 @@ export default function AdminCategories() {
   };
 
   const handleDelete = (id: string, name: string) => {
-    if (confirm(`Delete '${name}'? This will also remove or orphan nested children.`)) {
-      remove({ id }, {
-        onSuccess: () => { toast({ title: "Deleted", description: "Category removed." }); refetch(); },
+    setDeleteDialog({ id, name });
+  };
+
+  const confirmDelete = () => {
+    if (deleteDialog) {
+      remove({ id: deleteDialog.id }, {
+        onSuccess: () => { 
+          toast({ title: "Deleted", description: "Category removed." }); 
+          setDeleteDialog(null);
+          refetch(); 
+        },
         onError: () => toast({ title: "Error", description: "Failed to delete.", variant: "destructive" })
       });
     }
@@ -318,6 +330,21 @@ export default function AdminCategories() {
           </div>
         )}
       </Card>
+
+      <Dialog open={!!deleteDialog} onOpenChange={(open) => !open && setDeleteDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Deletion</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete '{deleteDialog?.name}'? This will also remove or orphan nested children.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeleteDialog(null)}>Cancel</Button>
+            <Button className="bg-red-600 text-white hover:bg-red-700" onClick={confirmDelete}>Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 }

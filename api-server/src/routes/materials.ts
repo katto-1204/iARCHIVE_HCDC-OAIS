@@ -69,9 +69,14 @@ router.get("/materials", async (req, res) => {
     if (categoryId) {
       query = query.where("categoryId", "==", categoryId);
     }
-    query = query.orderBy("createdAt", "desc");
     const snapshot = await query.get();
     const rows = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    // Sort in memory to avoid composite index requirement
+    rows.sort((a: any, b: any) => {
+      const dateA = new Date(a.createdAt || 0).getTime();
+      const dateB = new Date(b.createdAt || 0).getTime();
+      return dateB - dateA;
+    });
     const filtered = search ? rows.filter((m) => matchesSearch(m, search)) : rows;
     const total = filtered.length;
     const totalPages = Math.ceil(total / limit);
@@ -224,7 +229,7 @@ router.get("/materials/:id", async (req, res) => {
   }
 });
 
-router.put("/materials/:id", requireAuth, async (req, res) => {
+async function handleUpdateMaterial(req: any, res: any) {
   const user = req.user!;
   const id = String(req.params.id);
   const body = req.body;
@@ -259,7 +264,10 @@ router.put("/materials/:id", requireAuth, async (req, res) => {
     if (!updated) { res.status(404).json({ error: "Material not found" }); return; }
     res.json(updated);
   }
-});
+}
+
+router.put("/materials/:id", requireAuth, (req, res) => handleUpdateMaterial(req, res));
+router.patch("/materials/:id", requireAuth, (req, res) => handleUpdateMaterial(req, res));
 
 router.delete("/materials/:id", requireAuth, async (req, res) => {
   const user = req.user!;

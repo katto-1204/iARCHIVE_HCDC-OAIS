@@ -18,8 +18,8 @@ export default function AdminRequests() {
   const [rejectingId, setRejectingId] = React.useState<string | null>(null);
   const [rejectReason, setRejectReason] = React.useState("");
   
-  const { mutate: approve } = useApproveRequest();
-  const { mutate: reject } = useRejectRequest();
+  const { mutate: approve, isPending: isApproving } = useApproveRequest();
+  const { mutate: reject, isPending: isRejecting } = useRejectRequest();
   const { toast } = useToast();
 
   const handleApprove = (id: string) => {
@@ -173,8 +173,24 @@ export default function AdminRequests() {
                       </Link>
                       {mode === "access" ? (
                         <>
-                          <Button size="sm" variant="outline" className="text-emerald-600 border-emerald-200 hover:bg-emerald-50" onClick={() => handleApprove(req.id)}>Approve</Button>
-                          <Button size="sm" variant="outline" className="text-destructive border-destructive/20 hover:bg-destructive/10" onClick={() => handleReject(req.id)}>Reject</Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="text-emerald-600 border-emerald-200 hover:bg-emerald-50" 
+                            onClick={() => handleApprove(req.id)}
+                            disabled={isApproving || isRejecting}
+                          >
+                            {isApproving ? <span className="animate-spin mr-1">...</span> : "Approve"}
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="text-destructive border-destructive/20 hover:bg-destructive/10" 
+                            onClick={() => handleReject(req.id)}
+                            disabled={isApproving || isRejecting}
+                          >
+                            Reject
+                          </Button>
                         </>
                       ) : (
                         <>
@@ -208,8 +224,14 @@ export default function AdminRequests() {
             />
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setRejectingId(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={confirmReject}>Deny Request</Button>
+            <Button variant="ghost" onClick={() => setRejectingId(null)} disabled={isRejecting}>Cancel</Button>
+            <Button 
+              className="bg-red-600 text-white hover:bg-red-700" 
+              onClick={confirmReject} 
+              disabled={isRejecting}
+            >
+              {isRejecting ? "Denying..." : "Deny Request"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

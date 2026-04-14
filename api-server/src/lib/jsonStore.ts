@@ -119,7 +119,8 @@ function getDemoUserById(id?: string) {
   return DEMO_USERS.find((u) => u.id === id);
 }
 
-const DATA_BASE = process.cwd();
+const isVercel = process.env.VERCEL === "1" || !!process.env.VERCEL_ENV;
+const DATA_BASE = isVercel ? "/tmp" : process.cwd();
 const CATEGORIES_PATH = path.join(DATA_BASE, "categories.json");
 const MATERIALS_PATH = path.join(DATA_BASE, "materials.json");
 const USERS_PATH = path.join(DATA_BASE, "users.json");

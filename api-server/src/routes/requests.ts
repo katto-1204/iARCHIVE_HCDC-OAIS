@@ -56,9 +56,14 @@ router.get("/requests", requireAuth, async (req, res) => {
     if (user.role === "student" || user.role === "researcher" || user.role === "alumni" || user.role === "public") {
       query = query.where("userId", "==", user.userId);
     }
-    query = query.orderBy("createdAt", "desc");
     const snapshot = await query.get();
     const rows = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    // Sort in memory to avoid composite index requirement
+    rows.sort((a: any, b: any) => {
+      const dateA = new Date(a.createdAt || 0).getTime();
+      const dateB = new Date(b.createdAt || 0).getTime();
+      return dateB - dateA;
+    });
     const total = rows.length;
     const totalPages = Math.ceil(total / limit);
     const offset = (page - 1) * limit;
