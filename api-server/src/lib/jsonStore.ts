@@ -115,7 +115,9 @@ function getDemoUserByEmail(email?: string) {
 }
 
 function getDemoUserById(id?: string) {
-import { dirname } from "path";
+  return DEMO_USERS.find((u) => u.id === id);
+}
+
 const DATA_BASE = process.cwd();
 const CATEGORIES_PATH = path.join(DATA_BASE, "categories.json");
 const MATERIALS_PATH = path.join(DATA_BASE, "materials.json");
