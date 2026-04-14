@@ -312,7 +312,7 @@ export default function AdminCategories() {
           </div>
         ) : (
           <div className="w-full flex-col flex overflow-x-auto">
-            <div className="min-w-[700px] divide-y divide-border/0 pb-4">
+            <div className="min-w-full divide-y divide-border/0 pb-4">
                {renderTree(categoryTree)}
             </div>
           </div>

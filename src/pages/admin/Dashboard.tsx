@@ -10,11 +10,7 @@ import {
   AlertCircle, XCircle, FileText, Activity, Filter, Lock,
 } from "lucide-react";
 import { Link } from "wouter";
-import {
-  COMBINED_FIELDS, ISADG_AREAS,
-  PENDING_REQUESTS,
-  type ArchivalMaterial,
-} from "@/data/sampleData";
+import { type ArchivalMaterial } from "@/data/sampleData";
 import { getMaterials, getActivityFeed } from "@/data/storage";
 import {
   computeCompletion, computeISADGCompletion, computeDCCompletion,
@@ -28,6 +24,9 @@ type FilterTab = "all" | "complete" | "partial" | "incomplete";
 
 const ACTION_ICONS: Record<string, any> = {
   upload: Upload,
+  submit: Upload,
+  approve: ShieldCheck,
+  reject: XCircle,
   edit: Edit3,
   metadata_update: BarChart3,
   access_change: Shield,
@@ -35,10 +34,34 @@ const ACTION_ICONS: Record<string, any> = {
   request: ShieldCheck,
 };
 
-const CHART_DATA = [12, 18, 15, 25, 32, 28, 45, 38, 52, 48, 65, 72];
+const getApprovalStatus = (material: ArchivalMaterial) => material.approvalStatus || "approved";
+
+const buildIngestionSeries = (materials: ArchivalMaterial[]) => {
+  const now = new Date();
+  const weeks: number[] = Array.from({ length: 12 }, () => 0);
+  const start = new Date(now);
+  start.setDate(start.getDate() - 7 * 11);
+  start.setHours(0, 0, 0, 0);
+
+  materials.forEach((material) => {
+    const dateStr = material.createdAt || material.ingestDate;
+    if (!dateStr) return;
+    const dt = new Date(dateStr);
+    if (Number.isNaN(dt.getTime()) || dt < start || dt > now) return;
+    const diffWeeks = Math.floor((dt.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000));
+    if (diffWeeks >= 0 && diffWeeks < 12) {
+      weeks[diffWeeks] += 1;
+    }
+  });
+
+  return weeks;
+};
 
 const ACTION_COLORS: Record<string, string> = {
   upload: "#10B981",
+  submit: "#F59E0B",
+  approve: "#10B981",
+  reject: "#EF4444",
   edit: "#4169E1",
   metadata_update: "#8B5CF6",
   access_change: "#F59E0B",
@@ -51,8 +74,31 @@ export default function AdminDashboard() {
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
 
   const [materials, setMaterials] = React.useState<ArchivalMaterial[]>(() => getMaterials());
-  const [activityFeed] = React.useState(() => getActivityFeed());
+  const [activityFeed, setActivityFeed] = React.useState(() => getActivityFeed());
   const stats = React.useMemo(() => computeDashboardStats(materials), [materials]);
+    React.useEffect(() => {
+      const sync = () => {
+        setMaterials(getMaterials());
+        setActivityFeed(getActivityFeed());
+      };
+      window.addEventListener("storage", sync);
+      window.addEventListener("focus", sync);
+      return () => {
+        window.removeEventListener("storage", sync);
+        window.removeEventListener("focus", sync);
+      };
+    }, []);
+  const ingestionSeries = React.useMemo(() => buildIngestionSeries(materials), [materials]);
+  const maxIngestion = Math.max(...ingestionSeries, 1);
+  const pendingApprovals = React.useMemo(
+    () => materials.filter((m) => getApprovalStatus(m) === "pending").length,
+    [materials],
+  );
+  const lastWeek = ingestionSeries[ingestionSeries.length - 1] || 0;
+  const prevWeek = ingestionSeries[ingestionSeries.length - 2] || 0;
+  const growthPct = prevWeek ? Math.round(((lastWeek - prevWeek) / prevWeek) * 100) : (lastWeek > 0 ? 100 : 0);
+  const growthLabel = `${growthPct >= 0 ? "+" : ""}${growthPct}%`;
+  const growthText = prevWeek ? (growthPct >= 0 ? "Outperforming Target" : "Below Target") : "New Ingest Cycle";
 
   // Filter materials
   const filteredMaterials = React.useMemo(() => {
@@ -108,19 +154,19 @@ export default function AdminDashboard() {
               <CardTitle className="text-lg flex items-center gap-2 text-[#0a1628]">
                 <TrendingUp className="w-5 h-5 text-emerald-500" /> Ingestion Velocity
               </CardTitle>
-              <p className="text-xs text-muted-foreground mt-1">Growth of digital assets over the last 12 weeks.</p>
+              <p className="text-xs text-muted-foreground mt-1">Ingested items tracked over the last 12 weeks.</p>
             </div>
             <div className="text-right">
-              <span className="text-2xl font-bold text-[#0a1628]">+24%</span>
-              <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">Outperforming Target</p>
+              <span className="text-2xl font-bold text-[#0a1628]">{growthLabel}</span>
+              <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">{growthText}</p>
             </div>
           </CardHeader>
           <CardContent className="p-6 h-[200px] flex items-end gap-1">
-            {CHART_DATA.map((val, i) => (
+            {ingestionSeries.map((val, i) => (
               <div key={i} className="flex-1 flex flex-col items-center group cursor-pointer">
                 <div 
                   className="w-full bg-[#4169E1]/10 group-hover:bg-[#4169E1]/30 transition-all rounded-t-sm relative"
-                  style={{ height: `${(val / 80) * 100}%` }}
+                  style={{ height: `${(val / maxIngestion) * 100}%` }}
                 >
                   <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-[#0a1628] text-white text-[9px] font-bold px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">
                     {val}
@@ -145,11 +191,11 @@ export default function AdminDashboard() {
               <div className="px-5 py-3.5 hover:bg-white/5 transition-colors">
                 <div className="text-xs font-bold mb-1 flex items-center gap-2">
                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                   Pending Access Requests
+                   Pending Ingest Approvals
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-white/60">{PENDING_REQUESTS.length} researchers waiting for review</span>
-                  <Link href="/requests">
+                  <span className="text-[10px] text-white/60">{pendingApprovals} items awaiting admin approval</span>
+                  <Link href="/admin/collections">
                     <button className="text-[9px] font-black uppercase text-[#4169E1] hover:text-white transition-colors">Review Queue</button>
                   </Link>
                 </div>

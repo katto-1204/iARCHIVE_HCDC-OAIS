@@ -7,16 +7,18 @@
     "dev": "cross-env NODE_ENV=development pnpm run build && pnpm run start",
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
+    "migrate:json": "node ./scripts/migrate-json-to-firestore.mjs",
+    "init:firestore": "node ./scripts/init-firestore.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@workspace/api-zod": "file:../../../lib/api-zod",
-    "@workspace/db": "file:../../../lib/db",
+
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2",
-    "drizzle-orm": "^0.45.1",
+    "dotenv": "^16.4.7",
     "express": "^5",
+    "firebase-admin": "^12.5.0",
     "jsonwebtoken": "^9.0.3",
     "pino": "^9",
     "pino-http": "^10"

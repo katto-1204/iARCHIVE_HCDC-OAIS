@@ -5,7 +5,9 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Badge } 
 import { useGetAuditLogs } from "@workspace/api-client-react";
 
 export default function AdminAuditLogs() {
-  const { data, isLoading } = useGetAuditLogs({ limit: 100 });
+  const result = useGetAuditLogs({ limit: 100 });
+  const data = result.data as { logs: any[] } | undefined;
+  const isLoading = result.isLoading;
 
   return (
     <AdminLayout>

@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { FileText, Lock, UserPlus, Database, ArrowLeft, ChevronRight, CheckCircle2 } from "lucide-react";
-import { Button, Input, Label, Badge } from "@/components/ui-components";
+import { Button, Input, Label, Badge, Modal } from "@/components/ui-components";
 import { Textarea } from "@/components/ui/textarea";
 import { useRegister } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
@@ -13,7 +13,8 @@ const registerSchema = z.object({
   name: z.string().min(2, "Name is required"),
   email: z.string().email("Valid email is required"),
   password: z.string().min(8, "Password must be at least 8 characters"),
-  role: z.enum(["student", "researcher", "alumni", "public"]),
+  role: z.enum(["student", "researcher", "alumni", "staff", "public"]),
+  userCategory: z.string().min(1, "User category is required"),
   institution: z.string().min(1, "Institution/Affiliation is required"),
   purpose: z.string().optional(),
 });
@@ -22,10 +23,11 @@ export default function Register() {
   const [_, setLocation] = useLocation();
   const { toast } = useToast();
   const { mutate: mutateRegister, isPending } = useRegister();
+  const [errorModal, setErrorModal] = React.useState<{ title: string; message: string } | null>(null);
 
   const form = useForm<z.infer<typeof registerSchema>>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { role: "student" },
+    defaultValues: { role: "student", userCategory: "student" },
   });
 
   const onSubmit = (data: z.infer<typeof registerSchema>) => {
@@ -35,7 +37,12 @@ export default function Register() {
         setLocation("/login");
       },
       onError: (err: any) => {
-        toast({ title: "Registration Failed", description: err?.data?.error || "Error registering", variant: "destructive" });
+        const message = err?.data?.error || err?.message || "Error registering";
+        if (/already registered|email already|already in use/i.test(message)) {
+          setErrorModal({ title: "Email Already Registered", message: "That email already exists. Please log in or use another email." });
+          return;
+        }
+        toast({ title: "Registration Failed", description: message, variant: "destructive" });
       }
     });
   };
@@ -46,7 +53,7 @@ export default function Register() {
       <div className="hidden lg:flex w-[400px] bg-[#050a14] p-12 flex-col justify-between relative overflow-hidden shrink-0">
         <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_top_right,_rgba(150,0,0,0.5),_transparent_70%)]" />
         <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')]" />
-        
+
         <div className="relative z-10">
           <Link href="/" className="inline-flex items-center gap-3 group">
             <img src={`${import.meta.env.BASE_URL}logos/iarchive%20white%20logo.png`} alt="iArchive" className="h-10 w-auto brightness-110" />
@@ -56,7 +63,7 @@ export default function Register() {
         <div className="relative z-10 space-y-8">
           <div className="space-y-4">
             <Badge variant="outline" className="border-white/20 text-white/60 px-3 py-1 font-bold tracking-tighter uppercase text-[10px]">Secure Archival Access</Badge>
-            <h1 className="text-5xl font-display font-bold text-white leading-[1.1]">Preserving<br/>History<br/><span className="text-[#4169E1]">Together.</span></h1>
+            <h1 className="text-5xl font-display font-bold text-white leading-[1.1]">Preserving<br />History<br /><span className="text-[#4169E1]">Together.</span></h1>
             <p className="text-white/50 text-lg leading-relaxed max-w-sm">Create an account to track your research requests and access restricted HCDC digital collections.</p>
           </div>
 
@@ -120,11 +127,27 @@ export default function Register() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label className="text-sm font-bold text-[#050a14]">User Category</Label>
-                <select {...form.register("role")} className="flex h-12 w-full rounded-xl border border-muted-foreground/20 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4169E1]/10 focus:border-[#4169E1] disabled:cursor-not-allowed disabled:opacity-50 appearance-none">
-                  <option value="student">HCDC Student</option>
-                  <option value="researcher">External Researcher</option>
-                  <option value="alumni">HCDC Alumni</option>
-                  <option value="public">General Public</option>
+                <select 
+                  {...form.register("userCategory")} 
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    form.setValue("userCategory", val);
+                    // Map userCategory to internal system role for permissions
+                    if (val === "Holy Crossian administrators/faculty members") {
+                      form.setValue("role", "staff");
+                    } else if (val === "Researcher") {
+                      form.setValue("role", "researcher");
+                    } else {
+                      form.setValue("role", "student");
+                    }
+                  }}
+                  className="flex h-12 w-full rounded-xl border border-muted-foreground/20 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4169E1]/10 focus:border-[#4169E1] disabled:cursor-not-allowed disabled:opacity-50 appearance-none"
+                >
+                  <option value="Students">Students</option>
+                  <option value="Alumni">Alumni</option>
+                  <option value="Researcher">Researcher</option>
+                  <option value="Holy Crossian administrators/faculty members">Holy Crossian administrators/faculty members</option>
+                  <option value="Others (General Public)">Others (General Public)</option>
                 </select>
               </div>
               <div className="space-y-2">
@@ -147,12 +170,22 @@ export default function Register() {
           </form>
 
           <div className="text-center pt-8 border-t border-muted-foreground/10 flex items-center justify-center gap-2 text-sm text-muted-foreground">
-            Already have an approved account? 
+            Already have an approved account?
             <Link href="/login" className="text-[#4169E1] font-bold hover:underline flex items-center">
               Login here <ChevronRight className="w-4 h-4" />
             </Link>
           </div>
         </div>
+        <Modal
+          isOpen={!!errorModal}
+          onClose={() => setErrorModal(null)}
+          title={errorModal?.title || "Registration Error"}
+        >
+          <p className="text-sm text-muted-foreground">{errorModal?.message}</p>
+          <div className="mt-4 flex justify-end">
+            <Button variant="accent" onClick={() => setErrorModal(null)}>Okay</Button>
+          </div>
+        </Modal>
       </div>
     </div>
   );

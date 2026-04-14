@@ -1,10 +1,11 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv, type UserConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
-import type { Plugin } from "vite";
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /* ─── Demo Auth Mock Plugin ─── */
 const DEMO_PASSWORD = "admin123";
@@ -38,18 +39,27 @@ function mockAuthPlugin(): Plugin {
         req.on("data", (c: Buffer) => (body += c.toString()));
         req.on("end", () => {
           try {
-            const { email, password } = JSON.parse(body);
-            const user = DEMO_USERS.find((u) => u.email.toLowerCase() === (email || "").toLowerCase());
-            if (!user || password !== DEMO_PASSWORD) {
-              res.statusCode = 401;
-              res.setHeader("Content-Type", "application/json");
-              res.end(JSON.stringify({ error: "Invalid credentials" }));
-              return;
+            const data = JSON.parse(body);
+            const { email, password, idToken } = data;
+            
+            let user;
+            if (idToken) {
+              // Mock success for any idToken for demo purposes
+              user = DEMO_USERS[0]; 
+            } else {
+              user = DEMO_USERS.find((u) => u.email.toLowerCase() === (email || "").toLowerCase());
+              if (!user || password !== DEMO_PASSWORD) {
+                res.statusCode = 401;
+                res.setHeader("Content-Type", "application/json");
+                res.end(JSON.stringify({ error: "Invalid credentials" }));
+                return;
+              }
             }
+            
             const token = makeToken({ userId: user.id, email: user.email, role: user.role, name: user.name });
             res.setHeader("Content-Type", "application/json");
             res.end(JSON.stringify({ token, user: { ...user, createdAt: new Date().toISOString() } }));
-          } catch {
+          } catch (e) {
             res.statusCode = 400;
             res.setHeader("Content-Type", "application/json");
             res.end(JSON.stringify({ error: "Bad request" }));
@@ -411,53 +421,67 @@ if (!basePath) {
   );
 }
 
-export default defineConfig({
-  base: basePath,
-  plugins: [
+export default defineConfig(async ({ mode }): Promise<UserConfig> => {
+  const env = loadEnv(mode, process.cwd(), "");
+  const useRealApi = env.VITE_USE_REAL_API === "true";
+
+  const plugins = [
     react(),
     tailwindcss(),
     runtimeErrorOverlay(),
-    mockAuthPlugin(),
-    ...(process.env.NODE_ENV !== "production" &&
-    process.env.REPL_ID !== undefined
-      ? [
-          await import("@replit/vite-plugin-cartographer").then((m) =>
-            m.cartographer({
-              root: path.resolve(import.meta.dirname, ".."),
-            }),
-          ),
-          await import("@replit/vite-plugin-dev-banner").then((m) =>
-            m.devBanner(),
-          ),
-        ]
-      : []),
-  ],
-  resolve: {
-    alias: {
-      "@": path.resolve(import.meta.dirname, "src"),
-      "@assets": path.resolve(import.meta.dirname, "..", "..", "attached_assets"),
-      "@workspace/api-client-react": path.resolve(import.meta.dirname, "src", "lib", "api-client-react.ts"),
+    ...(useRealApi ? [] : [mockAuthPlugin()]),
+  ];
+
+  if (process.env.NODE_ENV !== "production" && process.env.REPL_ID !== undefined) {
+    const { cartographer } = await import("@replit/vite-plugin-cartographer");
+    const { devBanner } = await import("@replit/vite-plugin-dev-banner");
+    
+    plugins.push(
+      cartographer({
+        root: path.resolve(__dirname, ".."),
+      }),
+      devBanner()
+    );
+  }
+
+  return {
+    base: basePath,
+    plugins,
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "src"),
+        "@assets": path.resolve(__dirname, "..", "..", "attached_assets"),
+        "@workspace/api-client-react": path.resolve(__dirname, "src", "lib", "api-client-react.ts"),
+      },
+      dedupe: ["react", "react-dom"],
     },
-    dedupe: ["react", "react-dom"],
-  },
-  root: path.resolve(import.meta.dirname),
-  build: {
-    outDir: path.resolve(import.meta.dirname, "dist/public"),
-    emptyOutDir: true,
-  },
-  server: {
-    port,
-    host: "0.0.0.0",
-    allowedHosts: true,
-    fs: {
-      strict: true,
-      deny: ["**/.*"],
+    root: path.resolve(__dirname),
+    build: {
+      outDir: path.resolve(__dirname, "dist/public"),
+      emptyOutDir: true,
     },
-  },
-  preview: {
-    port,
-    host: "0.0.0.0",
-    allowedHosts: true,
-  },
+    server: {
+      port,
+      host: "0.0.0.0",
+      allowedHosts: true,
+      fs: {
+        strict: true,
+        deny: ["**/.*"],
+      },
+      proxy: useRealApi
+        ? {
+            "/api": {
+              target: "http://localhost:5000",
+              changeOrigin: true,
+            },
+          }
+        : undefined,
+    },
+    preview: {
+      port,
+      host: "0.0.0.0",
+      allowedHosts: true,
+    },
+  };
 });
 

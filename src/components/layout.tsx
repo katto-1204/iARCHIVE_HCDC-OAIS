@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Link, useLocation } from "wouter";
-import { Library, LayoutDashboard, Database, Users, GitPullRequest, Search, FileText, Settings, LogOut, Menu, X, Bell, Loader2 } from "lucide-react";
+import { Library, LayoutDashboard, Database, Users, GitPullRequest, Search, FileText, Settings, LogOut, Menu, X, Bell, Loader2, User } from "lucide-react";
 import { useGetMe, useLogout, useGetAccessRequests, useGetAuditLogs } from "@workspace/api-client-react";
 import { Button } from "./ui-components";
 import { cn } from "@/lib/utils";
@@ -56,7 +56,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="flex-1">
+      <main className="flex-1 relative">
         {children}
       </main>
 
@@ -97,10 +97,22 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const { data: user, isLoading } = useGetMe();
   const { data: reqData } = useGetAccessRequests({ status: 'pending' });
   const pendingCount = reqData?.requests?.length || 0;
-  const { data: auditData } = useGetAuditLogs({ limit: 5 });
-  const auditBadge = auditData?.logs?.length ? "New" : undefined;
+  const { data: auditData } = useGetAuditLogs({ limit: 5 }, { enabled: !!user && (user.role === "admin" || user.role === "archivist") });
+  const auditBadge = (auditData as any)?.logs?.length ? "New" : undefined;
   const { mutate: logoutMutate } = useLogout();
   const [sidebarOpen, setSidebarOpen] = React.useState(true);
+  const [isMobile, setIsMobile] = React.useState(false);
+
+  React.useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 1024;
+      setIsMobile(mobile);
+      setSidebarOpen(!mobile);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   React.useEffect(() => {
     if (!isLoading && !user) {
@@ -109,10 +121,15 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     }
     if (!isLoading && user) {
       if (user.role === "admin" && !location.startsWith("/admin")) setLocation("/admin");
-      if (user.role === "archivist" && !location.startsWith("/archivist")) setLocation("/archivist");
-      if (user.role === "student" && !location.startsWith("/student")) setLocation("/student");
+      else if (user.role === "archivist" && !location.startsWith("/archivist")) setLocation("/archivist");
+      else if (user.role !== "admin" && user.role !== "archivist" && !location.startsWith("/student")) setLocation("/student");
     }
   }, [user, isLoading, location, setLocation]);
+
+  // Close sidebar on route change on mobile
+  React.useEffect(() => {
+    if (isMobile) setSidebarOpen(false);
+  }, [location, isMobile]);
 
   if (isLoading || !user) return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
@@ -136,6 +153,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       : [
           { icon: LayoutDashboard, label: "Dashboard", href: "/student" },
           { icon: Database, label: "Browse Collections", href: "/collections" },
+          { icon: User, label: "My Profile", href: "/student" }, // Point to dashboard where profile tab is
         ];
 
   const roleAsideBg =
@@ -144,16 +162,24 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     user.role === "admin" ? "bg-[#0B3D91]" : user.role === "archivist" ? "bg-[#1A1A1A]" : "bg-[#B91C1C]";
 
   return (
-    <div className="min-h-screen bg-muted/30 flex">
+    <div className="min-h-screen bg-muted/30 flex overflow-x-hidden">
+      {/* Sidebar Backdrop for Mobile */}
+      {isMobile && sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity" 
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <aside className={cn(
-        `fixed inset-y-0 left-0 z-40 w-64 ${roleAsideBg} text-white transition-transform duration-300 flex flex-col border-r border-white/10 shadow-2xl`,
+        `fixed inset-y-0 left-0 z-50 w-64 ${roleAsideBg} text-white transition-transform duration-300 flex flex-col border-r border-white/10 shadow-2xl`,
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="h-16 flex items-center px-6 border-b border-white/10 bg-black/10">
           <img src={`${import.meta.env.BASE_URL}logos/iarchive%20icon.png`} className="w-8 h-8 object-contain mr-3" alt="Logo" />
           <h2 className="font-display font-bold text-xl tracking-tight uppercase">
-            {user.role === "admin" ? "Admin" : user.role === "archivist" ? "Archivist" : "Student"}
+            {user.role === "admin" ? "Admin" : user.role === "archivist" ? "Archivist" : "User"}
           </h2>
         </div>
         <div className="flex-1 py-6 overflow-y-auto custom-scrollbar">
@@ -183,7 +209,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
             <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-bold text-white uppercase border border-white/10">{user.name.charAt(0)}</div>
             <div className="overflow-hidden">
               <p className="text-sm font-bold text-white truncate">{user.name}</p>
-              <p className="text-xs text-white/50 capitalize truncate">{user.role}</p>
+              <p className="text-xs text-white/50 uppercase truncate">{user.role === "student" ? "USER" : user.role}</p>
             </div>
           </div>
           <Button variant="ghost" className="w-full justify-start text-white/70 hover:text-white hover:bg-white/10" onClick={() => {
@@ -200,16 +226,20 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main Content */}
-      <div className={cn("flex-1 transition-all duration-300 flex flex-col min-h-screen", sidebarOpen ? "ml-64" : "ml-0")}>
-        <header className="h-16 bg-white border-b border-border/50 flex items-center justify-between px-6 sticky top-0 z-30 shadow-sm">
+      <div className={cn(
+        "flex-1 transition-all duration-300 flex flex-col min-h-screen",
+        sidebarOpen && !isMobile ? "ml-64" : "ml-0"
+      )}>
+        <header className="h-16 bg-white border-b border-border/50 flex items-center justify-between px-4 md:px-6 sticky top-0 z-30 shadow-sm">
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
             {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
           <div className="flex items-center gap-4">
-            <Button variant="outline" size="sm" onClick={() => setLocation('/')}>View Public Site</Button>
+            <Button variant="outline" size="sm" className="hidden sm:inline-flex" onClick={() => setLocation('/')}>View Public Site</Button>
+            <Button variant="ghost" size="icon" className="sm:hidden" onClick={() => setLocation('/')}><Library className="w-5 h-5" /></Button>
           </div>
         </header>
-        <main className="flex-1 p-6 md:p-8">
+        <main className="flex-1 p-4 md:p-8 overflow-x-hidden">
           <div className="max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
             {children}
           </div>

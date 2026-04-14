@@ -54,7 +54,14 @@ export default function RequestAccess() {
     }
 
     submitRequest(
-      { data: { materialId, purpose: data.purpose.trim(), userId: me.id, userName: me.name } as any },
+      { data: {
+        materialId,
+        materialTitle: material?.title || material?.materialId || materialId,
+        materialCover: material?.thumbnailUrl || material?.pageImages?.[0],
+        purpose: data.purpose.trim(),
+        userId: me.id,
+        userName: me.name,
+      } as any },
       {
         onSuccess: () => {
           toast({ title: "Request Submitted", description: "Your access request is pending review by an archivist." });

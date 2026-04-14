@@ -361,74 +361,99 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ─── FEATURES HORIZONTAL SCROLL ─── */}
-      <section ref={targetRef} className="relative h-[400vh] bg-[#f7f8fc]">
-        <div className="sticky top-0 flex h-screen items-center overflow-hidden">
-          <div className="absolute inset-x-0 top-20 text-center z-20 pointer-events-none">
-             <motion.div 
-               initial={{ opacity: 0, y: 20 }}
-               whileInView={{ opacity: 1, y: 0 }}
-               transition={{ duration: 0.8 }}
-               className="max-w-2xl mx-auto px-6"
-             >
-                <p className="text-xs font-bold text-[#4169E1] uppercase tracking-[0.2em] mb-4">Why iArchive</p>
-                <h2 className="text-5xl font-bold text-[#0a1628] leading-tight">
-                  Built for <span className="font-serif italic text-[#4169E1] relative">
-                    archival excellence
-                    <svg className="absolute -bottom-2 lg:-bottom-3 left-0 w-full h-3 text-[#960000] opacity-40" viewBox="0 0 100 20" preserveAspectRatio="none">
-                      <path d="M0 10 Q 50 20 100 10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    </svg>
-                  </span>
-                </h2>
-             </motion.div>
+      {/* ─── FEATURES SECTION (Responsive) ─── */}
+      <section className="bg-[#f7f8fc] py-20 md:py-0">
+        {/* Mobile View: Vertical Stack */}
+        <div className="md:hidden px-6 space-y-8 text-center">
+          <div className="mb-12">
+            <p className="text-[10px] font-bold text-[#4169E1] uppercase tracking-[0.2em] mb-4">Why iArchive</p>
+            <h2 className="text-4xl font-bold text-[#0a1628] leading-tight">
+              Built for <span className="font-serif italic text-[#4169E1]">archival excellence</span>
+            </h2>
           </div>
-
-          <motion.div style={{ x: springX }} className="flex gap-10 px-24">
-            {features.map((f, i) => (
-              <div 
-                key={i} 
-                className="group relative h-[320px] w-[500px] overflow-hidden rounded-[2.5rem] bg-white border border-border/50 shadow-sm transition-all duration-700 hover:shadow-2xl hover:border-[#4169E1]/40 shrink-0"
-              >
-                <div className="absolute inset-0 bg-gradient-to-br from-[#4169E1]/5 via-white to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-                <div className="p-8 flex items-start gap-8 h-full relative z-10">
-                  <div className="w-16 h-16 rounded-2xl bg-[#0a1628]/5 group-hover:bg-[#4169E1] flex items-center justify-center shrink-0 group-hover:scale-110 group-hover:-rotate-3 transition-all duration-500 shadow-sm">
-                    <f.icon className="w-8 h-8 text-[#0a1628] group-hover:text-white transition-colors duration-500" />
-                  </div>
-                  <div className="flex flex-col justify-center h-full">
-                    <h3 className="text-2xl font-bold text-[#0a1628] mb-3 group-hover:text-[#4169E1] transition-colors">{f.title}</h3>
-                    <p className="text-muted-foreground leading-relaxed text-[15px] font-light group-hover:text-[#0a1628]/80 transition-colors">
-                      {f.desc}
-                    </p>
-                    <div className="mt-6 flex items-center gap-2 text-[#4169E1] font-bold text-[10px] uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 group-hover:translate-x-3 transition-all duration-500">
-                      View Capability <ArrowRight className="w-3 h-3" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Decorative element - subtle grid pattern on hover */}
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-[0.03] pointer-events-none transition-opacity duration-700 bg-[radial-gradient(#0a1628_1px,transparent_1px)] [background-size:20px_20px]" />
-                <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-[#4169E1]/5 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+          {features.map((f, i) => (
+            <div key={i} className="bg-white p-8 rounded-3xl border border-border/50 shadow-sm text-left">
+              <div className="w-12 h-12 rounded-xl bg-[#0a1628]/5 flex items-center justify-center mb-6">
+                <f.icon className="w-6 h-6 text-[#0a1628]" />
               </div>
-            ))}
-            
-            {/* View Collection Card - Matching style */}
-            <div className="h-[320px] w-[500px] flex items-center justify-center shrink-0">
-               <Link href="/collections">
-                 <div className="flex flex-col items-center gap-6 group cursor-pointer">
-                    <motion.div 
-                      whileHover={{ scale: 1.1, rotate: 5 }}
-                      className="w-20 h-20 rounded-3xl bg-[#0a1628] flex items-center justify-center text-white shadow-2xl transition-all duration-500 group-hover:bg-[#4169E1]"
-                    >
-                       <Search className="w-7 h-7" />
-                    </motion.div>
-                    <div className="text-center">
-                       <h4 className="text-xl font-bold text-[#0a1628] mb-1">Access the Full Archive</h4>
-                       <p className="text-[#4169E1] text-[10px] uppercase tracking-[0.3em] font-black">Begin Research Pipeline →</p>
-                    </div>
-                 </div>
-               </Link>
+              <h3 className="text-xl font-bold text-[#0a1628] mb-3">{f.title}</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
             </div>
-          </motion.div>
+          ))}
+          <Link href="/collections">
+            <Button className="w-full mt-8 bg-[#0a1628] text-white">Explore Full Archive</Button>
+          </Link>
+        </div>
+
+        {/* Desktop View: Horizontal Scroll */}
+        <div ref={targetRef} className="hidden md:block relative h-[400vh]">
+          <div className="sticky top-0 flex h-screen items-center overflow-hidden">
+            <div className="absolute inset-x-0 top-20 text-center z-20 pointer-events-none">
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8 }}
+                className="max-w-2xl mx-auto px-6"
+              >
+                  <p className="text-xs font-bold text-[#4169E1] uppercase tracking-[0.2em] mb-4">Why iArchive</p>
+                  <h2 className="text-5xl font-bold text-[#0a1628] leading-tight">
+                    Built for <span className="font-serif italic text-[#4169E1] relative">
+                      archival excellence
+                      <svg className="absolute -bottom-2 lg:-bottom-3 left-0 w-full h-3 text-[#960000] opacity-40" viewBox="0 0 100 20" preserveAspectRatio="none">
+                        <path d="M0 10 Q 50 20 100 10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      </svg>
+                    </span>
+                  </h2>
+              </motion.div>
+            </div>
+
+            <motion.div style={{ x: springX }} className="flex gap-10 px-24">
+              {features.map((f, i) => (
+                <div 
+                  key={i} 
+                  className="group relative h-[320px] w-[500px] overflow-hidden rounded-[2.5rem] bg-white border border-border/50 shadow-sm transition-all duration-700 hover:shadow-2xl hover:border-[#4169E1]/40 shrink-0"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#4169E1]/5 via-white to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+                  <div className="p-8 flex items-start gap-8 h-full relative z-10">
+                    <div className="w-16 h-16 rounded-2xl bg-[#0a1628]/5 group-hover:bg-[#4169E1] flex items-center justify-center shrink-0 group-hover:scale-110 group-hover:-rotate-3 transition-all duration-500 shadow-sm">
+                      <f.icon className="w-8 h-8 text-[#0a1628] group-hover:text-white transition-colors duration-500" />
+                    </div>
+                    <div className="flex flex-col justify-center h-full">
+                      <h3 className="text-2xl font-bold text-[#0a1628] mb-3 group-hover:text-[#4169E1] transition-colors">{f.title}</h3>
+                      <p className="text-muted-foreground leading-relaxed text-[15px] font-light group-hover:text-[#0a1628]/80 transition-colors">
+                        {f.desc}
+                      </p>
+                      <div className="mt-6 flex items-center gap-2 text-[#4169E1] font-bold text-[10px] uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 group-hover:translate-x-3 transition-all duration-500">
+                        View Capability <ArrowRight className="w-3 h-3" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Decorative element - subtle grid pattern on hover */}
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-[0.03] pointer-events-none transition-opacity duration-700 bg-[radial-gradient(#0a1628_1px,transparent_1px)] [background-size:20px_20px]" />
+                  <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-[#4169E1]/5 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+                </div>
+              ))}
+              
+              {/* View Collection Card - Matching style */}
+              <div className="h-[320px] w-[500px] flex items-center justify-center shrink-0">
+                <Link href="/collections">
+                  <div className="flex flex-col items-center gap-6 group cursor-pointer">
+                      <motion.div 
+                        whileHover={{ scale: 1.1, rotate: 5 }}
+                        className="w-20 h-20 rounded-3xl bg-[#0a1628] flex items-center justify-center text-white shadow-2xl transition-all duration-500 group-hover:bg-[#4169E1]"
+                      >
+                        <Search className="w-7 h-7" />
+                      </motion.div>
+                      <div className="text-center">
+                        <h4 className="text-xl font-bold text-[#0a1628] mb-1">Access the Full Archive</h4>
+                        <p className="text-[#4169E1] text-[10px] uppercase tracking-[0.3em] font-black">Begin Research Pipeline →</p>
+                      </div>
+                  </div>
+                </Link>
+              </div>
+            </motion.div>
+          </div>
         </div>
       </section>
 
@@ -450,7 +475,7 @@ export default function Home() {
           <div className="relative">
             {/* High-Fidelity Circuit SVG Background */}
             <div className="hidden md:block absolute inset-0 -top-10 pointer-events-none">
-              <svg className="w-full h-40" preserveAspectRatio="none">
+              <svg className="w-full h-40" viewBox="0 0 100 100" preserveAspectRatio="none">
                 <defs>
                   <linearGradient id="circuit-grad" x1="0%" y1="0%" x2="100%" y2="0%">
                     <stop offset="0%" stopColor="#4169E1" />
@@ -463,7 +488,7 @@ export default function Home() {
                   initial={{ pathLength: 0 }}
                   whileInView={{ pathLength: 1 }}
                   transition={{ duration: 1.5, ease: "easeInOut" }}
-                  d="M 16.6% 75 L 25% 75 L 25% 40 L 41.6% 40" 
+                  d="M 16.6 75 L 25 75 L 25 40 L 41.6 40" 
                   fill="none" stroke="url(#circuit-grad)" strokeWidth="2" strokeDasharray="6 6"
                 />
                 {/* Horizontal segment 2 */}
@@ -471,7 +496,7 @@ export default function Home() {
                   initial={{ pathLength: 0 }}
                   whileInView={{ pathLength: 1 }}
                   transition={{ duration: 1.5, delay: 0.5, ease: "easeInOut" }}
-                  d="M 58.3% 40 L 75% 40 L 75% 75 L 83.3% 75" 
+                  d="M 58.3 40 L 75 40 L 75 75 L 83.3 75" 
                   fill="none" stroke="url(#circuit-grad)" strokeWidth="2" strokeDasharray="6 6"
                 />
               </svg>

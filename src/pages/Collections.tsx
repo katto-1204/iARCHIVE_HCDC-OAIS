@@ -70,11 +70,12 @@ export default function Collections() {
 
   const { data: user } = useGetMe();
   const [showOaisOnly, setShowOaisOnly] = React.useState(false);
+  const isPrivileged = user?.role === "admin" || user?.role === "archivist";
 
   const roleBranding = {
     admin: { bg: "bg-[#002366]", label: "Admin" },
     archivist: { bg: "bg-black", label: "Archivist" },
-    student: { bg: "bg-[#960000]", label: "Student" },
+    student: { bg: "bg-[#960000]", label: "User" },
   }[user?.role as string] || { bg: "bg-[#0a1628]", label: "" };
 
   const activeFilters = [
@@ -84,6 +85,8 @@ export default function Collections() {
   ].filter(Boolean) as { key: string; label: string; clear: () => void }[];
 
   const displayMaterials = localMaterials.filter((mat: any) => {
+    const approvalStatus = mat.approvalStatus || "approved";
+    if (!isPrivileged && approvalStatus !== "approved") return false;
     if (showOaisOnly && !checkOAISCompliance(mat)) return false;
     if (access && mat.access !== access) return false;
     if (debouncedSearch) {
@@ -99,10 +102,14 @@ export default function Collections() {
   });
 
   // Stats
-  const totalPublic = localMaterials.filter(m => m.access === "public").length;
-  const totalRestricted = localMaterials.filter(m => m.access === "restricted").length;
-  const totalConfidential = localMaterials.filter(m => m.access === "confidential").length;
-  const totalOais = localMaterials.filter(m => checkOAISCompliance(m)).length;
+  const visibleMaterials = localMaterials.filter((mat) => {
+    const approvalStatus = mat.approvalStatus || "approved";
+    return isPrivileged || approvalStatus === "approved";
+  });
+  const totalPublic = visibleMaterials.filter(m => m.access === "public").length;
+  const totalRestricted = visibleMaterials.filter(m => m.access === "restricted").length;
+  const totalConfidential = visibleMaterials.filter(m => m.access === "confidential").length;
+  const totalOais = visibleMaterials.filter(m => checkOAISCompliance(m)).length;
 
   return (
     <div className="min-h-screen bg-[#f7f8fc] font-sans">
@@ -359,6 +366,9 @@ export default function Collections() {
               const AccIcon = acc.icon;
               const hasCover = mat.thumbnailUrl || (mat.pageImages && mat.pageImages.length > 0);
               const coverImg = mat.pageImages?.[0] || mat.thumbnailUrl;
+              const approvalStatus = mat.approvalStatus || "approved";
+              const showApproval = isPrivileged && approvalStatus !== "approved";
+              const approvalBadgeClass = approvalStatus === "pending" ? "bg-amber-500/90" : "bg-red-500/90";
               const isHovered = hoveredCard === mat.id;
               const formatLabel = mat.format?.includes("image") ? "TIFF" : mat.format?.includes("video") ? "MP4" : "PDF";
 
@@ -371,6 +381,11 @@ export default function Collections() {
                   >
                     {/* Cover Image / Gradient */}
                     <div className="h-[200px] shrink-0 relative overflow-hidden">
+                      {showApproval && (
+                        <div className={`absolute top-3 right-3 z-20 rounded-full ${approvalBadgeClass} text-white text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 shadow-lg`}>
+                          {approvalStatus}
+                        </div>
+                      )}
                       {hasCover ? (
                         <>
                           <img
@@ -498,12 +513,20 @@ export default function Collections() {
               const acc = ACCESS_CONFIG[mat.access as keyof typeof ACCESS_CONFIG] || ACCESS_CONFIG.public;
               const AccIcon = acc.icon;
               const coverImg = mat.pageImages?.[0] || mat.thumbnailUrl;
+              const approvalStatus = mat.approvalStatus || "approved";
+              const showApproval = isPrivileged && approvalStatus !== "approved";
+              const approvalBadgeClass = approvalStatus === "pending" ? "bg-amber-500/90" : "bg-red-500/90";
               const formatLabel = mat.format?.includes("image") ? "TIFF" : mat.format?.includes("video") ? "MP4" : "PDF";
 
               return (
                 <Link key={mat.id || mat.uniqueId} href={`/materials/${mat.id || mat.uniqueId}`}>
                   <div className="bg-white rounded-2xl border border-border/60 overflow-hidden group hover:border-[#4169E1]/40 hover:shadow-xl hover:shadow-[#4169E1]/5 transition-all duration-300 cursor-pointer flex">
                     <div className="w-[180px] shrink-0 relative overflow-hidden bg-slate-100 flex flex-col group border-r border-border/40">
+                      {showApproval && (
+                        <div className={`absolute top-3 left-3 z-20 rounded-full ${approvalBadgeClass} text-white text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 shadow-lg`}>
+                          {approvalStatus}
+                        </div>
+                      )}
                       {mat.pageImages && mat.pageImages.length > 0 ? (
                         <>
                            <div className="flex-1 relative overflow-hidden">

@@ -67,122 +67,114 @@ function PageViewer({
 
   return (
     <>
-      <div className="bg-white rounded-2xl border border-border/60 overflow-hidden shadow-sm">
+      <div className="rounded-3xl border border-white/10 overflow-hidden shadow-2xl bg-[#0c0f16]">
         {/* Viewer Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-border/60 bg-muted/10">
+        <div className="flex flex-wrap items-center justify-between px-5 py-3 gap-3 border-b border-white/10 bg-gradient-to-r from-[#0f172a] to-[#111827]">
           <div className="flex items-center gap-3">
-            <span className="bg-[#0a1628] text-white text-xs font-bold px-2.5 py-1 rounded">Document Viewer</span>
-            <span className="text-xs text-muted-foreground font-medium">
-              Page {currentPage + 1} of {maxVisiblePages}{pages ? ` (${pages} total)` : ''}
+            <span className="bg-white/10 text-white text-[10px] font-bold px-3 py-1 rounded-full tracking-widest">MEDIA VIEWER</span>
+            <span className="text-xs text-white/60">
+              Page {currentPage + 1} of {maxVisiblePages}{pages ? ` (${pages} total)` : ""}
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setShowFullscreen(true)} className="w-8 h-8 rounded-lg border border-border hover:bg-muted/50 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
+            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${isRestricted ? "bg-[#960000]/20 text-[#ffb4b4]" : "bg-emerald-500/20 text-emerald-200"}`}>
+              {isRestricted ? "RESTRICTED" : "PUBLIC"}
+            </span>
+            <button onClick={() => setShowFullscreen(true)} className="w-8 h-8 rounded-lg border border-white/10 hover:bg-white/10 flex items-center justify-center text-white/70 hover:text-white transition-colors">
               <Maximize2 className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Main Page Display */}
-        <div className="relative bg-[#f0f0f4]">
-          {/* Cover Page (page 0) = larger */}
-          <div className="relative flex items-center justify-center min-h-[420px] max-h-[600px] overflow-hidden">
-            <img 
-              src={visibleImages[currentPage]} 
-              alt={`${title} - Page ${currentPage + 1}`} 
-              className={`max-h-[580px] w-full object-cover transition-all duration-500 ${!canAccess && isRestricted && currentPage === 3 ? 'blur-md opacity-70' : ''}`}
-              style={{ objectPosition: 'top' }}
-            />
-            
-            {/* Page label */}
-            <div className="absolute top-3 left-3 bg-black/60 text-white text-[10px] px-3 py-1 rounded-lg font-bold backdrop-blur-sm">
-              {currentPage === 0 ? "Cover Page" : `Page ${currentPage + 1}`}
-            </div>
-
-            {/* Restricted overlay on 4th page (index 3) */}
-            {!canAccess && isRestricted && currentPage === 3 && (
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/60 to-white flex flex-col items-center justify-end pb-10 z-10">
-                <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-border/60 p-8 max-w-md text-center mx-4 animate-fade-in-up">
-                  <div className="w-14 h-14 rounded-full bg-[#960000]/10 flex items-center justify-center mx-auto mb-4">
-                    <Lock className="w-7 h-7 text-[#960000]" />
-                  </div>
-                  <h3 className="text-lg font-bold text-[#0a1628] mb-2">Restricted Content</h3>
-                  <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
-                    You've reached the preview limit. This material requires authorized access to view all {pages || totalDisplayPages} pages.
-                  </p>
-                  <Link 
-                    href={`/request-access?materialId=${encodeURIComponent(materialId)}&title=${encodeURIComponent(title)}`}
-                  >
-                    <button className="w-full bg-[#960000] hover:bg-[#7a0000] text-white font-bold py-3 px-6 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg">
-                      <Lock className="w-4 h-4" /> Request Access to Continue
-                    </button>
-                  </Link>
-                </div>
-              </div>
-            )}
-
-            {/* Navigation Arrows */}
-            {currentPage > 0 && (
-              <button 
-                onClick={() => goTo(currentPage - 1)}
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 shadow-lg border border-border/60 flex items-center justify-center hover:bg-white transition-all z-20 group"
-              >
-                <ChevronLeft className="w-5 h-5 text-[#0a1628] group-hover:text-[#4169E1]" />
-              </button>
-            )}
-            {currentPage < maxVisiblePages - 1 && (!isRestricted || canAccess || currentPage < 3) && (
-              <button 
-                onClick={() => goTo(currentPage + 1)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 shadow-lg border border-border/60 flex items-center justify-center hover:bg-white transition-all z-20 group"
-              >
-                <ChevronRight className="w-5 h-5 text-[#0a1628] group-hover:text-[#4169E1]" />
-              </button>
-            )}
-          </div>
-
-          {/* Thumbnail Strip */}
-          <div className="border-t border-border/60 bg-white px-4 py-3">
-            <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-1">
+        <div className="flex flex-col md:flex-row">
+          {/* Filmstrip */}
+          <div className="md:w-28 w-full md:border-r border-white/10 bg-[#0b0f16] md:max-h-[640px]">
+            <div className="md:h-full md:overflow-y-auto flex md:flex-col gap-2 p-3 overflow-x-auto custom-scrollbar">
               {visibleImages.map((img, idx) => (
                 <button
                   key={idx}
                   onClick={() => goTo(idx)}
                   className={`relative shrink-0 w-16 h-20 rounded-lg overflow-hidden border-2 transition-all ${
-                    currentPage === idx 
-                      ? 'border-[#4169E1] shadow-md ring-2 ring-[#4169E1]/20' 
-                      : 'border-border/40 hover:border-[#4169E1]/40 opacity-70 hover:opacity-100'
+                    currentPage === idx
+                      ? "border-emerald-400 ring-2 ring-emerald-400/20"
+                      : "border-white/10 opacity-70 hover:opacity-100"
                   }`}
                 >
                   <img src={img} alt={`Thumbnail ${idx + 1}`} className="w-full h-full object-cover" />
                   <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[8px] font-bold text-center py-0.5">
-                    {idx === 0 ? 'Cover' : idx + 1}
+                    {idx === 0 ? "Cover" : idx + 1}
                   </div>
-                  {/* Locked indicator for restricted pages beyond limit */}
                   {!canAccess && isRestricted && idx === maxVisiblePages - 1 && idx < totalDisplayPages - 1 && (
-                    <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
-                      <Lock className="w-3 h-3 text-[#960000]" />
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                      <Lock className="w-3 h-3 text-[#ffb4b4]" />
                     </div>
                   )}
                 </button>
               ))}
-              {/* Show locked placeholder thumbnails for restricted content */}
               {!canAccess && isRestricted && totalDisplayPages > maxVisiblePages && (
                 <>
-                  {Array.from({ length: Math.min(3, totalDisplayPages - maxVisiblePages) }).map((_, idx) => (
+                  {Array.from({ length: Math.min(2, totalDisplayPages - maxVisiblePages) }).map((_, idx) => (
                     <div
                       key={`locked-${idx}`}
-                      className="shrink-0 w-16 h-20 rounded-lg border-2 border-dashed border-[#960000]/30 bg-[#960000]/5 flex flex-col items-center justify-center gap-1"
+                      className="shrink-0 w-16 h-20 rounded-lg border-2 border-dashed border-[#960000]/40 bg-[#960000]/10 flex flex-col items-center justify-center gap-1"
                     >
-                      <Lock className="w-3 h-3 text-[#960000]/50" />
-                      <span className="text-[7px] font-bold text-[#960000]/50 uppercase">Locked</span>
+                      <Lock className="w-3 h-3 text-[#ffb4b4]/70" />
+                      <span className="text-[7px] font-bold text-[#ffb4b4]/70 uppercase">Locked</span>
                     </div>
                   ))}
-                  {totalDisplayPages - maxVisiblePages > 3 && (
-                    <div className="shrink-0 w-16 h-20 rounded-lg border-2 border-dashed border-muted-foreground/20 bg-muted/20 flex items-center justify-center">
-                      <span className="text-[9px] font-bold text-muted-foreground/50">+{totalDisplayPages - maxVisiblePages - 3}</span>
-                    </div>
-                  )}
                 </>
+              )}
+            </div>
+          </div>
+
+          {/* Main Stage */}
+          <div className="relative flex-1 bg-gradient-to-b from-[#101420] to-[#0c0f16] min-h-[520px]">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.08),_transparent_55%)]" />
+            <div className="relative flex items-center justify-center min-h-[520px] max-h-[640px] overflow-hidden px-8 py-6">
+              <img
+                src={visibleImages[currentPage]}
+                alt={`${title} - Page ${currentPage + 1}`}
+                className={`max-h-[620px] w-full object-contain transition-all duration-500 ${!canAccess && isRestricted && currentPage === 3 ? "blur-md opacity-70" : ""}`}
+              />
+
+              <div className="absolute top-4 left-4 bg-black/60 text-white text-[10px] px-3 py-1 rounded-full font-bold backdrop-blur-sm">
+                {currentPage === 0 ? "Cover Page" : `Page ${currentPage + 1}`}
+              </div>
+
+              {!canAccess && isRestricted && currentPage === 3 && (
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/40 to-black/60 flex flex-col items-center justify-end pb-10 z-10">
+                  <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-border/60 p-8 max-w-md text-center mx-4 animate-fade-in-up">
+                    <div className="w-14 h-14 rounded-full bg-[#960000]/10 flex items-center justify-center mx-auto mb-4">
+                      <Lock className="w-7 h-7 text-[#960000]" />
+                    </div>
+                    <h3 className="text-lg font-bold text-[#0a1628] mb-2">Restricted Content</h3>
+                    <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
+                      You've reached the preview limit. This material requires authorized access to view all {pages || totalDisplayPages} pages.
+                    </p>
+                    <Link href={`/request-access?materialId=${encodeURIComponent(materialId)}&title=${encodeURIComponent(title)}`}>
+                      <button className="w-full bg-[#960000] hover:bg-[#7a0000] text-white font-bold py-3 px-6 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg">
+                        <Lock className="w-4 h-4" /> Request Access to Continue
+                      </button>
+                    </Link>
+                  </div>
+                </div>
+              )}
+
+              {currentPage > 0 && (
+                <button
+                  onClick={() => goTo(currentPage - 1)}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 flex items-center justify-center transition-all"
+                >
+                  <ChevronLeft className="w-5 h-5 text-white" />
+                </button>
+              )}
+              {currentPage < maxVisiblePages - 1 && (!isRestricted || canAccess || currentPage < 3) && (
+                <button
+                  onClick={() => goTo(currentPage + 1)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 flex items-center justify-center transition-all"
+                >
+                  <ChevronRight className="w-5 h-5 text-white" />
+                </button>
               )}
             </div>
           </div>
@@ -361,6 +353,31 @@ export default function MaterialDetail() {
     );
   }
 
+  const approvalStatus = material.approvalStatus || "approved";
+  const isPrivileged = user?.role === "admin" || user?.role === "archivist";
+  const isPublished = approvalStatus === "approved";
+
+  if (!isPublished && !isPrivileged) {
+    return (
+      <div className="min-h-screen bg-[#f7f8fc] flex items-center justify-center p-6">
+        <div className="max-w-xl w-full bg-white rounded-2xl border border-border/60 shadow-sm p-8 text-center">
+          <div className="w-14 h-14 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle className="w-7 h-7" />
+          </div>
+          <h2 className="text-xl font-bold text-[#0a1628] mb-2">Awaiting Admin Approval</h2>
+          <p className="text-sm text-muted-foreground mb-6">
+            This archival material is pending administrative approval and is not yet published for public access.
+          </p>
+          <Link href="/collections">
+            <button className="bg-[#4169E1] text-white font-semibold px-6 py-2.5 rounded-lg text-sm hover:bg-[#3558c8] transition-colors">
+              Back to Collections
+            </button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   const accessBadge = {
     public: { label: "PUBLIC", className: "bg-[#4169E1]/10 text-[#4169E1] border border-[#4169E1]/20" },
     restricted: { label: "RESTRICTED", className: "bg-amber-50 text-amber-700 border border-amber-200" },
@@ -368,9 +385,9 @@ export default function MaterialDetail() {
   }[material.access as "public" | "restricted" | "confidential"] ?? { label: material.access?.toUpperCase() || "", className: "bg-muted text-muted-foreground border border-border" };
 
   const fixityVerified = material.fixityStatus === "verified" || material.sha256;
-  const canViewDetail = material.access === "public" || user?.role === "admin" || user?.role === "archivist" || !!isApproved;
+  const canViewDetail = material.access === "public" || isPrivileged || !!isApproved;
   const isRestricted = material.access === "restricted" || material.access === "confidential";
-  const canAccessFull = material.access === "public" || user?.role === "admin" || user?.role === "archivist" || !!isApproved;
+  const canAccessFull = material.access === "public" || isPrivileged || !!isApproved;
 
   return (
     <div className="min-h-screen bg-[#f7f8fc] font-sans">

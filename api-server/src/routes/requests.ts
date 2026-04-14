@@ -1,9 +1,8 @@
 import { Router } from "express";
-import { db, accessRequestsTable, materialsTable, usersTable } from "@workspace/db";
-import { eq, count, and, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth.js";
 import { generateId } from "../lib/id.js";
 import { logAudit } from "./audit.js";
+import { getFirestoreDb } from "../lib/firebase.js";
 import {
   jsonStoreApproveAccessRequest,
   jsonStoreGetAccessRequests,
@@ -14,12 +13,23 @@ import {
 const router = Router();
 
 async function formatRequest(r: any) {
-  const [material] = await db.select().from(materialsTable).where(eq(materialsTable.id, r.materialId)).limit(1);
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, r.userId)).limit(1);
+  const db = getFirestoreDb();
+  let materialTitle = "Unknown";
+  const matSnap = await db.collection("materials").doc(r.materialId).get();
+  if (matSnap.exists) {
+    materialTitle = (matSnap.data() as any).title || "Unknown";
+  } else {
+    const byMaterialId = await db.collection("materials").where("materialId", "==", r.materialId).limit(1).get();
+    if (!byMaterialId.empty) {
+      materialTitle = (byMaterialId.docs[0].data() as any).title || "Unknown";
+    }
+  }
+  const userSnap = await db.collection("users").doc(r.userId).get();
+  const user = userSnap.exists ? (userSnap.data() as any) : null;
   return {
     id: r.id,
     materialId: r.materialId,
-    materialTitle: material?.title || "Unknown",
+    materialTitle,
     userId: r.userId,
     userName: user?.name || "Unknown",
     userEmail: user?.email || "Unknown",
@@ -34,23 +44,27 @@ async function formatRequest(r: any) {
 router.get("/requests", requireAuth, async (req, res) => {
   const page = Math.max(1, parseInt(req.query.page as string) || 1);
   const limit = 20;
-  const offset = (page - 1) * limit;
   const status = req.query.status as string;
   const user = req.user!;
 
   try {
-    const conditions: any[] = [];
+    const db = getFirestoreDb();
+    let query = db.collection("accessRequests");
     if (status && ["pending", "approved", "rejected"].includes(status)) {
-      conditions.push(eq(accessRequestsTable.status, status as any));
+      query = query.where("status", "==", status);
     }
     if (user.role === "student" || user.role === "researcher" || user.role === "alumni" || user.role === "public") {
-      conditions.push(eq(accessRequestsTable.userId, user.userId));
+      query = query.where("userId", "==", user.userId);
     }
-    const where = conditions.length > 0 ? and(...conditions) : undefined;
-    const [{ count: total }] = await db.select({ count: count() }).from(accessRequestsTable).where(where);
-    const rows = await db.select().from(accessRequestsTable).where(where).orderBy(sql`${accessRequestsTable.createdAt} desc`).limit(limit).offset(offset);
-    const formatted = await Promise.all(rows.map(formatRequest));
-    res.json({ requests: formatted, total: Number(total), page, totalPages: Math.ceil(Number(total) / limit) });
+    query = query.orderBy("createdAt", "desc");
+    const snapshot = await query.get();
+    const rows = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const total = rows.length;
+    const totalPages = Math.ceil(total / limit);
+    const offset = (page - 1) * limit;
+    const pageItems = rows.slice(offset, offset + limit);
+    const formatted = await Promise.all(pageItems.map(formatRequest));
+    res.json({ requests: formatted, total, page, totalPages });
   } catch {
     const role = user.role;
     const selfRoles = ["student", "researcher", "alumni", "public"];
@@ -65,9 +79,19 @@ router.post("/requests", requireAuth, async (req, res) => {
   if (!materialId || !purpose) { res.status(400).json({ error: "Material and purpose required" }); return; }
   try {
     const id = generateId();
-    await db.insert(accessRequestsTable).values({ id, materialId, userId: user.userId, purpose, status: "pending" });
+    const db = getFirestoreDb();
+    const now = new Date().toISOString();
+    await db.collection("accessRequests").doc(id).set({
+      id,
+      materialId,
+      userId: user.userId,
+      purpose,
+      status: "pending",
+      createdAt: now,
+      updatedAt: now,
+    });
     await logAudit({ action: "SUBMIT_REQUEST", entityType: "request", entityId: id, userId: user.userId, userName: user.name, details: `Submitted access request for material: ${materialId}` });
-    const [newReq] = await db.select().from(accessRequestsTable).where(eq(accessRequestsTable.id, id)).limit(1);
+    const newReq = { id, materialId, userId: user.userId, purpose, status: "pending", createdAt: now, updatedAt: now };
     res.status(201).json(await formatRequest(newReq));
   } catch {
     const created = jsonStoreSubmitAccessRequest({
@@ -88,9 +112,10 @@ router.post("/requests/:id/approve", requireAuth, requireRole("admin", "archivis
   const user = req.user!;
   const id = String(req.params.id);
   try {
-    const [req_] = await db.select().from(accessRequestsTable).where(eq(accessRequestsTable.id, id)).limit(1);
-    if (!req_) { res.status(404).json({ error: "Request not found" }); return; }
-    await db.update(accessRequestsTable).set({ status: "approved", reviewedBy: user.userId, updatedAt: new Date() }).where(eq(accessRequestsTable.id, id));
+    const db = getFirestoreDb();
+    const snap = await db.collection("accessRequests").doc(id).get();
+    if (!snap.exists) { res.status(404).json({ error: "Request not found" }); return; }
+    await db.collection("accessRequests").doc(id).update({ status: "approved", reviewedBy: user.userId, updatedAt: new Date().toISOString() });
     await logAudit({ action: "APPROVE_REQUEST", entityType: "request", entityId: id, userId: user.userId, userName: user.name, details: `Approved access request` });
     res.json({ message: "Request approved" });
   } catch {
@@ -105,9 +130,10 @@ router.post("/requests/:id/reject", requireAuth, requireRole("admin", "archivist
   const id = String(req.params.id);
   const { reason } = req.body;
   try {
-    const [req_] = await db.select().from(accessRequestsTable).where(eq(accessRequestsTable.id, id)).limit(1);
-    if (!req_) { res.status(404).json({ error: "Request not found" }); return; }
-    await db.update(accessRequestsTable).set({ status: "rejected", rejectionReason: reason, reviewedBy: user.userId, updatedAt: new Date() }).where(eq(accessRequestsTable.id, id));
+    const db = getFirestoreDb();
+    const snap = await db.collection("accessRequests").doc(id).get();
+    if (!snap.exists) { res.status(404).json({ error: "Request not found" }); return; }
+    await db.collection("accessRequests").doc(id).update({ status: "rejected", rejectionReason: reason, reviewedBy: user.userId, updatedAt: new Date().toISOString() });
     await logAudit({ action: "REJECT_REQUEST", entityType: "request", entityId: id, userId: user.userId, userName: user.name, details: `Rejected access request: ${reason}` });
     res.json({ message: "Request rejected" });
   } catch {

@@ -534,7 +534,9 @@ export default function AdminMaterials() {
       fonds: "HCDC — Holy Cross of Davao College",
       subfonds: mat.hierarchyPath?.split(" > ")[1]?.trim() || "",
       program: mat.hierarchyPath?.split(" > ")[2]?.trim() || "",
-      series: mat.hierarchyPath?.split(" > ")[3]?.trim() || ""
+      series: mat.hierarchyPath?.split(" > ")[3]?.trim() || "",
+      fileData: undefined,
+      fileType: mat.fileType || ""
     });
     setChecklistValues(mat as any);
     setUploadOpen(true);
@@ -766,9 +768,9 @@ export default function AdminMaterials() {
             </div>
 
             <div className="overflow-x-auto">
-              <div className="min-w-[800px] divide-y divide-border/40">
-                <div className="grid grid-cols-[120px_60px_1fr_100px_70px_80px_60px] gap-2 px-4 py-2.5 bg-muted/30 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                  <span>Unique ID</span><span>Barcode</span><span>Title</span><span>Progress</span><span className="text-right">%</span><span className="text-center">Status</span><span></span>
+              <div className="min-w-full divide-y divide-border/40">
+                <div className="grid grid-cols-[1fr_100px] md:grid-cols-[120px_60px_1fr_100px_70px_80px_60px] gap-2 px-4 py-2.5 bg-muted/30 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                  <span className="hidden md:inline text-left">Unique ID</span><span className="hidden md:inline text-left">Barcode</span><span className="text-left">Title</span><span className="hidden md:inline text-left">Progress</span><span className="hidden md:inline text-right">%</span><span className="text-center">Status</span><span className="hidden md:inline"></span>
                 </div>
 
                 {filteredMaterials.length === 0 ? (
@@ -786,12 +788,14 @@ export default function AdminMaterials() {
 
                     return (
                       <React.Fragment key={mat.uniqueId}>
-                        <div className={cn("grid grid-cols-[120px_60px_1fr_100px_70px_80px_60px] gap-2 px-4 py-3 items-center hover:bg-muted/10 transition-colors group cursor-pointer", isExpanded && "bg-muted/5")} onClick={() => toggleMaterialDetail(mat)}>
-                          <div className="flex items-center gap-1.5">
+                        <div className={cn("grid grid-cols-[1fr_100px] md:grid-cols-[120px_60px_1fr_100px_70px_80px_60px] gap-2 px-4 py-3 items-center hover:bg-muted/10 transition-colors group cursor-pointer", isExpanded && "bg-muted/5")} onClick={() => toggleMaterialDetail(mat)}>
+                          <div className="hidden md:flex items-center gap-1.5">
                             <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
                             <span className="font-mono text-[11px] font-bold text-[#0a1628]">{mat.uniqueId}</span>
                           </div>
-                          <Barcode value={mat.uniqueId} width={50} height={16} />
+                          <div className="hidden md:block">
+                            <Barcode value={mat.uniqueId} width={50} height={16} />
+                          </div>
                           <div className="min-w-0 pr-4">
                             <span className="text-sm font-semibold text-[#0a1628] group-hover:text-primary truncate block text-left transition-colors w-full">
                               {mat.title}
@@ -805,14 +809,14 @@ export default function AdminMaterials() {
                               )}
                             </div>
                           </div>
-                          <div className="h-1.5 bg-muted/60 rounded-full overflow-hidden">
+                          <div className="hidden md:block h-1.5 bg-muted/60 rounded-full overflow-hidden">
                             <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: color }} />
                           </div>
-                          <span className="text-right text-xs font-bold" style={{ color }}>{pct}%</span>
+                          <span className="hidden md:block text-right text-xs font-bold" style={{ color }}>{pct}%</span>
                           <div className="text-center">
                             <Badge variant={pct >= 100 ? "success" : pct >= 50 ? "accent" : "default"} className="text-[9px] capitalize">{pct >= 100 ? "Complete" : pct >= 50 ? "Partial" : "Incomplete"}</Badge>
                           </div>
-                          <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="hidden md:flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={(e) => handleEditMaterial(mat, e)}>
                               <Edit className="w-3.5 h-3.5" />
                             </Button>

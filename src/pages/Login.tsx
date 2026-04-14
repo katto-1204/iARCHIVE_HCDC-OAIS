@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Library, ShieldCheck, Search, Users, LogIn, KeyRound, Sparkles, ArrowRight, Database, Lock } from "lucide-react";
 import { Button, Card, Input, Label } from "@/components/ui-components";
+import { Modal } from "@/components/ui-components";
 import { useLogin } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -18,6 +19,7 @@ export default function Login() {
   const { toast } = useToast();
   const { mutate, isPending } = useLogin();
   const [activeDemo, setActiveDemo] = React.useState<string | null>(null);
+  const [errorModal, setErrorModal] = React.useState<{ title: string; message: string } | null>(null);
   
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
@@ -32,14 +34,23 @@ export default function Login() {
           setLocation('/admin');
         } else if (res.user.role === 'archivist') {
           setLocation('/archivist');
-        } else if (res.user.role === 'student') {
-          setLocation('/student');
         } else {
-          setLocation('/collections');
+          setLocation('/student');
         }
       },
       onError: (err) => {
-        toast({ title: "Login Failed", description: (err as any)?.data?.error || "Invalid credentials. Please try again.", variant: "destructive" });
+        const message = (err as any)?.data?.error || (err as any)?.message || "Invalid credentials. Please try again.";
+        const title = /not active|approval/i.test(message)
+          ? "Account Pending"
+          : /user not found|email not found|invalid login/i.test(message)
+            ? "Account Not Found"
+            : "Login Failed";
+        const detail = /not active|approval/i.test(message)
+          ? "Your account is pending approval. Please wait for activation."
+          : /user not found|email not found|invalid login/i.test(message)
+            ? "We could not find that account. Please register or check your email."
+            : message;
+        setErrorModal({ title, message: detail });
       }
     });
   };
@@ -47,7 +58,7 @@ export default function Login() {
   const demoUsers = [
     { label: "Admin", email: "admin@hcdc.edu.ph", role: "Full system control", icon: ShieldCheck, color: "bg-[#0a1628]", hoverColor: "hover:bg-[#0a1628]", ring: "ring-[#0a1628]/30" },
     { label: "Archivist", email: "archivist@hcdc.edu.ph", role: "Catalog & manage", icon: Database, color: "bg-[#4169E1]", hoverColor: "hover:bg-[#4169E1]", ring: "ring-[#4169E1]/30" },
-    { label: "Student", email: "student@hcdc.edu.ph", role: "Browse & request", icon: Users, color: "bg-[#960000]", hoverColor: "hover:bg-[#960000]", ring: "ring-[#960000]/30" },
+    { label: "User", email: "student@hcdc.edu.ph", role: "Browse & request", icon: Users, color: "bg-[#960000]", hoverColor: "hover:bg-[#960000]", ring: "ring-[#960000]/30" },
   ];
 
   const fillAndSubmit = (email: string) => {
@@ -90,7 +101,7 @@ export default function Login() {
 
           <div className="space-y-3">
             {[
-              { icon: Lock, title: "Role-Based Access", desc: "Separate dashboards for Admin, Archivist, and Student users" },
+              { icon: Lock, title: "Role-Based Access", desc: "Separate dashboards for Admin, Archivist, and User accounts" },
               { icon: Search, title: "Full Archive Search", desc: "Search across ISAD(G) metadata, Dublin Core elements, and more" },
               { icon: ShieldCheck, title: "OAIS Compliant", desc: "ISO 14721:2012 certified preservation standards" },
             ].map((f, i) => (
@@ -116,34 +127,7 @@ export default function Login() {
         </Link>
         
         <div className="w-full max-w-md">
-          {/* Quick-login cards */}
-          <div className="mb-6">
-            <p className="text-white/40 text-xs font-semibold uppercase tracking-widest mb-3">Quick Sign In</p>
-            <div className="grid grid-cols-3 gap-2">
-              {demoUsers.map((u) => (
-                <button
-                  key={u.email}
-                  type="button"
-                  onClick={() => fillAndSubmit(u.email)}
-                  disabled={isPending}
-                  className={`group relative overflow-hidden rounded-xl border border-white/10 p-3 text-center transition-all duration-300 hover:border-white/25 hover:scale-[1.02] ${activeDemo === u.email ? 'ring-2 ring-white/30 bg-white/10' : 'bg-white/5'}`}
-                >
-                  <div className={`w-9 h-9 rounded-lg ${u.color} flex items-center justify-center mx-auto mb-2`}>
-                    <u.icon className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="text-white text-xs font-bold">{u.label}</div>
-                  <div className="text-white/35 text-[10px] mt-0.5">{u.role}</div>
-                </button>
-              ))}
-            </div>
-          </div>
 
-          {/* Divider */}
-          <div className="flex items-center gap-3 mb-6">
-            <div className="flex-1 h-px bg-white/10" />
-            <span className="text-white/30 text-xs font-medium">or sign in manually</span>
-            <div className="flex-1 h-px bg-white/10" />
-          </div>
 
           {/* Form */}
           <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-7">
@@ -209,6 +193,17 @@ export default function Login() {
           </div>
         </div>
       </div>
+
+      <Modal
+        isOpen={!!errorModal}
+        onClose={() => setErrorModal(null)}
+        title={errorModal?.title || "Login Error"}
+      >
+        <p className="text-sm text-muted-foreground">{errorModal?.message}</p>
+        <div className="mt-4 flex justify-end">
+          <Button variant="accent" onClick={() => setErrorModal(null)}>Okay</Button>
+        </div>
+      </Modal>
     </div>
   );
 }

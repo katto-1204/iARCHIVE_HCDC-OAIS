@@ -4,6 +4,7 @@ import { SAMPLE_MATERIALS, ACTIVITY_FEED, type ArchivalMaterial, type ActivityEn
 const STORAGE_KEYS = {
   MATERIALS: "iarchive_materials",
   ACTIVITY: "iarchive_activity",
+  INGEST_REQUESTS: "iarchive_ingest_requests",
   VERSION: "iarchive_version",
 };
 
@@ -88,6 +89,9 @@ export function initializeStorage() {
   }
   if (!localStorage.getItem(STORAGE_KEYS.ACTIVITY)) {
     localStorage.setItem(STORAGE_KEYS.ACTIVITY, JSON.stringify(ACTIVITY_FEED));
+  }
+  if (!localStorage.getItem(STORAGE_KEYS.INGEST_REQUESTS)) {
+    localStorage.setItem(STORAGE_KEYS.INGEST_REQUESTS, JSON.stringify([]));
   }
 }
 
@@ -178,9 +182,10 @@ export async function saveMaterial(material: ArchivalMaterial) {
             processedMaterial.fileType = blob.type || material.fileType;
             processedMaterial.fileUrl = undefined;
             processedMaterial.fileId = fileId;
-          } else if (material.fileUrl instanceof Blob) {
-            await saveFile(fileId, material.fileUrl, material.fileUrl.type || material.fileType);
-            processedMaterial.fileType = material.fileUrl.type || material.fileType;
+          } else if (material.fileUrl && typeof material.fileUrl === "object" && (material.fileUrl as any) instanceof Blob) {
+            const fileBlob = material.fileUrl as any as Blob;
+            await saveFile(fileId, fileBlob, fileBlob.type || material.fileType);
+            processedMaterial.fileType = fileBlob.type || material.fileType;
             processedMaterial.fileUrl = undefined;
             processedMaterial.fileId = fileId;
           } else if (typeof material.fileUrl === "string" && material.fileUrl.startsWith("blob:")) {
@@ -191,8 +196,8 @@ export async function saveMaterial(material: ArchivalMaterial) {
         if (material.pageImages && material.pageImages.length > 0) {
           const fileId = material.fileId || material.id;
           const first = material.pageImages[0] as any;
-          if (first instanceof Blob) {
-            await saveFile(fileId + "_thumbs", material.pageImages as unknown as Blob[], "image/jpeg");
+          if (first && typeof first === "object" && first instanceof Blob) {
+            await saveFile(fileId + "_thumbs", material.pageImages as any as Blob[], "image/jpeg");
             processedMaterial.pageImages = [];
             processedMaterial.fileId = fileId;
           } else if (typeof first === "string" && first.startsWith("data:")) {
@@ -259,4 +264,38 @@ export function addActivity(entry: Omit<ActivityEntry, "id" | "timestamp">) {
   const updatedFeed = [newEntry, ...feed].slice(0, 50);
   localStorage.setItem(STORAGE_KEYS.ACTIVITY, JSON.stringify(updatedFeed));
   return updatedFeed;
+}
+
+export interface IngestApprovalRequest {
+  id: string;
+  materialId: string;
+  materialTitle: string;
+  hierarchyPath?: string;
+  requestedBy: string;
+  requestedAt: string;
+  status: "pending" | "approved" | "rejected";
+}
+
+export function getIngestRequests(): IngestApprovalRequest[] {
+  if (typeof window === "undefined") return [];
+  const stored = localStorage.getItem(STORAGE_KEYS.INGEST_REQUESTS);
+  if (!stored) {
+    initializeStorage();
+    return [];
+  }
+  try { return JSON.parse(stored); } catch { return []; }
+}
+
+export function addIngestRequest(request: IngestApprovalRequest) {
+  const list = getIngestRequests();
+  const updated = [request, ...list].slice(0, 100);
+  localStorage.setItem(STORAGE_KEYS.INGEST_REQUESTS, JSON.stringify(updated));
+  return updated;
+}
+
+export function updateIngestRequest(id: string, status: "approved" | "rejected") {
+  const list = getIngestRequests();
+  const updated = list.map((req) => req.id === id ? { ...req, status } : req);
+  localStorage.setItem(STORAGE_KEYS.INGEST_REQUESTS, JSON.stringify(updated));
+  return updated;
 }

@@ -405,6 +405,10 @@ export interface ArchivalMaterial {
   aipId?: string;
   ingestDate?: string;
   ingestBy?: string;
+  createdByRole?: string;
+  approvalStatus?: "pending" | "approved" | "rejected";
+  approvedAt?: string;
+  approvedBy?: string;
   pages?: number;
   pageImages?: string[];
   createdAt: string;
@@ -780,7 +784,7 @@ export interface ActivityEntry {
   id: string;
   timestamp: string;
   user: string;
-  actionType: "upload" | "edit" | "metadata_update" | "access_change" | "delete" | "request";
+  actionType: "upload" | "submit" | "approve" | "reject" | "edit" | "metadata_update" | "access_change" | "delete" | "request";
   description: string;
   materialId?: string;
 }

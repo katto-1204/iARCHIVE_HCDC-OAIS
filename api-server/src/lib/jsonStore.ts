@@ -1,7 +1,10 @@
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 import { generateId, generateMaterialId } from "./id.js";
 import { hashSync } from "bcryptjs";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 type JsonCategory = {
   id: string;
@@ -117,7 +120,7 @@ function getDemoUserById(id?: string) {
   return DEMO_USERS.find((u) => u.id === id);
 }
 
-const DATA_BASE = path.resolve(process.cwd(), "..", "iarchive");
+const DATA_BASE = path.resolve(__dirname, "..", "..", "..");
 const CATEGORIES_PATH = path.join(DATA_BASE, "categories.json");
 const MATERIALS_PATH = path.join(DATA_BASE, "materials.json");
 const USERS_PATH = path.join(DATA_BASE, "users.json");
@@ -585,6 +588,7 @@ export function jsonStoreGetStats() {
 
 export function jsonStoreGetUserByEmail(email: string) {
   const users = safeReadJson<JsonUser[]>(USERS_PATH, []);
+  if (!email) return null;
   const existing = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
   if (existing) return existing;
 
@@ -638,6 +642,7 @@ export function jsonStoreRegisterUser(input: {
   email: string;
   password: string;
   role: string;
+  userCategory?: string;
   institution?: string;
   purpose?: string;
 }) {
@@ -656,9 +661,9 @@ export function jsonStoreRegisterUser(input: {
     email: input.email,
     passwordHash,
     role: input.role,
-    userCategory: input.role,
-    institution: input.institution ?? null,
-    purpose: input.purpose ?? null,
+    userCategory: input.userCategory || input.role,
+    institution: input.institution || null,
+    purpose: input.purpose || null,
     status: "pending",
     createdAt: now,
     updatedAt: now,
@@ -692,6 +697,7 @@ export function jsonStoreGetUsers(params: { status?: string; page?: number }) {
       role: u.role,
       userCategory: u.userCategory,
       institution: u.institution,
+      purpose: u.purpose,
       status: u.status,
       createdAt: u.createdAt,
     })),

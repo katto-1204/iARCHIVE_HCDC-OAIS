@@ -1,4 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getActivityFeed } from "@/data/storage";
+import { firebaseAuth } from "@/lib/firebase-client";
+import { signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword } from "firebase/auth";
 
 type MutationArgs<TData = unknown> = {
   id?: string;
@@ -47,21 +50,132 @@ async function apiRequest<T = any>(
 
 export function useLogin() {
   return useMutation({
-    mutationFn: (args: MutationArgs<{ email: string; password: string }>) =>
-      apiRequest<{ token: string; user: any }>("/api/auth/login", {
-        method: "POST",
-        body: JSON.stringify(args.data || {}),
+    mutationFn: async (args: MutationArgs<{ email: string; password: string }>) => {
+      const email = args.data?.email || "";
+      const password = args.data?.password || "";
+      const demoEmails = new Set([
+        "admin@hcdc.edu.ph",
+        "archivist@hcdc.edu.ph",
+        "student@hcdc.edu.ph",
+      ]);
+      if (demoEmails.has(email.toLowerCase()) && password === "admin123") {
+        return apiRequest<{ token: string; user: any }>("/api/auth/login", {
+          method: "POST",
+          body: JSON.stringify({ email, password }),
+        });
+      }
+
+      try {
+        const cred = await signInWithEmailAndPassword(firebaseAuth, email, password);
+        const idToken = await cred.user.getIdToken();
+        return apiRequest<{ token: string; user: any }>("/api/auth/login", {
+          method: "POST",
+          body: JSON.stringify({ idToken, email, password }),
+        });
+      } catch (err: any) {
+        if (import.meta.env.VITE_USE_REAL_API === "true") {
+           try {
+             return await apiRequest<{ token: string; user: any }>("/api/auth/login", {
+               method: "POST",
+               body: JSON.stringify({ email, password }),
+             });
+           } catch (apiErr) {
+             // Fall through to existing error handlers if api also fails
+           }
+        }
+
+        const code = err?.code || "";
+        if (code === "auth/user-not-found") {
+          throw new Error("Account not found");
+        }
+        if (code === "auth/wrong-password" || code === "auth/invalid-credential") {
+          throw new Error("Invalid credentials");
+        }
+        if (code === "auth/too-many-requests") {
+          throw new Error("Too many attempts. Please try again later.");
+        }
+        throw err;
+      }
+    },
+  });
+}
+
+export function useUpdateMe() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { name?: string; institution?: string; purpose?: string }) =>
+      apiRequest("/api/auth/me", {
+        method: "PATCH",
+        body: JSON.stringify(data),
       }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    },
   });
 }
 
 export function useRegister() {
   return useMutation({
-    mutationFn: (args: MutationArgs<any>) =>
-      apiRequest("/api/auth/register", {
-        method: "POST",
-        body: JSON.stringify(args.data || {}),
-      }),
+    mutationFn: async (args: MutationArgs<any>) => {
+      const payload = args.data || {};
+      const email = payload.email || "";
+      const password = payload.password || "";
+      try {
+        // Attempt client-side Firebase registration first
+        const cred = await createUserWithEmailAndPassword(firebaseAuth, email, password);
+        const idToken = await cred.user.getIdToken();
+        await apiRequest("/api/auth/register", {
+          method: "POST",
+          body: JSON.stringify({
+            idToken,
+            name: payload.name,
+            email,
+            role: payload.role,
+            institution: payload.institution,
+            purpose: payload.purpose,
+            password: password,
+          }),
+        });
+        await signOut(firebaseAuth);
+        return { ok: true };
+      } catch (err: any) {
+        // If it's a known Firebase error that suggests we should try local registration
+        // (like 400 Bad Request, auth/operation-not-allowed, etc.)
+        // or if VITE_USE_REAL_API is true, we attempt the backend call directly.
+        const isFirebaseError = err?.code?.startsWith("auth/");
+        const isRealApi = import.meta.env.VITE_USE_REAL_API === "true";
+
+        if (isRealApi && (isFirebaseError || !err.code)) {
+           try {
+             return await apiRequest("/api/auth/register", {
+               method: "POST",
+               body: JSON.stringify({
+                 name: payload.name,
+                 email,
+                 password,
+                 role: payload.role,
+                 institution: payload.institution,
+                 purpose: payload.purpose,
+               }),
+             });
+           } catch (apiErr: any) {
+             throw apiErr;
+           }
+        }
+        
+        const code = err?.code || "";
+        if (code === "auth/email-already-in-use") {
+          throw new Error("Email already registered");
+        }
+        if (code === "auth/invalid-email") {
+          throw new Error("Invalid email address");
+        }
+        if (code === "auth/weak-password") {
+          throw new Error("Password is too weak");
+        }
+        throw err;
+      }
+    },
   });
 }
 
@@ -83,7 +197,14 @@ export function useGetMe() {
 export function useLogout() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => apiRequest("/api/auth/logout", { method: "POST" }, { allowUnauthorized: true }),
+    mutationFn: async () => {
+      try {
+        await signOut(firebaseAuth);
+      } catch {
+        // Ignore client sign-out errors.
+      }
+      return apiRequest("/api/auth/logout", { method: "POST" }, { allowUnauthorized: true });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
     },
@@ -262,9 +383,8 @@ export function useApproveUser() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (args: MutationArgs) =>
-      apiRequest("/api/admin/approve-user", {
+      apiRequest(`/api/users/${args.id}/approve`, {
         method: "POST",
-        body: JSON.stringify({ id: args.id }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
@@ -276,9 +396,8 @@ export function useRejectUser() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (args: MutationArgs) =>
-      apiRequest("/api/admin/reject-user", {
+      apiRequest(`/api/users/${args.id}/reject`, {
         method: "POST",
-        body: JSON.stringify({ id: args.id }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
@@ -303,14 +422,40 @@ export function useDeleteUser() {
   });
 }
 
-export function useGetAuditLogs(params?: { limit?: number }) {
-  return useQuery({
+export function useGetAuditLogs(params?: { limit?: number }, options?: any) {
+  return useQuery<{ logs: any[] }>({
     queryKey: ["/api/audit", params || {}],
-    queryFn: () => {
+    ...options,
+    queryFn: async () => {
       const searchParams = new URLSearchParams();
       if (params?.limit) searchParams.set("limit", String(params.limit));
       const query = searchParams.toString();
-      return apiRequest<{ logs: any[] }>(`/api/audit${query ? `?${query}` : ""}`);
+
+      const feed = getActivityFeed();
+      const localLogs = feed.map((entry) => ({
+        id: entry.id,
+        createdAt: entry.timestamp,
+        userName: entry.user,
+        action: entry.actionType,
+        entityType: "material",
+        entityId: entry.materialId || "-",
+        details: entry.description,
+      }));
+
+      let apiLogs: any[] = [];
+      try {
+        const apiResp = await apiRequest<{ logs: any[] }>(`/api/audit${query ? `?${query}` : ""}`);
+        apiLogs = apiResp?.logs || [];
+      } catch {
+        apiLogs = [];
+      }
+
+      const merged = [...apiLogs, ...localLogs]
+        .filter((log) => log && log.createdAt)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      const limited = params?.limit ? merged.slice(0, params.limit) : merged;
+      return { logs: limited };
     },
   });
 }

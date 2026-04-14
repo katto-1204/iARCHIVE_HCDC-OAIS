@@ -47,7 +47,7 @@
   },
   "include": [
     "src/**/*",
-    "seed.ts"
+    "api-server/scripts/**/*.mjs"
   ],
   "exclude": [
     "node_modules",

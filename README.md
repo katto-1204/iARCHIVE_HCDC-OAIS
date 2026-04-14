@@ -37,6 +37,7 @@ The system serves three user roles — **Administrators**, **Archivists**, and *
 | **UI Components** | Radix UI primitives (Dialog, Select, Tabs, Toast, Tooltip, etc.) |
 | **Date Handling** | date-fns |
 | **Backend (Dev mode)** | Vite middleware mock API plugin (see `vite.config.ts`) |
+| **Backend (Production)** | Express + Firebase Admin SDK (Auth + Firestore) |
 | **Package Manager** | pnpm 9.15.4 (monorepo workspace) |
 
 ### Monorepo Structure
@@ -55,7 +56,6 @@ Archive-Keeper/
 │       └── package.json
 ├── lib/
 │   ├── api-client-react/      ← Shared React Query hooks (@workspace/api-client-react)
-│   └── db/                    ← Drizzle ORM schema (@workspace/db)
 ├── api-server/                ← Express/Node backend (for production)
 ├── vercel.json                ← Deployment configuration
 └── pnpm-workspace.yaml        ← Workspace definition
@@ -313,7 +313,7 @@ Output directory: `artifacts/iarchive/dist/public`
 
 ### Known Deployment Issues
 
-1. **Monorepo `file:` Dependencies:** The `package.json` references `@workspace/api-client-react` and `@workspace/db` via `file:../../lib/...` paths. Vercel's install step must resolve these correctly within the monorepo.
+1. **Monorepo `file:` Dependencies:** The `package.json` references `@workspace/api-client-react` via `file:../../lib/...` paths. Vercel's install step must resolve these correctly within the monorepo.
 
 2. **Missing `installCommand`:** Vercel needs an explicit install command for pnpm monorepos. Add:
    ```json
@@ -334,6 +334,9 @@ Output directory: `artifacts/iarchive/dist/public`
 |---|---|---|
 | `PORT` | `5173` | Dev server port |
 | `BASE_PATH` | `/` | Base URL path for deployment |
+| `FIREBASE_PROJECT_ID` | (none) | Firebase project ID (api-server) |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | (none) | Firebase Admin service account JSON (api-server) |
+| `FIREBASE_API_KEY` | (none) | Firebase web API key for email/password login (api-server) |
 
 ---
 

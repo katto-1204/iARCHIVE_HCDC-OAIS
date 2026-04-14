@@ -96,7 +96,7 @@ export async function exportSingleMaterialToExcel(material: ArchivalMaterial) {
   // Populate ISAD(G) fields
   const isadgFields = COMBINED_FIELDS.filter(f => f.standard === 'ISAD(G)' || f.standard === 'Both');
   for (const field of isadgFields) {
-    const value = (material[field.id as keyof ArchivalMaterial] || '') as string;
+    const value = (material[field.fieldKey as keyof ArchivalMaterial] || '') as string;
     addDataRow(field.code, field.name, field.standard, value);
   }
 
@@ -113,7 +113,7 @@ export async function exportSingleMaterialToExcel(material: ArchivalMaterial) {
   // Populate Dublin Core only fields
   const dcFields = COMBINED_FIELDS.filter(f => f.standard === 'Dublin Core');
   for (const field of dcFields) {
-    const value = (material[field.id as keyof ArchivalMaterial] || '') as string;
+    const value = (material[field.fieldKey as keyof ArchivalMaterial] || '') as string;
     addDataRow(field.code, field.name, field.standard, value);
   }
 
