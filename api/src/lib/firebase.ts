@@ -14,26 +14,11 @@ function getServiceAccountJson() {
       // Fix potential extra escaping if the variable was wrapped in unnecessary quotes in Vercel UI
       let sanitizedRaw = raw.trim();
       if (sanitizedRaw.startsWith("'") && sanitizedRaw.endsWith("'")) sanitizedRaw = sanitizedRaw.slice(1, -1);
+      if (sanitizedRaw.startsWith('"') && sanitizedRaw.endsWith('"')) sanitizedRaw = sanitizedRaw.slice(1, -1);
       
       const sa = JSON.parse(sanitizedRaw);
       if (sa.private_key && typeof sa.private_key === "string") {
-        // Standard Firebase Private Key repair for Environment Variables
-        // 1. Handle literal "\n" strings that JSON.parse might have missed or were double-escaped
-        let key = sa.private_key.replace(/\\n/g, "\n");
-        
-        // 2. If it's a single line with no newlines but HAS the headers, it needs re-formatting
-        if (!key.includes("\n") && key.includes("-----BEGIN PRIVATE KEY-----")) {
-          // Extract the base64 part
-          const match = key.match(/-----BEGIN PRIVATE KEY-----([^-]+)-----END PRIVATE KEY-----/);
-          if (match) {
-             const base64 = match[1].replace(/\s/g, "");
-             // Break it into 64-character lines as expected by some parsers
-             const lines = base64.match(/.{1,64}/g) || [];
-             key = `-----BEGIN PRIVATE KEY-----\n${lines.join("\n")}\n-----END PRIVATE KEY-----\n`;
-          }
-        }
-        
-        sa.private_key = key;
+        sa.private_key = sa.private_key.replace(/\\n/g, "\n");
       }
       return sa;
     } catch (err: any) {
