@@ -1,25 +1,50 @@
 import express, { type Express } from "express";
 import cors from "cors";
+import pinoHttp from "pino-http";
 import jwt from "jsonwebtoken";
-// Note: We import from the original location, but Vercel will now see them 
-// because we are part of the 'api' function build context
-import router from "./src/routes/index.js";
-import { logger } from "./src/lib/logger.js";
+import router from "./routes/index.js";
+import { logger } from "./lib/logger.js";
 
 const app: Express = express();
 
-console.log("iArchive Vercel Edge-Safe Backend Initializing...");
+console.log("iArchive Backend Initializing...");
+console.log("NODE_ENV:", process.env.NODE_ENV);
+console.log("VERCEL:", process.env.VERCEL);
+console.log("PROJECT_ID:", process.env.FIREBASE_PROJECT_ID || "Not set");
 
-app.use((req, res, next) => {
-  console.log(`${req.method} ${req.url}`);
-  next();
-});
-
+if (process.env.NODE_ENV !== "production") {
+  app.use(
+    pinoHttp({
+      logger,
+      serializers: {
+        req(req) {
+          return {
+            id: req.id,
+            method: req.method,
+            url: req.url?.split("?")[0],
+          };
+        },
+        res(res) {
+          return {
+            statusCode: res.statusCode,
+          };
+        },
+      },
+    }),
+  );
+} else {
+  // Simple request logging for production
+  app.use((req, res, next) => {
+    console.log(`${req.method} ${req.url}`);
+    next();
+  });
+}
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// TOTAL WAR DEMO BYPASS
+// TOTAL WAR DEMO BYPASS: Intercepts ANY POST containing demo credentials
+// This is immune to pathing issues (e.g. /api/auth/login vs /auth/login)
 app.use((req, res, next) => {
   if (req.method === "POST") {
     const { email, password } = req.body || {};
@@ -43,6 +68,7 @@ app.use((req, res, next) => {
         }, secret, { expiresIn: "7d" });
         return res.status(200).json({ token, user: demoUsers[inputEmail] });
       } catch (e) {
+        // If signing fails, we still let them in with a dummy token for safety
         return res.status(200).json({ token: "emergency-token-" + Date.now(), user: demoUsers[inputEmail] });
       }
     }
@@ -51,24 +77,17 @@ app.use((req, res, next) => {
 });
 
 app.get("/api/test", (req, res) => {
-  res.json({ 
-    message: "iArchive Vercel API is live", 
-    vercel: true,
-    env: process.env.NODE_ENV,
-    time: new Date().toISOString()
-  });
+  res.json({ message: "API is working", cwd: process.cwd(), node_env: process.env.NODE_ENV });
 });
-
 app.use("/api", router);
-
-// Error Handler
+// @ts-ignore
 app.use((err: any, req: any, res: any, next: any) => {
-  console.error("Vercel API Error:", err);
+  logger.error(err);
   const status = err.status || err.statusCode || 500;
   res.status(status).json({
     message: err.message || "Internal Server Error",
-    error: process.env.NODE_ENV === "development" ? err : { name: err.name },
-    stack: process.env.NODE_ENV === "development" ? err.stack : undefined
+    error: err, // temporarily show error details in production to debug
+    stack: err.stack,
   });
 });
 
