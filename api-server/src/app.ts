@@ -7,25 +7,33 @@ import { logger } from "./lib/logger.js";
 
 const app: Express = express();
 
-app.use(
-  pinoHttp({
-    logger,
-    serializers: {
-      req(req) {
-        return {
-          id: req.id,
-          method: req.method,
-          url: req.url?.split("?")[0],
-        };
+if (process.env.NODE_ENV !== "production") {
+  app.use(
+    pinoHttp({
+      logger,
+      serializers: {
+        req(req) {
+          return {
+            id: req.id,
+            method: req.method,
+            url: req.url?.split("?")[0],
+          };
+        },
+        res(res) {
+          return {
+            statusCode: res.statusCode,
+          };
+        },
       },
-      res(res) {
-        return {
-          statusCode: res.statusCode,
-        };
-      },
-    },
-  }),
-);
+    }),
+  );
+} else {
+  // Simple request logging for production
+  app.use((req, res, next) => {
+    console.log(`${req.method} ${req.url}`);
+    next();
+  });
+}
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -68,12 +76,13 @@ app.get("/api/test", (req, res) => {
 });
 app.use("/api", router);
 // @ts-ignore
-app.use((err, req, res, next) => {
+app.use((err: any, req: any, res: any, next: any) => {
   logger.error(err);
   const status = err.status || err.statusCode || 500;
   res.status(status).json({
     message: err.message || "Internal Server Error",
-    error: process.env.NODE_ENV === "development" ? err : {},
+    error: err, // temporarily show error details in production to debug
+    stack: err.stack,
   });
 });
 

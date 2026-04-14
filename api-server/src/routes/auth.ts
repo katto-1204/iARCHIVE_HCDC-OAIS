@@ -100,12 +100,17 @@ router.post("/auth/login", async (req, res) => {
       return;
     }
     
-    let decoded: { uid: string, email?: string, name?: string };
+    let decoded: { uid: string, email?: string, name?: string } | null;
     try {
       const auth = getFirebaseAuth();
       decoded = await auth.verifyIdToken(firebaseToken);
     } catch {
       decoded = await verifyIdTokenRestFallback(firebaseToken);
+    }
+    
+    if (!decoded) {
+      res.status(401).json({ error: "Invalid Firebase token" });
+      return;
     }
     
     let profile: any = null;
@@ -148,7 +153,6 @@ router.post("/auth/login", async (req, res) => {
         res.status(403).json({ error: "Account is not active. Please wait for approval." });
         return;
       }
-      // Validated active JSON fallback user
     }
 
     res.json({
@@ -216,13 +220,19 @@ router.post("/auth/register", async (req, res) => {
     let resolvedEmail = email as string | undefined;
     
     if (idToken) {
-      let decoded: { uid: string, email?: string, name?: string };
+      let decoded: { uid: string, email?: string, name?: string } | null;
       try {
         const auth = getFirebaseAuth();
         decoded = await auth.verifyIdToken(idToken);
       } catch {
         decoded = await verifyIdTokenRestFallback(idToken);
       }
+      
+      if (!decoded) {
+        res.status(401).json({ error: "Invalid Firebase token" });
+        return;
+      }
+      
       uid = decoded.uid;
       resolvedEmail = decoded.email || resolvedEmail;
     } else {

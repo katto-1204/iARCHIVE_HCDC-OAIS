@@ -57,7 +57,7 @@ export function ensureFirebaseApp() {
   const serviceAccount = getServiceAccountJson();
 
   if (!projectId || !serviceAccount) {
-    _firebaseInitError = "Firebase not configured — missing FIREBASE_PROJECT_ID or service account credentials. Using JSON file storage fallback.";
+    _firebaseInitError = "Firebase not configured: missing FIREBASE_PROJECT_ID or service account credentials. Falling back to JSON local storage.";
     console.warn(_firebaseInitError);
     throw new Error(_firebaseInitError);
   }
