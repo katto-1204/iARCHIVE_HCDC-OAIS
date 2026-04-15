@@ -8,17 +8,26 @@ import pinoHttp from "pino-http";
 import fs from "fs";
 import path from "path";
 
-const { sign } = pkg;
+const signToken = (pkg as any).default?.sign || pkg.sign || (pkg as any).sign;
 const app = express();
 
+// Set dummy secret if missing to prevent boot crash
 const JWT_SECRET = process.env.JWT_SECRET || "iarchive-hcdc-secret-2026";
 
-// Initialize pino-http with our production-safe logger
-const pino = (pinoHttp as any).default || pinoHttp;
-app.use((pino as any)({ 
-  logger,
-  autoLogging: process.env.NODE_ENV !== "production"
-}));
+// Request Logging
+if (process.env.NODE_ENV !== "production") {
+  const pino = (pinoHttp as any).default || pinoHttp;
+  app.use((pino as any)({ 
+    logger,
+    autoLogging: true
+  }));
+} else {
+  // Simple production request logging to avoid pino-http .child() crashes
+  app.use((req, res, next) => {
+    logger.info(`${req.method} ${req.url}`);
+    next();
+  });
+}
 
 app.use(cors());
 app.use(express.json());
@@ -37,7 +46,7 @@ app.post("/api/auth/login", (req, res, next) => {
 
   if (demoUsers[inputEmail] && (password === "admin123" || !password)) {
     console.log("DEMO BYPASS REACHED IN VERCEL:", inputEmail);
-    const token = sign({ 
+    const token = signToken({ 
       userId: demoUsers[inputEmail].id, 
       email: inputEmail, 
       role: demoUsers[inputEmail].role,

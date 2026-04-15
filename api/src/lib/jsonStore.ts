@@ -3,7 +3,9 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { generateId, generateMaterialId } from "./id.js";
 import bcrypt from "bcryptjs";
-const { hashSync } = bcrypt;
+
+// Ensure bcryptjs works correctly in ESM/CommonJS contexts
+const hashSync = (bcrypt as any).default?.hashSync || bcrypt.hashSync;
 
 type JsonCategory = {
   id: string;
