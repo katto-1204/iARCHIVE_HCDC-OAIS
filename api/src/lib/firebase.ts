@@ -3,6 +3,7 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 
 let _firebaseInitialized = false;
 let _firebaseInitError: string | null = null;
@@ -22,11 +23,15 @@ function getServiceAccountJson() {
     }
   }
   
-  // Try FIREBASE_SERVICE_ACCOUNT_PATH or local service-account.json
+  // Setup paths relative to this file to handle different CWDs
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  
   const possiblePaths = [
     process.env["FIREBASE_SERVICE_ACCOUNT_PATH"],
     path.join(process.cwd(), "service-account.json"),
-    path.join(process.cwd(), "api-server", "service-account.json"),
+    path.resolve(__dirname, "../../../api-server/service-account.json"), // Root project path
+    path.resolve(__dirname, "../../service-account.json"), // Relative to lib
   ].filter(Boolean) as string[];
 
   for (const saPath of possiblePaths) {

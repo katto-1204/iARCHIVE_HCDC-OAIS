@@ -95,32 +95,24 @@ export function useRegister() {
       const payload = args.data || {};
       const email = payload.email || "";
       const password = payload.password || "";
+      
       try {
-        const cred = await createUserWithEmailAndPassword(firebaseAuth, email, password);
-        const idToken = await cred.user.getIdToken();
         await apiRequest("/api/auth/register", {
           method: "POST",
           body: JSON.stringify({
-            idToken,
             name: payload.name,
             email,
+            password,
             role: payload.role,
             institution: payload.institution,
             purpose: payload.purpose,
           }),
         });
-        await signOut(firebaseAuth);
         return { ok: true };
       } catch (err: any) {
-        const code = err?.code || "";
-        if (code === "auth/email-already-in-use") {
+        const msg = err?.data?.error || err?.message || "";
+        if (msg.includes("already registered") || msg.includes("email-already-in-use")) {
           throw new Error("Email already registered");
-        }
-        if (code === "auth/invalid-email") {
-          throw new Error("Invalid email address");
-        }
-        if (code === "auth/weak-password") {
-          throw new Error("Password is too weak");
         }
         throw err;
       }
