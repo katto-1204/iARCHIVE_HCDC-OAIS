@@ -110,6 +110,9 @@ export default function AdminMaterials() {
   const isAdmin = currentRole === "admin";
   const approvalStatusFor = (material: ArchivalMaterial) => material.approvalStatus || "approved";
   const [approvalFilter, setApprovalFilter] = React.useState<"all" | "approved" | "pending" | "rejected">("all");
+  const [dateSort, setDateSort] = React.useState<"newest" | "oldest" | "none">("newest");
+  const [folderSummaryOpen, setFolderSummaryOpen] = React.useState(false);
+  const [folderSummaryData, setFolderSummaryData] = React.useState<{count: number, names: string[]}>({count: 0, names: []});
 
   // Pagination
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -165,6 +168,7 @@ export default function AdminMaterials() {
   const [metadataFileName, setMetadataFileName] = React.useState("");
   
   const [checklistOpen, setChecklistOpen] = React.useState(false);
+  const [checklistMode, setChecklistMode] = React.useState<"select" | "fill">("select");
   const [selectedChecklistFields, setSelectedChecklistFields] = React.useState<Set<string>>(new Set());
   const [checklistValues, setChecklistValues] = React.useState<Record<string, string>>({});
   const [successDialogOpen, setSuccessDialogOpen] = React.useState(false);
@@ -404,8 +408,35 @@ export default function AdminMaterials() {
          setRawExtractionText(extractedText);
       }
       
+      const fileExt = file.name.split('.').pop()?.toUpperCase() || "FILE";
+      const baseName = file.name.replace(/\.[^/.]+$/, "");
+      const sizeStr = (file.size / 1024 / 1024).toFixed(2) + " MB";
+      const fileDate = file.lastModified ? new Date(file.lastModified).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+      const previewSnippet = extractedText ? extractedText.substring(0, 150).trim() : "";
+
+      // ** AUTO-METADATA EXTRACTION FROM FILE PROPERTIES ** //
+      setChecklistValues(prev => ({
+        ...prev,
+        title: prev.title || baseName,
+        date: prev.date || fileDate,
+        dateOfDescription: prev.dateOfDescription || fileDate,
+        format: prev.format || file.type || fileExt,
+        extentAndMedium: prev.extentAndMedium || `${sizeStr} Digital ${fileExt}`,
+        description: prev.description || previewSnippet
+      }));
+
+      setSelectedChecklistFields(prev => {
+        const n = new Set(prev);
+        n.add('title');
+        n.add('date');
+        n.add('dateOfDescription');
+        n.add('format');
+        n.add('extentAndMedium');
+        if (previewSnippet) n.add('description');
+        return n;
+      });
+
       if (!uploadForm.title && !metadataFileName) {
-         const previewSnippet = extractedText.substring(0, 150).trim();
          let inferredAccess: "public" | "restricted" | "confidential" = uploadForm.access;
          const lowerClean = extractedText.toLowerCase();
          if (lowerClean.includes('confidential') || lowerClean.includes('classified')) inferredAccess = 'confidential';
@@ -413,18 +444,12 @@ export default function AdminMaterials() {
 
          setUploadForm((prev: any) => ({
            ...prev, 
-           title: prev.title || file.name.replace(/\.[^/.]+$/, ""),
+           title: prev.title || baseName,
            format: prev.format || file.type || "application/octet-stream",
            description: prev.description || previewSnippet,
            access: inferredAccess,
            pageImages: extractedImages.length > 0 ? extractedImages : prev.pageImages,
            pages: detectedPageCount || prev.pages || 1
-         }));
-
-         setChecklistValues(prev => ({
-           ...prev,
-           title: prev.title || file.name.replace(/\.[^/.]+$/, ""),
-           description: prev.description || previewSnippet,
          }));
       } else {
          setUploadForm((prev: any) => ({
@@ -444,6 +469,7 @@ export default function AdminMaterials() {
     const isDocx = file.name.toLowerCase().endsWith(".docx");
     const isCsv = file.name.toLowerCase().endsWith(".csv");
     const isXlsx = file.name.toLowerCase().endsWith(".xlsx");
+    const isPdf = file.name.toLowerCase().endsWith(".pdf");
     
     setMetadataProcessingState("scanning");
     setMetadataFileName(file.name);
@@ -451,7 +477,17 @@ export default function AdminMaterials() {
     let extractedText = "";
     
     try {
-      if (isDocx && window.mammoth) {
+      if (isPdf && window.pdfjsLib) {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        let fullText = "";
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          fullText += textContent.items.map((item: any) => item.str).join(" ") + "\n\n";
+        }
+        extractedText = fullText;
+      } else if (isDocx && window.mammoth) {
         const arrayBuffer = await file.arrayBuffer();
         const result = await window.mammoth.extractRawText({ arrayBuffer });
         extractedText = result.value;
@@ -488,10 +524,17 @@ export default function AdminMaterials() {
               creator: newCreator || prev.creator,
               description: newDesc || prev.description,
            }));
+           setSelectedChecklistFields(prev => {
+             const n = new Set(prev);
+             if (newTitle) n.add('title');
+             if (newCreator) n.add('creator');
+             if (newDesc) n.add('description');
+             return n;
+           });
         }
       }
 
-      setRawExtractionText(extractedText);
+      setRawExtractionText(prev => prev ? prev + "\n\n═══ Extracted from Metadata File: " + file.name + " ═══\n\n" + extractedText : extractedText);
       
       const previewSnippet = extractedText.substring(0, 150).trim();
       setChecklistValues(prev => ({
@@ -499,6 +542,12 @@ export default function AdminMaterials() {
         description: prev.description || previewSnippet,
         dateOfDescription: prev.dateOfDescription || new Date().toISOString().split('T')[0],
       }));
+      setSelectedChecklistFields(prev => {
+        const n = new Set(prev);
+        if (previewSnippet) n.add('description');
+        n.add('dateOfDescription');
+        return n;
+      });
     } catch (err) {
       console.error("Metadata extraction failed", err);
     }
@@ -530,9 +579,11 @@ export default function AdminMaterials() {
 
     if (files.length > 1) {
        setMetadataProcessingState("scanning");
-       const imageFiles = Array.from(files)
+       const allFiles = Array.from(files);
+       const imageFiles = allFiles
          .filter(f => f.type.startsWith('image/'))
          .sort((a,b) => a.name.localeCompare(b.name));
+       const metaFiles = allFiles.filter(f => !f.type.startsWith('image/'));
        
        let images: string[] = [];
        let imageBlobs: Blob[] = [];
@@ -542,11 +593,30 @@ export default function AdminMaterials() {
          images.push(createObjectUrl(blob));
        }
        // If no main images present, populate as main preview
-       if (pdfPreviewImages.length === 0) {
+       if (pdfPreviewImages.length === 0 && images.length > 0) {
           setPdfPreviewImages(images);
          setPdfPreviewBlobs(imageBlobs);
-         setUploadForm(prev => ({ ...prev, pages: images.length, pageImages: images }));
+         setUploadForm(prev => ({ 
+            ...prev, 
+            pages: images.length, 
+            pageImages: images,
+            fileData: imageBlobs[0] || prev.fileData,
+            fileType: "image/jpeg"
+         }));
        }
+
+       // Also extract metadata from any non-image files in the folder
+       for (const mf of metaFiles) {
+         await extractMetadataFile(mf);
+       }
+
+       // Show folder summary modal
+       setFolderSummaryData({
+         count: allFiles.length,
+         names: allFiles.slice(0, 20).map(f => f.name)
+       });
+       setFolderSummaryOpen(true);
+
        setMetadataProcessingState("done");
        return;
     }
@@ -572,8 +642,14 @@ export default function AdminMaterials() {
         m.id === selectedHierarchyItem
       );
     }
+    // Date sorting
+    if (dateSort === "newest") {
+      result.sort((a, b) => new Date(b.createdAt || b.ingestDate || 0).getTime() - new Date(a.createdAt || a.ingestDate || 0).getTime());
+    } else if (dateSort === "oldest") {
+      result.sort((a, b) => new Date(a.createdAt || a.ingestDate || 0).getTime() - new Date(b.createdAt || b.ingestDate || 0).getTime());
+    }
     return result;
-  }, [materials, search, selectedHierarchyItem, approvalFilter]);
+  }, [materials, search, selectedHierarchyItem, approvalFilter, dateSort]);
 
   const totalPages = Math.ceil(filteredMaterials.length / itemsPerPage);
   const paginatedMaterials = filteredMaterials.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -949,6 +1025,16 @@ export default function AdminMaterials() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
                 <Input className="pl-9 bg-muted/50" placeholder="Search item title or ID..." value={search} onChange={(e) => setSearch(e.target.value)} />
               </div>
+              <Select value={dateSort} onValueChange={(v: any) => setDateSort(v)}>
+                <SelectTrigger className="w-[160px] h-9 text-xs bg-white shrink-0">
+                  <SelectValue placeholder="Sort by date" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">Newest First</SelectItem>
+                  <SelectItem value="oldest">Oldest First</SelectItem>
+                  <SelectItem value="none">No Sort</SelectItem>
+                </SelectContent>
+              </Select>
               <div className="text-sm text-muted-foreground flex items-center gap-2 shrink-0">
                 <Layers className="w-4 h-4" /> {filteredMaterials.length} items
               </div>
@@ -1216,6 +1302,34 @@ export default function AdminMaterials() {
         </div>
       </div>
 
+      {/* ═══ Folder Upload Summary Modal ═══ */}
+      <Dialog open={folderSummaryOpen} onOpenChange={setFolderSummaryOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg text-[#0a1628]">
+              <FolderOpen className="w-5 h-5 text-indigo-600" /> Folder Upload Complete
+            </DialogTitle>
+            <DialogDescription>
+              {folderSummaryData.count} file(s) have been processed from the selected folder.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[300px] overflow-y-auto border rounded-lg p-3 bg-muted/20 space-y-1">
+            {folderSummaryData.names.map((name, i) => (
+              <div key={i} className="flex items-center gap-2 text-xs text-[#0a1628] py-1 px-2 rounded hover:bg-muted/30">
+                <FileText className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                <span className="truncate">{name}</span>
+              </div>
+            ))}
+            {folderSummaryData.count > 20 && (
+              <p className="text-[10px] text-muted-foreground text-center pt-2">...and {folderSummaryData.count - 20} more files</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setFolderSummaryOpen(false)} className="bg-indigo-600 hover:bg-indigo-700">Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* ═══ Upload & Scan Dialog (Admin Form Overhaul) ═══ */}
       <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
         <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto bg-[#fafbfc]">
@@ -1224,13 +1338,94 @@ export default function AdminMaterials() {
               <Upload className="w-5 h-5 text-primary" /> Setup Archival Item
             </DialogTitle>
             <DialogDescription>
-              Assign the reference identifier, upload media and metadata separately, and organize the hierarchy.
+              Upload the material first, then assign metadata and organize the hierarchy.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-6 py-2">
-            
-            {/* 1. Reference Code Generator */}
+
+            {/* ── STEP 1: UPLOAD MATERIAL FIRST ── */}
+            <div className="border border-indigo-200 bg-indigo-50/30 rounded-xl p-5">
+               <h4 className="text-xs font-bold text-indigo-900 uppercase tracking-widest mb-1 flex items-center gap-2">
+                 <Upload className="w-4 h-4 text-indigo-500" /> Step 1 — Upload Material
+               </h4>
+               <p className="text-[10px] text-muted-foreground mb-4 font-medium">Select the media type and upload the file or folder first.</p>
+               
+               <div className="flex gap-2 mb-3 bg-white/50 p-1 rounded-lg border border-indigo-100 flex-wrap">
+                  <button type="button" onClick={() => setMediaCategory("document")} className={cn("flex-1 text-[10px] font-bold uppercase tracking-wide py-2 rounded-md flex items-center justify-center gap-1.5 transition-all text-xs min-w-[70px]", mediaCategory === "document" ? "bg-indigo-600 text-white shadow-md ring-1 ring-indigo-600/50" : "text-muted-foreground hover:bg-white hover:shadow-sm")}><FileText className="w-3.5 h-3.5" /> Document</button>
+                  <button type="button" onClick={() => setMediaCategory("image")} className={cn("flex-1 text-[10px] font-bold uppercase tracking-wide py-2 rounded-md flex items-center justify-center gap-1.5 transition-all text-xs min-w-[70px]", mediaCategory === "image" ? "bg-indigo-600 text-white shadow-md ring-1 ring-indigo-600/50" : "text-muted-foreground hover:bg-white hover:shadow-sm")}><ImageIcon className="w-3.5 h-3.5" /> Picture</button>
+                  <button type="button" onClick={() => setMediaCategory("video")} className={cn("flex-1 text-[10px] font-bold uppercase tracking-wide py-2 rounded-md flex items-center justify-center gap-1.5 transition-all text-xs min-w-[70px]", mediaCategory === "video" ? "bg-indigo-600 text-white shadow-md ring-1 ring-indigo-600/50" : "text-muted-foreground hover:bg-white hover:shadow-sm")}><Video className="w-3.5 h-3.5" /> Video</button>
+               </div>
+               
+               <div className="space-y-3">
+                  <div>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1.5">Direct File Upload</span>
+                    <Input type="file" onChange={handleMediaUpload} className="bg-white border-dashed border-2 cursor-pointer h-12 flex items-center file:mr-4 file:py-1 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" accept={mediaCategory === "document" ? ".pdf,.doc,.docx" : mediaCategory === "image" ? "image/*" : "video/*"} />
+                  </div>
+                  
+                  {/* Folder upload — available for all media types */}
+                  <div className="flex gap-2 w-full">
+                    {/* @ts-ignore */}
+                    <input type="file" onChange={handleMetadataScanUpload} className="hidden" id="mainFolderUploadInput" webkitdirectory="true" multiple />
+                    <Button variant="outline" onClick={() => document.getElementById('mainFolderUploadInput')?.click()} className="w-full text-xs h-10 border-indigo-200 text-indigo-700 hover:bg-indigo-50">
+                      <FolderOpen className="w-4 h-4 mr-1.5" /> Upload Folder
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                     <div className="h-px bg-indigo-100/60 flex-1"></div>
+                     <span className="text-[9px] font-bold text-indigo-300 uppercase tracking-widest">AND / OR</span>
+                     <div className="h-px bg-indigo-100/60 flex-1"></div>
+                  </div>
+                  
+                  <div>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1.5">External URL Link</span>
+                    <Input type="url" placeholder={`Paste URL to ${mediaCategory} (e.g Google Drive)...`} value={uploadForm.videoUrl} onChange={(e) => setUploadForm({...uploadForm, videoUrl: e.target.value})} className="bg-white border-dashed border-2 text-sm focus-visible:ring-indigo-500 placeholder:text-muted-foreground h-10" />
+                  </div>
+               </div>
+               
+               {processingState === "scanning" && (
+                 <div className="mt-3 text-xs text-indigo-700 font-bold flex items-center gap-2">
+                   <Loader2 className="w-3.5 h-3.5 animate-spin" /> Processing material...
+                 </div>
+               )}
+               {processingState === "done" && uploadForm.fileData && (
+                 <div className="mt-3 text-[10px] text-indigo-700 font-bold flex items-center gap-1.5 bg-indigo-100 p-1.5 rounded">
+                   <CheckCircle2 className="w-3.5 h-3.5" /> Material uploaded: {mainFileName || fileDetails?.name || "File ready"}
+                 </div>
+               )}
+
+               {/* For document type: the document IS also the metadata source */}
+               {mediaCategory === "document" && processingState === "done" && (
+                 <div className="mt-2 text-[10px] text-emerald-600 font-bold flex items-center gap-1.5 bg-emerald-50 p-1.5 rounded border border-emerald-200">
+                   <CheckCircle2 className="w-3.5 h-3.5" /> Document text extracted and mapped to metadata checklist
+                 </div>
+               )}
+            </div>
+
+            {/* ── STEP 2: METADATA DOCUMENT (for all media types) ── */}
+            <div className="border border-emerald-200 bg-emerald-50/30 rounded-xl p-5">
+               <h4 className="text-xs font-bold text-emerald-900 uppercase tracking-widest mb-1 flex items-center gap-2">
+                 <FileText className="w-4 h-4 text-emerald-500" /> Step 2 — Metadata Document (Optional)
+               </h4>
+                <p className="text-[10px] text-muted-foreground mb-4 font-medium">Upload a descriptive doc/PDF/Excel/CSV to auto-fill metadata fields. The extracted text will populate the checklist.</p>
+                <div className="flex gap-2">
+                  <Input type="file" onChange={handleMetadataScanUpload} className="bg-white flex-1" accept=".pdf,.doc,.docx,.txt,.csv,.xlsx" />
+                </div>
+               
+               {metadataProcessingState === "scanning" && (
+                 <div className="mt-3 text-xs text-emerald-700 font-bold flex items-center gap-2">
+                   <Loader2 className="w-3.5 h-3.5 animate-spin" /> Extracting Metadata...
+                 </div>
+               )}
+               {metadataProcessingState === "done" && (
+                 <div className="mt-3 text-[10px] text-emerald-700 font-bold flex items-center gap-1.5 bg-emerald-100 p-1.5 rounded">
+                   <CheckCircle2 className="w-3.5 h-3.5" /> Text Extracted for Checklist: {metadataFileName}
+                 </div>
+               )}
+            </div>
+
+            {/* ── STEP 3: Reference Code Generator ── */}
             <div className="bg-slate-50 rounded-xl p-6 border shadow-sm flex flex-col justify-between">
               <div className="mb-4">
                  <span className="text-muted-foreground text-xs font-bold mb-1 block">Unique material identifier</span>
@@ -1273,41 +1468,37 @@ export default function AdminMaterials() {
               </div>
             </div>
 
-            {/* 2. Cascading Hierarchy & Basic Info */}
-            {/* Document Hierarchy Section */}
+            {/* ── STEP 4: Organizational Hierarchy ── */}
             <div className="bg-white rounded-xl border p-5">
               <h4 className="flex items-center gap-2 text-sm font-bold text-[#0a1628] mb-4">
                 <FolderTree className="w-5 h-5 text-[#4169E1]" /> Organizational Hierarchy
               </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5 font-mono">Institution (Fonds)</label>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5 font-mono">Fonds</label>
                   <Input value="HCDC — Holy Cross of Davao College" disabled className="bg-muted text-xs font-semibold h-10" />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5 focus-within:text-[#0a1628] transition-colors font-mono">
-                    Department (Sub-fonds)
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5 font-mono">
+                    Sub-fonds (Department)
                   </label>
-                  <Select value={uploadForm.subfonds} onValueChange={v => setUploadForm(p => ({ ...p, subfonds: v, program: "", series: "" }))}>
+                  <Select value={uploadForm.subfonds} onValueChange={v => setUploadForm(p => ({ ...p, subfonds: v }))}>
                     <SelectTrigger className="h-10 bg-white border-border/60 hover:border-[#4169E1]/50 focus:ring-[#4169E1]/20 transition-all font-semibold text-[#0a1628]"><SelectValue placeholder="Select Department" /></SelectTrigger>
-                    <SelectContent>
-                      {categories.filter(c => c.parentId === "hcdc_root" || !c.parentId).map((f: any) => <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>)}
+                    <SelectContent className="max-h-[300px] overflow-y-auto">
+                      {categories.map((c: any) => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5 focus-within:text-[#0a1628] transition-colors font-mono">
-                    Series Label
-                  </label>
-                  <Select value={uploadForm.series} onValueChange={v => setUploadForm(p => ({ ...p, series: v }))} disabled={!uploadForm.subfonds}>
-                    <SelectTrigger className="h-10 bg-white border-border/60 hover:border-[#4169E1]/50 focus:ring-[#4169E1]/20 transition-all font-semibold text-[#0a1628]"><SelectValue placeholder="Select Series" /></SelectTrigger>
-                    <SelectContent>
-                      {categories.filter(c => {
-                        const parent = categories.find(p => p.name === uploadForm.subfonds);
-                        return c.parentId === parent?.id;
-                      }).map((s: any) => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                   <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5 font-mono">
+                     Series
+                   </label>
+                   <Input 
+                     placeholder="e.g. Research Papers, Yearbooks..." 
+                     value={uploadForm.series || ""} 
+                     onChange={e => setUploadForm(p => ({ ...p, series: e.target.value }))}
+                     className="h-10 bg-white"
+                   />
                 </div>
               </div>
 
@@ -1323,68 +1514,6 @@ export default function AdminMaterials() {
               </div>
             </div>
 
-            {/* 3. Dual Uploads */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Box A: Main Material */}
-              <div className="border border-indigo-200 bg-indigo-50/30 rounded-xl p-5">
-                 <h4 className="text-xs font-bold text-indigo-900 uppercase tracking-widest mb-1 flex items-center gap-2">
-                   <Upload className="w-4 h-4 text-indigo-500" /> 1. Main Material Asset
-                 </h4>
-                 <p className="text-[10px] text-muted-foreground mb-4 font-medium">Select the media type and upload the file.</p>
-                 
-                 <div className="flex gap-2 mb-3 bg-white/50 p-1 rounded-lg border border-indigo-100 flex-wrap">
-                    <button type="button" onClick={() => setMediaCategory("document")} className={cn("flex-1 text-[10px] font-bold uppercase tracking-wide py-2 rounded-md flex items-center justify-center gap-1.5 transition-all text-xs min-w-[70px]", mediaCategory === "document" ? "bg-indigo-600 text-white shadow-md ring-1 ring-indigo-600/50" : "text-muted-foreground hover:bg-white hover:shadow-sm")}><FileText className="w-3.5 h-3.5" /> Document</button>
-                    <button type="button" onClick={() => setMediaCategory("image")} className={cn("flex-1 text-[10px] font-bold uppercase tracking-wide py-2 rounded-md flex items-center justify-center gap-1.5 transition-all text-xs min-w-[70px]", mediaCategory === "image" ? "bg-indigo-600 text-white shadow-md ring-1 ring-indigo-600/50" : "text-muted-foreground hover:bg-white hover:shadow-sm")}><ImageIcon className="w-3.5 h-3.5" /> Picture</button>
-                    <button type="button" onClick={() => setMediaCategory("video")} className={cn("flex-1 text-[10px] font-bold uppercase tracking-wide py-2 rounded-md flex items-center justify-center gap-1.5 transition-all text-xs min-w-[70px]", mediaCategory === "video" ? "bg-indigo-600 text-white shadow-md ring-1 ring-indigo-600/50" : "text-muted-foreground hover:bg-white hover:shadow-sm")}><Video className="w-3.5 h-3.5" /> Video</button>
-                 </div>
-                 
-                 <div className="space-y-4">
-                    <div>
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1.5">Direct File Upload</span>
-                      <Input type="file" onChange={handleMediaUpload} className="bg-white border-dashed border-2 cursor-pointer h-12 flex items-center file:mr-4 file:py-1 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" accept={mediaCategory === "document" ? ".pdf,.doc,.docx" : mediaCategory === "image" ? "image/*" : "video/*"} />
-                    </div>
-                    
-                    <div className="flex items-center gap-3">
-                       <div className="h-px bg-indigo-100/60 flex-1"></div>
-                       <span className="text-[9px] font-bold text-indigo-300 uppercase tracking-widest">AND / OR</span>
-                       <div className="h-px bg-indigo-100/60 flex-1"></div>
-                    </div>
-                    
-                    <div>
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1.5">External URL Link</span>
-                      <Input type="url" placeholder={`Paste URL to ${mediaCategory} (e.g Google Drive)...`} value={uploadForm.videoUrl} onChange={(e) => setUploadForm({...uploadForm, videoUrl: e.target.value})} className="bg-white border-dashed border-2 text-sm focus-visible:ring-indigo-500 placeholder:text-muted-foreground h-10" />
-                    </div>
-                 </div>
-              </div>
-
-              {/* Box B: Metadata Scanner */}
-              <div className="border border-emerald-200 bg-emerald-50/30 rounded-xl p-5">
-                 <h4 className="text-xs font-bold text-emerald-900 uppercase tracking-widest mb-1 flex items-center gap-2">
-                   <FileText className="w-4 h-4 text-emerald-500" /> 2. Metadata Document (Scan)
-                 </h4>
-                  <p className="text-[10px] text-muted-foreground mb-4 font-medium">Upload descriptive doc/PDF/Excel/CSV to route to the metadata parsing engine, or a folder of images.</p>
-                  <div className="flex gap-2">
-                    <Input type="file" onChange={handleMetadataScanUpload} className="bg-white flex-1" accept=".pdf,.doc,.docx,.txt,.csv,.xlsx,image/*" multiple />
-                    {/* @ts-ignore */}
-                    <input type="file" onChange={handleMetadataScanUpload} className="hidden" id="folderUploadInput" webkitdirectory="true" multiple />
-                    <Button variant="outline" onClick={() => document.getElementById('folderUploadInput')?.click()} className="whitespace-nowrap h-10 px-3 bg-white hover:bg-emerald-50 text-emerald-700 border-emerald-200">
-                      <FolderOpen className="w-4 h-4 mr-1.5" /> Folder
-                    </Button>
-                  </div>
-                 
-                 {metadataProcessingState === "scanning" && (
-                   <div className="mt-3 text-xs text-emerald-700 font-bold flex items-center gap-2">
-                     <Loader2 className="w-3.5 h-3.5 animate-spin" /> Extracting Metadata...
-                   </div>
-                 )}
-                 {metadataProcessingState === "done" && (
-                   <div className="mt-3 text-[10px] text-emerald-700 font-bold flex items-center gap-1.5 bg-emerald-100 p-1.5 rounded">
-                     <CheckCircle2 className="w-3.5 h-3.5" /> Text Extracted for Checklist: {metadataFileName}
-                   </div>
-                 )}
-              </div>
-            </div>
-
           </div>
 
           <DialogFooter className="mt-2 border-t pt-4 flex gap-2">
@@ -1397,7 +1526,7 @@ export default function AdminMaterials() {
                 }
                 setUploadOpen(false); 
                 setPreviewOpen(true); 
-              }} disabled={processingState === "scanning" || metadataProcessingState === "scanning" || !uploadForm.fileData} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+              }} disabled={processingState === "scanning" || metadataProcessingState === "scanning" || (!uploadForm.fileData && !uploadForm.videoUrl)} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
                Proceed to Page Preview <ChevronRight className="w-4 h-4 ml-2" />
             </Button>
           </DialogFooter>
@@ -1595,7 +1724,7 @@ export default function AdminMaterials() {
 
           <DialogFooter className="border-t pt-4">
             <Button variant="ghost" onClick={() => { setAccessControlOpen(false); setPreviewOpen(true); }}>Back to Preview</Button>
-            <Button onClick={() => { setAccessControlOpen(false); setChecklistOpen(true); }} className="gap-2 bg-[#0a1628] hover:bg-[#1a2b4b]">
+            <Button onClick={() => { setAccessControlOpen(false); setChecklistMode("select"); setChecklistOpen(true); }} className="gap-2 bg-[#0a1628] hover:bg-[#1a2b4b]">
                Proceed to Metadata Checklist <ChevronRight className="w-4 h-4" />
             </Button>
           </DialogFooter>
@@ -1603,7 +1732,10 @@ export default function AdminMaterials() {
       </Dialog>
 
       {/* ═══ Metadata Checklist Dialog ═══ */}
-      <Dialog open={checklistOpen} onOpenChange={setChecklistOpen}>
+      <Dialog open={checklistOpen} onOpenChange={(open) => {
+        setChecklistOpen(open);
+        if (!open) setChecklistMode("select");
+      }}>
         <DialogContent className="max-w-3xl w-[95vw] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><ShieldCheck className="w-6 h-6 text-emerald-500" /> Apply Full Metadata Schema</DialogTitle>
@@ -1631,6 +1763,7 @@ export default function AdminMaterials() {
              </Button>
           </div>
           <MetadataChecklist 
+            mode={checklistMode}
             selectedFields={selectedChecklistFields} 
             onToggle={(fieldKey) => setSelectedChecklistFields(prev => { 
               const n = new Set(prev); 
@@ -1644,8 +1777,13 @@ export default function AdminMaterials() {
             allowedFieldIds={activeSchema}
           />
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setChecklistOpen(false)}>Cancel</Button>
-            <Button onClick={async () => {
+            <Button variant="ghost" onClick={() => { setChecklistOpen(false); setChecklistMode("select"); }}>Cancel</Button>
+            {checklistMode === "select" ? (
+               <Button onClick={() => setChecklistMode("fill")} disabled={selectedChecklistFields.size === 0} className="bg-[#0a1628] hover:bg-[#1a2b4b]">
+                 Preview & save <ChevronRight className="w-4 h-4 ml-2" />
+               </Button>
+            ) : (
+               <Button onClick={async () => {
               const hierarchyPath = `HCDC > ${uploadForm.subfonds}${uploadForm.program ? ' > ' + uploadForm.program : ''}${uploadForm.series ? ' > ' + uploadForm.series : ''}`;
               const existingApproval = (selectedMaterial as any)?.approvalStatus;
               const approvalStatus = editingMaterialId
@@ -1777,6 +1915,7 @@ export default function AdminMaterials() {
                 editingMaterialId ? "Update Item" : "Finalize Ingest"
               )}
             </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
