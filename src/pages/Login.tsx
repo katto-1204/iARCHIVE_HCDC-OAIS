@@ -109,18 +109,19 @@ export default function Login() {
       </div>
 
       {/* Right: Login form */}
-      <div className="flex-1 flex items-center justify-center px-5 py-12 sm:p-12 relative z-10">
-        <div className="lg:hidden flex items-center justify-center mb-8 w-full">
+      <div className="flex-1 flex flex-col items-center justify-center px-5 py-12 sm:p-12 relative z-10">
+        <div className="lg:hidden flex items-center justify-center shrink-0 mb-10 w-full">
           <Link href="/" className="flex items-center gap-3">
             <img src={`${import.meta.env.BASE_URL}logos/iarchive%20white%20logo.png`} alt="iArchive" className="h-9 w-auto object-contain" />
           </Link>
         </div>
-        <div className="w-full max-w-md">
+        <div className="w-full max-w-md animate-fade-in-up">
           {/* Form */}
-          <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-5 sm:p-7">
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-white mb-1">Sign In</h2>
-              <p className="text-white/40 text-sm">Enter your credentials to continue</p>
+          <div className="bg-[#0b1220]/80 backdrop-blur-2xl rounded-3xl border border-white/10 p-7 sm:p-10 shadow-2xl shadow-black/60 relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#4169E1] via-[#7c94e8] to-[#960000]" />
+            <div className="mb-8">
+              <h2 className="text-3xl font-black text-white mb-2">Sign In</h2>
+              <p className="text-white/50 text-sm">Enter your credentials to continue</p>
             </div>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <div className="space-y-2">

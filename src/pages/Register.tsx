@@ -123,13 +123,11 @@ export default function Register() {
             <span className="ml-3 font-display font-bold text-2xl tracking-tight text-[#050a14]">iArchive</span>
           </Link>
         </div>
-        <div className="w-full max-w-xl space-y-10">
-          <div className="space-y-3">
-            <Button variant="ghost" className="text-muted-foreground hover:text-foreground -ml-4" onClick={() => window.history.back()}>
-              <ArrowLeft className="w-4 h-4 mr-2" /> Back to iArchive
-            </Button>
-            <h2 className="text-4xl font-display font-bold text-[#050a14] tracking-tight">Request Account</h2>
-            <p className="text-muted-foreground">Submit your application for archivist verification. Accounts are usually reviewed within 24 hours.</p>
+        <div className="w-full max-w-xl bg-white border border-border/50 rounded-3xl p-8 sm:p-12 shadow-2xl shadow-[#4169E1]/5 relative overflow-hidden animate-fade-in-up">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#4169E1] via-[#7c94e8] to-[#960000]" />
+          <div className="space-y-3 mb-10">
+            <h2 className="text-3xl sm:text-4xl font-black text-[#0a1628] tracking-tight">Request Account</h2>
+            <p className="text-muted-foreground text-sm">Submit your application for archivist verification. Accounts are usually reviewed within 24 hours.</p>
           </div>
 
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">

@@ -115,39 +115,39 @@ export default function Collections() {
     <div className="min-h-screen bg-[#f7f8fc] font-sans">
       {/* ─── HEADER ─── */}
       <header className={`${roleBranding.bg} border-b border-white/10 sticky top-0 z-50`}>
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-4 group">
-            <img src={`${import.meta.env.BASE_URL}logos/iarchive%20white%20logo.png`} alt="iArchive" className="h-11 w-auto object-contain drop-shadow-lg group-hover:scale-105 transition-transform duration-300" />
-            <div className="flex flex-col">
-              <span className="text-white font-black text-2xl tracking-tight leading-none uppercase">iArchive</span>
-              <span className="text-[9px] text-white/40 font-bold uppercase tracking-[0.2em] mt-1.5 whitespace-nowrap">HCDC Digital Collections</span>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-3 group shrink-0">
+            <img src={`${import.meta.env.BASE_URL}logos/iarchive%20white%20logo.png`} alt="iArchive" className="h-9 sm:h-11 w-auto object-contain drop-shadow-lg group-hover:scale-105 transition-transform duration-300" />
+            <div className="hidden md:flex flex-col">
+              <span className="text-white font-black text-xl lg:text-2xl tracking-tight leading-none uppercase">iArchive</span>
+              <span className="text-[8px] lg:text-[9px] text-white/40 font-bold uppercase tracking-[0.2em] mt-1.5 whitespace-nowrap">HCDC Digital Collections</span>
             </div>
           </Link>
-          <nav className="hidden md:flex items-center gap-8 text-sm text-white/60">
+          <nav className="hidden lg:flex items-center gap-8 text-sm text-white/60">
             <Link href="/" className="hover:text-white transition-colors font-medium">Home</Link>
             <span className="text-white/20">|</span>
             <span className="text-white font-bold tracking-wide">Collections</span>
           </nav>
           {user ? (
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3 sm:gap-6 shrink-0">
               <Link href={user.role === 'admin' ? "/admin" : user.role === 'archivist' ? "/archivist" : "/student"}>
-                <button className="flex items-center gap-2.5 bg-white/10 hover:bg-white/20 text-white text-sm font-bold px-4 py-2 rounded-lg transition-all border border-white/20 hover:border-white/40 shadow-sm shadow-black/10">
-                  <LayoutDashboard className="w-4 h-4" /> Dashboard
+                <button className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white text-xs sm:text-sm font-bold px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg transition-all border border-white/20 hover:border-white/40 shadow-sm shadow-black/10">
+                  <LayoutDashboard className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span className="hidden sm:inline">Dashboard</span>
                 </button>
               </Link>
-              <div className="flex items-center gap-4 border-l border-white/10 pl-6">
-                <div className="flex flex-col items-end">
+              <div className="flex items-center gap-3 sm:gap-4 sm:border-l border-white/10 sm:pl-6">
+                <div className="hidden sm:flex flex-col items-end">
                   <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">{roleBranding.label}</span>
                   <span className="text-sm font-bold text-white">{user.name}</span>
                 </div>
-                <div className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center shadow-lg shadow-black/20">
-                  <User className="w-5 h-5 text-white/70" />
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center shadow-lg shadow-black/20 shrink-0">
+                  <User className="w-4 h-4 sm:w-5 sm:h-5 text-white/70" />
                 </div>
               </div>
             </div>
           ) : (
-            <Link href="/login">
-              <button className="text-sm font-bold text-white bg-[#4169E1] px-5 py-2 rounded-lg hover:bg-[#3558c8] transition-all shadow-lg shadow-black/20">Sign In</button>
+            <Link href="/login" className="shrink-0">
+              <button className="text-xs sm:text-sm font-bold text-white bg-[#4169E1] px-4 py-1.5 sm:px-5 sm:py-2 rounded-lg hover:bg-[#3558c8] transition-all shadow-lg shadow-black/20">Sign In</button>
             </Link>
           )}
         </div>
@@ -197,8 +197,8 @@ export default function Collections() {
           </div>
 
           {/* Search Bar */}
-          <div className="flex gap-3">
-            <div className="relative flex-1 max-w-2xl group">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1 group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30 group-focus-within:text-[#4169E1] transition-colors" />
               <input
                 type="text"
