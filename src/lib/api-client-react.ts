@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getActivityFeed } from "@/data/storage";
 import { firebaseAuth } from "@/lib/firebase-client";
-import { signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword } from "firebase/auth";
+import { signOut } from "firebase/auth";
 
 type MutationArgs<TData = unknown> = {
   id?: string;
@@ -53,37 +53,36 @@ export function useLogin() {
     mutationFn: async (args: MutationArgs<{ email: string; password: string }>) => {
       const email = args.data?.email || "";
       const password = args.data?.password || "";
-      const demoEmails = new Set([
-        "admin@hcdc.edu.ph",
-        "archivist@hcdc.edu.ph",
-        "student@hcdc.edu.ph",
-      ]);
-      if (demoEmails.has(email.toLowerCase()) && password === "admin123") {
-        return apiRequest<{ token: string; user: any }>("/api/auth/login", {
+
+      // All logins go through the backend API — no client-side Firebase Auth needed.
+      // The backend handles Firebase Admin SDK auth, demo accounts, and fallbacks.
+      try {
+        return await apiRequest<{ token: string; user: any }>("/api/auth/login", {
           method: "POST",
           body: JSON.stringify({ email, password }),
         });
-      }
-
-      try {
-        const cred = await signInWithEmailAndPassword(firebaseAuth, email, password);
-        const idToken = await cred.user.getIdToken();
-        return apiRequest<{ token: string; user: any }>("/api/auth/login", {
-          method: "POST",
-          body: JSON.stringify({ idToken }),
-        });
       } catch (err: any) {
-        const code = err?.code || "";
-        if (code === "auth/user-not-found") {
-          throw new Error("Account not found");
+        // Parse backend error into user-friendly message
+        const raw = err?.data?.error || err?.message || "";
+        if (/not active|approval|pending/i.test(raw)) {
+          throw new Error("Your account is pending approval. Please wait for an administrator to activate your account.");
         }
-        if (code === "auth/wrong-password" || code === "auth/invalid-credential") {
-          throw new Error("Invalid credentials");
+        if (/not found|no user|invalid login/i.test(raw)) {
+          throw new Error("No account found with that email. Please register first.");
         }
-        if (code === "auth/too-many-requests") {
-          throw new Error("Too many attempts. Please try again later.");
+        if (/invalid credentials|wrong password|INVALID_PASSWORD/i.test(raw)) {
+          throw new Error("Incorrect password. Please try again.");
         }
-        throw err;
+        if (/INVALID_LOGIN_CREDENTIALS/i.test(raw)) {
+          throw new Error("Invalid email or password. Please check your credentials and try again.");
+        }
+        if (/too many/i.test(raw)) {
+          throw new Error("Too many login attempts. Please wait a few minutes and try again.");
+        }
+        if (/EMAIL_NOT_FOUND/i.test(raw)) {
+          throw new Error("No account found with that email. Please register first.");
+        }
+        throw new Error(raw || "Login failed. Please try again.");
       }
     },
   });

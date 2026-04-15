@@ -3,9 +3,8 @@ import { Link, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { FileText, Lock, UserPlus, Database, ArrowLeft, ChevronRight, CheckCircle2 } from "lucide-react";
-import { Button, Input, Label, Badge, Modal } from "@/components/ui-components";
-import { Textarea } from "@/components/ui/textarea";
+import { Lock, UserPlus, ArrowLeft, ChevronRight, CheckCircle2, X, AlertTriangle, MailWarning, PartyPopper } from "lucide-react";
+import { Button, Input, Label, Badge } from "@/components/ui-components";
 import { useRegister } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -18,11 +17,18 @@ const registerSchema = z.object({
   purpose: z.string().optional(),
 });
 
+type ModalData = {
+  type: "success" | "duplicate" | "error";
+  title: string;
+  message: string;
+  suggestion?: string;
+};
+
 export default function Register() {
   const [_, setLocation] = useLocation();
   const { toast } = useToast();
   const { mutate: mutateRegister, isPending } = useRegister();
-  const [errorModal, setErrorModal] = React.useState<{ title: string; message: string } | null>(null);
+  const [modal, setModal] = React.useState<ModalData | null>(null);
 
   const form = useForm<z.infer<typeof registerSchema>>({
     resolver: zodResolver(registerSchema),
@@ -32,18 +38,38 @@ export default function Register() {
   const onSubmit = (data: z.infer<typeof registerSchema>) => {
     mutateRegister({ data }, {
       onSuccess: () => {
-        toast({ title: "Registration Submitted", description: "Your account is pending approval by an archivist." });
-        setLocation("/login");
+        setModal({
+          type: "success",
+          title: "Registration Submitted!",
+          message: "Your account application has been received successfully.",
+          suggestion: "An administrator will review your application and activate your account. You will be able to log in once approved."
+        });
       },
       onError: (err: any) => {
-        const message = err?.data?.error || err?.message || "Error registering";
+        const message = err?.message || err?.data?.error || "Error registering";
         if (/already registered|email already|already in use/i.test(message)) {
-          setErrorModal({ title: "Email Already Registered", message: "That email already exists. Please log in or use another email." });
-          return;
+          setModal({
+            type: "duplicate",
+            title: "Email Already Registered",
+            message: "An account with this email address already exists in our system.",
+            suggestion: "Please sign in with your existing account, or use a different email address."
+          });
+        } else {
+          setModal({
+            type: "error",
+            title: "Registration Failed",
+            message: message,
+            suggestion: "Please check your information and try again. If the problem persists, contact the administrator."
+          });
         }
-        toast({ title: "Registration Failed", description: message, variant: "destructive" });
       }
     });
+  };
+
+  const modalConfig = {
+    success: { icon: PartyPopper, color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20", gradient: "from-emerald-500 to-emerald-600" },
+    duplicate: { icon: MailWarning, color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20", gradient: "from-amber-500 to-amber-600" },
+    error: { icon: AlertTriangle, color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/20", gradient: "from-red-500 to-red-600" },
   };
 
   return (
@@ -72,7 +98,7 @@ export default function Register() {
               { title: "Controlled Access", desc: "Direct communication with archivists" }
             ].map((feature, i) => (
               <div key={i} className="flex gap-4 items-start">
-                <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center shrink-0 border border-white/10 group-hover:border-white/20 transition-colors">
+                <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center shrink-0 border border-white/10">
                   <CheckCircle2 className="w-4 h-4 text-[#4169E1]" />
                 </div>
                 <div>
@@ -85,7 +111,7 @@ export default function Register() {
         </div>
 
         <div className="relative z-10">
-          <p className="text-white/20 text-xs font-medium tracking-widest uppercase">© {new Date().getFullYear()} Holy Cross of Davao College</p>
+          <p className="text-white/20 text-xs font-medium tracking-widest uppercase">&copy; {new Date().getFullYear()} Holy Cross of Davao College</p>
         </div>
       </div>
 
@@ -159,16 +185,48 @@ export default function Register() {
             </Link>
           </div>
         </div>
-        <Modal
-          isOpen={!!errorModal}
-          onClose={() => setErrorModal(null)}
-          title={errorModal?.title || "Registration Error"}
-        >
-          <p className="text-sm text-muted-foreground">{errorModal?.message}</p>
-          <div className="mt-4 flex justify-end">
-            <Button variant="accent" onClick={() => setErrorModal(null)}>Okay</Button>
-          </div>
-        </Modal>
+
+        {/* ─── Premium Registration Modal ─── */}
+        {modal && (() => {
+          const cfg = modalConfig[modal.type];
+          const Icon = cfg.icon;
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => { if (modal.type !== "success") setModal(null); }}>
+              <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+              <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden"
+                onClick={(e) => e.stopPropagation()}>
+                <div className={`h-1.5 w-full bg-gradient-to-r ${cfg.gradient}`} />
+                <div className="p-7">
+                  <button onClick={() => { modal.type === "success" ? setLocation("/login") : setModal(null); }}
+                    className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors">
+                    <X className="w-5 h-5" />
+                  </button>
+                  <div className={`w-16 h-16 rounded-2xl ${cfg.bg} border ${cfg.border} flex items-center justify-center mb-5`}>
+                    <Icon className={`w-8 h-8 ${cfg.color}`} />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">{modal.title}</h3>
+                  <p className="text-gray-600 text-sm leading-relaxed">{modal.message}</p>
+                  {modal.suggestion && <p className="text-gray-400 text-xs leading-relaxed mt-3 bg-gray-50 rounded-lg p-3 border border-gray-100">{modal.suggestion}</p>}
+                  <div className="flex gap-3 mt-6">
+                    {modal.type === "success" ? (
+                      <button onClick={() => setLocation("/login")}
+                        className="w-full h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-lg shadow-emerald-600/20">
+                        <CheckCircle2 className="w-4 h-4" /> Go to Login
+                      </button>
+                    ) : modal.type === "duplicate" ? (
+                      <>
+                        <button onClick={() => setModal(null)} className="flex-1 h-11 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-colors">Use Different Email</button>
+                        <Link href="/login" className="flex-1 h-11 rounded-xl bg-[#4169E1] hover:bg-[#3558c0] text-white text-sm font-semibold flex items-center justify-center gap-2 transition-colors">Sign In</Link>
+                      </>
+                    ) : (
+                      <button onClick={() => setModal(null)} className="w-full h-11 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold transition-colors">Try Again</button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
