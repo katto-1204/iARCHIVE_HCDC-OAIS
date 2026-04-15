@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Link, useLocation } from "wouter";
-import { Library, LayoutDashboard, Database, Users, GitPullRequest, Search, FileText, Settings, LogOut, Menu, X, Bell, Loader2, User } from "lucide-react";
+import { Library, LayoutDashboard, Database, Users, GitPullRequest, Search, FileText, Settings, LogOut, Menu, X, Bell, Loader2, User, UserCog } from "lucide-react";
 import { useGetMe, useLogout, useGetAccessRequests, useGetAuditLogs, useGetUsers } from "@workspace/api-client-react";
 import { Button } from "./ui-components";
 import { cn } from "@/lib/utils";
@@ -40,7 +40,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
                 document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
               }
             }} className="text-foreground/80 hover:text-accent transition-colors cursor-pointer">Features</button>
-            <Link href="/about" className="text-foreground/80 hover:text-accent transition-colors">About OAIS</Link>
+            <Link href="/about" className="text-foreground/80 hover:text-accent transition-colors">About iARCHIVE</Link>
             <Link href="/terms" className="text-foreground/80 hover:text-accent transition-colors">Terms</Link>
             {user ? (
               <div className="flex items-center gap-4">
@@ -133,24 +133,25 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         { icon: Database, label: "Archival Materials", href: "/admin/collections" },
         { icon: FileText, label: "Categories", href: "/admin/categories" },
         { icon: GitPullRequest, label: "Requests", href: "/admin/requests", badge: pendingReqCount },
-        { icon: Users, label: "Admin Accounts", href: "/admin/users", badge: pendingUsersCount },
+        { icon: UserCog, label: "Admin Accounts", href: "/admin/users", badge: pendingUsersCount },
+        { icon: Users, label: "User Accounts", href: "/admin/user-accounts" },
         { icon: Bell, label: "Announcements", href: "/admin/announcements" },
         { icon: Search, label: "Audit Logs", href: "/admin/audit", badge: auditBadge },
         { icon: User, label: "My Profile", href: "/admin/profile" },
       ]
     : user.role === "archivist"
       ? [
-          { icon: LayoutDashboard, label: "Dashboard", href: "/archivist" },
-          { icon: Database, label: "Archival Materials", href: "/archivist/collections" },
-          { icon: FileText, label: "Categories", href: "/archivist/categories" },
-          { icon: GitPullRequest, label: "Requests", href: "/archivist/requests", badge: pendingReqCount },
-          { icon: User, label: "My Profile", href: "/archivist/profile" },
-        ]
+        { icon: LayoutDashboard, label: "Dashboard", href: "/archivist" },
+        { icon: Database, label: "Archival Materials", href: "/archivist/collections" },
+        { icon: FileText, label: "Categories", href: "/archivist/categories" },
+        { icon: GitPullRequest, label: "Requests", href: "/archivist/requests", badge: pendingReqCount },
+        { icon: User, label: "My Profile", href: "/archivist/profile" },
+      ]
       : [
-          { icon: LayoutDashboard, label: "Dashboard", href: "/student" },
-          { icon: Database, label: "Browse Collections", href: "/collections" },
-          { icon: User, label: "My Profile", href: "/student/profile" },
-        ];
+        { icon: LayoutDashboard, label: "Dashboard", href: "/student" },
+        { icon: Database, label: "Browse Collections", href: "/collections" },
+        { icon: User, label: "My Profile", href: "/student/profile" },
+      ];
 
   const roleAsideBg =
     user.role === "admin" ? "bg-[#0B2D5A]" : user.role === "archivist" ? "bg-[#000000]" : "bg-[#960000]";
@@ -187,7 +188,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                   <link.icon className={cn("w-5 h-5 mr-3 transition-transform group-hover:scale-110", active ? "text-white" : "text-white/50")} />
                   <span className="flex-1">{link.label}</span>
                   {link.badge ? (
-                     <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">{link.badge}</span>
+                    <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">{link.badge}</span>
                   ) : null}
                 </Link>
               );

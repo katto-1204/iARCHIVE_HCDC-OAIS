@@ -22,7 +22,7 @@ export default function About() {
   return (
     <PublicLayout>
       <div className="min-h-screen bg-[#f7f8fc] pt-24 pb-16">
-        <motion.div 
+        <motion.div
           initial="initial"
           animate="animate"
           variants={staggerContainer}

@@ -17,7 +17,7 @@ export default function Home() {
   const targetRef = React.useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({ target: targetRef });
   const x = useTransform(scrollYProgress, [0, 1], ["0%", "-82%"]);
-  
+
   // Smoother transition for the transform
   const springX = useSpring(x, {
     stiffness: 100,
@@ -51,7 +51,7 @@ export default function Home() {
             entry.target.classList.add("reveal-visible");
             // Also apply to children with reveal-up
             entry.target.querySelectorAll('.reveal-up').forEach(c => c.classList.add('reveal-visible'));
-            
+
             const children = entry.target.querySelectorAll('[data-stagger]');
             children.forEach((child, idx) => {
               (child as HTMLElement).style.transitionDelay = `${idx * 120}ms`;
@@ -67,7 +67,7 @@ export default function Home() {
     const observeNodes = () => {
       document.querySelectorAll("[data-reveal], .reveal-up, [data-stagger]").forEach((el) => observer.observe(el));
     };
-    
+
     observeNodes();
     const mo = new MutationObserver(observeNodes);
     mo.observe(document.body, { childList: true, subtree: true });
@@ -82,7 +82,7 @@ export default function Home() {
     { icon: Shield, title: "Fixity & Integrity", desc: "Automated SHA-256 bit-level checks ensure your archival information packages (AIP) remain authentic and unaltered over decades." },
     { icon: GitBranch, title: "Request Workflow", desc: "A streamlined researcher portal for petitioning access to restricted items, integrated directly with archivist approval queues." },
     { icon: Activity, title: "Audit & Compliance", desc: "Complete transparency with granular activity logs tracking every view and modification for institutional oversight." },
-    { icon: LayoutDashboard, title: "OAIS Compliance", desc: "Built on the ISO 14721:2012 framework, managing the full lifecycle from SIP ingestion to DIP access." },
+    { icon: LayoutDashboard, title: "OAIS Aligned", desc: "Built on the ISO 14721:2012 framework, managing the full lifecycle from SIP ingestion to DIP access." },
     { icon: ClipboardList, title: "Login Monitoring", desc: "Proactive security tracking for all user sessions, ensuring archival access remains within authorized institutional boundaries." },
   ];
 
@@ -172,42 +172,41 @@ export default function Home() {
       {/* ─── NAVBAR ─── */}
       <header className="fixed top-4 inset-x-0 z-50">
         <div className="max-w-5xl mx-auto px-4">
-          <div className={`h-14 flex items-center justify-between px-5 rounded-full transition-all duration-500 shadow-2xl ring-1 ring-white/5 ${
-            scrollY > 500
-              ? 'bg-[#6b0000] border border-[#960000]/40 shadow-[#960000]/25'
-              : 'bg-[#5a0000]/60 backdrop-blur-2xl border border-red-400/15 shadow-[#960000]/20'
-          }`}>
-          <Link href="/" className="flex items-center gap-4">
-            <img src={`${import.meta.env.BASE_URL}logos/iarchive%20white%20logo.png`} alt="iArchive logo" className="h-11 w-auto object-contain" />
-          </Link>
-          <nav className="hidden md:flex items-center gap-1 text-sm font-medium text-white/70">
-            <Link href="/collections">
-              <button className="hover:text-white hover:bg-white/10 px-3.5 py-1.5 rounded-full transition-all cursor-pointer">Collections</button>
+          <div className={`h-14 flex items-center justify-between px-5 rounded-full transition-all duration-500 shadow-2xl ring-1 ring-white/5 ${scrollY > 500
+            ? 'bg-[#6b0000] border border-[#960000]/40 shadow-[#960000]/25'
+            : 'bg-[#5a0000]/60 backdrop-blur-2xl border border-red-400/15 shadow-[#960000]/20'
+            }`}>
+            <Link href="/" className="flex items-center gap-4">
+              <img src={`${import.meta.env.BASE_URL}logos/iarchive%20white%20logo.png`} alt="iArchive logo" className="h-11 w-auto object-contain" />
             </Link>
-            <button onClick={() => {
-              const el = document.getElementById('features');
-              if (el) el.scrollIntoView({ behavior: 'smooth' });
-            }} className="hover:text-white hover:bg-white/10 px-3.5 py-1.5 rounded-full transition-all cursor-pointer">Features</button>
-            <Link href="/about">
-              <button className="hover:text-white hover:bg-white/10 px-3.5 py-1.5 rounded-full transition-all cursor-pointer">About OAIS</button>
-            </Link>
-            <Link href="/terms">
-              <button className="hover:text-white hover:bg-white/10 px-3.5 py-1.5 rounded-full transition-all cursor-pointer">Terms</button>
-            </Link>
-          </nav>
-          {user ? (
-            <Link href={user.role === 'admin' ? "/admin" : user.role === 'archivist' ? "/archivist" : "/student"}>
-              <button className="flex items-center gap-2 bg-[#4169E1] hover:bg-[#3558c8] text-white text-sm font-semibold px-4 py-1.5 rounded-full transition-all border border-[#4169E1] hover:border-white/20 cursor-pointer shadow-lg shadow-black/20">
-                <LayoutDashboard className="w-3.5 h-3.5" /> Dashboard
-              </button>
-            </Link>
-          ) : (
-            <Link href="/login">
-              <button className="flex items-center gap-2 bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white text-sm font-semibold px-4 py-1.5 rounded-full transition-all border border-white/10 hover:border-white/20 cursor-pointer">
-                <LogIn className="w-3.5 h-3.5" /> Login
-              </button>
-            </Link>
-          )}
+            <nav className="hidden md:flex items-center gap-1 text-sm font-medium text-white/70">
+              <Link href="/collections">
+                <button className="hover:text-white hover:bg-white/10 px-3.5 py-1.5 rounded-full transition-all cursor-pointer">Collections</button>
+              </Link>
+              <button onClick={() => {
+                const el = document.getElementById('features');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }} className="hover:text-white hover:bg-white/10 px-3.5 py-1.5 rounded-full transition-all cursor-pointer">Features</button>
+              <Link href="/about">
+                <button className="hover:text-white hover:bg-white/10 px-3.5 py-1.5 rounded-full transition-all cursor-pointer">About iARCHIVE</button>
+              </Link>
+              <Link href="/terms">
+                <button className="hover:text-white hover:bg-white/10 px-3.5 py-1.5 rounded-full transition-all cursor-pointer">Terms</button>
+              </Link>
+            </nav>
+            {user ? (
+              <Link href={user.role === 'admin' ? "/admin" : user.role === 'archivist' ? "/archivist" : "/student"}>
+                <button className="flex items-center gap-2 bg-[#4169E1] hover:bg-[#3558c8] text-white text-sm font-semibold px-4 py-1.5 rounded-full transition-all border border-[#4169E1] hover:border-white/20 cursor-pointer shadow-lg shadow-black/20">
+                  <LayoutDashboard className="w-3.5 h-3.5" /> Dashboard
+                </button>
+              </Link>
+            ) : (
+              <Link href="/login">
+                <button className="flex items-center gap-2 bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white text-sm font-semibold px-4 py-1.5 rounded-full transition-all border border-white/10 hover:border-white/20 cursor-pointer">
+                  <LogIn className="w-3.5 h-3.5" /> Login
+                </button>
+              </Link>
+            )}
           </div>
         </div>
       </header>
@@ -331,10 +330,10 @@ export default function Home() {
             {(Array.isArray(categories)
               ? categories.slice(0, 3)
               : [
-                  { id: "1", name: "Yearbooks", description: "Annual yearbook collection" },
-                  { id: "2", name: "Faculty Publications", description: "Academic research and publications" },
-                  { id: "3", name: "Digital Materials", description: "Born-digital institutional records" },
-                ]
+                { id: "1", name: "Yearbooks", description: "Annual yearbook collection" },
+                { id: "2", name: "Faculty Publications", description: "Academic research and publications" },
+                { id: "3", name: "Digital Materials", description: "Born-digital institutional records" },
+              ]
             ).map((cat, i) => (
               <Link key={cat.id} href={`/collections?category=${cat.id}`}>
                 <div data-stagger className={`reveal-up ${catColors[i % catColors.length]} rounded-2xl overflow-hidden group cursor-pointer hover:scale-[1.03] transition-all duration-500 shadow-lg hover:shadow-2xl`}>
@@ -389,28 +388,28 @@ export default function Home() {
         <div ref={targetRef} className="hidden md:block relative h-[400vh]">
           <div className="sticky top-0 flex h-screen items-center overflow-hidden">
             <div className="absolute inset-x-0 top-20 text-center z-20 pointer-events-none">
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8 }}
                 className="max-w-2xl mx-auto px-6"
               >
-                  <p className="text-xs font-bold text-[#4169E1] uppercase tracking-[0.2em] mb-4">Why iArchive</p>
-                  <h2 className="text-5xl font-bold text-[#0a1628] leading-tight">
-                    Built for <span className="font-serif italic text-[#4169E1] relative">
-                      archival excellence
-                      <svg className="absolute -bottom-2 lg:-bottom-3 left-0 w-full h-3 text-[#960000] opacity-40" viewBox="0 0 100 20" preserveAspectRatio="none">
-                        <path d="M0 10 Q 50 20 100 10" stroke="currentColor" strokeWidth="4" fill="none" />
-                      </svg>
-                    </span>
-                  </h2>
+                <p className="text-xs font-bold text-[#4169E1] uppercase tracking-[0.2em] mb-4">Why iArchive</p>
+                <h2 className="text-5xl font-bold text-[#0a1628] leading-tight">
+                  Built for <span className="font-serif italic text-[#4169E1] relative">
+                    archival excellence
+                    <svg className="absolute -bottom-2 lg:-bottom-3 left-0 w-full h-3 text-[#960000] opacity-40" viewBox="0 0 100 20" preserveAspectRatio="none">
+                      <path d="M0 10 Q 50 20 100 10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    </svg>
+                  </span>
+                </h2>
               </motion.div>
             </div>
 
             <motion.div style={{ x: springX }} className="flex gap-10 px-24">
               {features.map((f, i) => (
-                <div 
-                  key={i} 
+                <div
+                  key={i}
                   className="group relative h-[320px] w-[500px] overflow-hidden rounded-[2.5rem] bg-white border border-border/50 shadow-sm transition-all duration-700 hover:shadow-2xl hover:border-[#4169E1]/40 shrink-0"
                 >
                   <div className="absolute inset-0 bg-gradient-to-br from-[#4169E1]/5 via-white to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
@@ -434,21 +433,21 @@ export default function Home() {
                   <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-[#4169E1]/5 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
                 </div>
               ))}
-              
+
               {/* View Collection Card - Matching style */}
               <div className="h-[320px] w-[500px] flex items-center justify-center shrink-0">
                 <Link href="/collections">
                   <div className="flex flex-col items-center gap-6 group cursor-pointer">
-                      <motion.div 
-                        whileHover={{ scale: 1.1, rotate: 5 }}
-                        className="w-20 h-20 rounded-3xl bg-[#0a1628] flex items-center justify-center text-white shadow-2xl transition-all duration-500 group-hover:bg-[#4169E1]"
-                      >
-                        <Search className="w-7 h-7" />
-                      </motion.div>
-                      <div className="text-center">
-                        <h4 className="text-xl font-bold text-[#0a1628] mb-1">Access the Full Archive</h4>
-                        <p className="text-[#4169E1] text-[10px] uppercase tracking-[0.3em] font-black">Begin Research Pipeline →</p>
-                      </div>
+                    <motion.div
+                      whileHover={{ scale: 1.1, rotate: 5 }}
+                      className="w-20 h-20 rounded-3xl bg-[#0a1628] flex items-center justify-center text-white shadow-2xl transition-all duration-500 group-hover:bg-[#4169E1]"
+                    >
+                      <Search className="w-7 h-7" />
+                    </motion.div>
+                    <div className="text-center">
+                      <h4 className="text-xl font-bold text-[#0a1628] mb-1">Access the Full Archive</h4>
+                      <p className="text-[#4169E1] text-[10px] uppercase tracking-[0.3em] font-black">Begin Research Pipeline →</p>
+                    </div>
                   </div>
                 </Link>
               </div>
@@ -484,19 +483,19 @@ export default function Home() {
                   </linearGradient>
                 </defs>
                 {/* Horizontal segment 1 */}
-                <motion.path 
+                <motion.path
                   initial={{ pathLength: 0 }}
                   whileInView={{ pathLength: 1 }}
                   transition={{ duration: 1.5, ease: "easeInOut" }}
-                  d="M 16.6 75 L 25 75 L 25 40 L 41.6 40" 
+                  d="M 16.6 75 L 25 75 L 25 40 L 41.6 40"
                   fill="none" stroke="url(#circuit-grad)" strokeWidth="2" strokeDasharray="6 6"
                 />
                 {/* Horizontal segment 2 */}
-                <motion.path 
+                <motion.path
                   initial={{ pathLength: 0 }}
                   whileInView={{ pathLength: 1 }}
                   transition={{ duration: 1.5, delay: 0.5, ease: "easeInOut" }}
-                  d="M 58.3 40 L 75 40 L 75 75 L 83.3 75" 
+                  d="M 58.3 40 L 75 40 L 75 75 L 83.3 75"
                   fill="none" stroke="url(#circuit-grad)" strokeWidth="2" strokeDasharray="6 6"
                 />
               </svg>
@@ -504,7 +503,7 @@ export default function Home() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative lg:px-12">
               {steps.map((step, i) => (
-                <motion.div 
+                <motion.div
                   key={i}
                   initial={{ opacity: 0, scale: 0.95 }}
                   whileInView={{ opacity: 1, scale: 1 }}
@@ -517,10 +516,10 @@ export default function Home() {
                       <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20" />
                       <step.icon className="w-10 h-10 text-white relative z-10 group-hover:scale-110 transition-transform duration-500" />
                     </div>
-                    
+
                     {/* Pulsing Outer Ring */}
                     <div className="absolute -inset-4 border border-[#4169E1]/10 rounded-full animate-[ping_3s_infinite] opacity-50" />
-                    
+
                     {/* Index Label - Fixed visibility & type safe */}
                     <div className="absolute -top-3 -left-3 w-10 h-10 bg-white border-2 border-[#4169E1] rounded-xl flex items-center justify-center text-xs font-black text-[#0a1628] shadow-xl z-30">
                       {parseInt(String(step.num)) < 10 ? `0${step.num}` : step.num}

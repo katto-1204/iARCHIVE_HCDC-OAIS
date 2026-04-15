@@ -2,50 +2,36 @@ import * as React from "react";
 import { format } from "date-fns";
 import { AdminLayout } from "@/components/layout";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Badge, Button, Input, Card, CardContent, CardHeader, CardTitle } from "@/components/ui-components";
-import { Search, UserCheck, UserX, Trash2, Users, Clock, ShieldCheck, Shield, Eye, Upload, Edit, Settings, UserPlus, FileText, Loader2 } from "lucide-react";
+import { Search, UserCheck, UserX, Trash2, Users, Clock, ShieldCheck, Shield, Eye, Upload, Edit, Settings, UserPlus, FileText, Loader2, Filter, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { useGetUsers, useApproveUser, useRejectUser, useDeleteUser } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-interface AdminPermissions {
-  view: boolean;
-  upload: boolean;
-  edit: boolean;
-  delete: boolean;
-  manageUsers: boolean;
-}
-
-const DEFAULT_PERMISSIONS: Record<string, AdminPermissions> = {
-  admin: { view: true, upload: true, edit: true, delete: true, manageUsers: true },
-  archivist: { view: true, upload: true, edit: true, delete: false, manageUsers: false },
-  student: { view: true, upload: false, edit: false, delete: false, manageUsers: false },
-};
-
-const PERMISSION_LABELS = [
-  { key: "view", label: "View Materials", icon: Eye, desc: "Browse and view archival materials" },
-  { key: "upload", label: "Upload / Ingest", icon: Upload, desc: "Upload new materials into the archive" },
-  { key: "edit", label: "Edit Metadata", icon: Edit, desc: "Modify metadata fields on materials" },
-  { key: "delete", label: "Delete Materials", icon: Trash2, desc: "Permanently delete archival items" },
-  { key: "manageUsers", label: "Manage Users", icon: Users, desc: "Approve/reject users, change roles" },
-] as const;
-
-export default function AdminUsers() {
+export default function UserAccounts() {
   const [tab, setTab] = React.useState<"active" | "pending" | "rejected">("active");
   const [search, setSearch] = React.useState("");
+  const [roleFilter, setRoleFilter] = React.useState<"all" | "student" | "alumni" | "researcher" | "faculty">("all");
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const itemsPerPage = 10;
+
   const { data, isLoading, refetch } = useGetUsers({ status: tab as any });
   const { mutate: approve, isPending: isApproving } = useApproveUser();
   const { mutate: reject, isPending: isRejecting } = useRejectUser();
   const { mutate: remove, isPending: isDeleting } = useDeleteUser();
   const { toast } = useToast();
 
-  // Permissions management
-  const [permissionsOpen, setPermissionsOpen] = React.useState(false);
-  const [editingUser, setEditingUser] = React.useState<any>(null);
-  const [userPerms, setUserPerms] = React.useState<AdminPermissions>(DEFAULT_PERMISSIONS.admin);
-
   // Deletion State
   const [deleteDialog, setDeleteDialog] = React.useState<{id: string, name: string} | null>(null);
+  // View Details
+  const [viewingUser, setViewingUser] = React.useState<any>(null);
+
+  // Rejection reason modal state
+  const [rejectDialog, setRejectDialog] = React.useState<{id: string, name: string} | null>(null);
+  const [rejectReason, setRejectReason] = React.useState("");
+
+  // Reset page on tab/filter change
+  React.useEffect(() => { setCurrentPage(1); }, [tab, search, roleFilter]);
 
   const handleApprove = (id: string) => {
     approve({ id }, {
@@ -56,10 +42,6 @@ export default function AdminUsers() {
       onError: () => toast({ title: "Error", description: "Failed to approve user.", variant: "destructive" })
     });
   };
-
-  // Rejection reason modal state
-  const [rejectDialog, setRejectDialog] = React.useState<{id: string, name: string} | null>(null);
-  const [rejectReason, setRejectReason] = React.useState("");
 
   const handleReject = (id: string, name: string) => {
     setRejectDialog({ id, name });
@@ -96,20 +78,6 @@ export default function AdminUsers() {
     }
   };
 
-  const openPermissions = (user: any) => {
-    setEditingUser(user);
-    setUserPerms(DEFAULT_PERMISSIONS[user.role] || DEFAULT_PERMISSIONS.student);
-    setPermissionsOpen(true);
-  };
-
-  const savePermissions = () => {
-    toast({
-      title: "Permissions Updated",
-      description: `Access control for ${editingUser?.name} has been saved.`,
-    });
-    setPermissionsOpen(false);
-  };
-
   const getRoleBadge = (role: string) => {
     const variants: Record<string, "default" | "success" | "accent"> = {
       admin: "accent",
@@ -119,89 +87,100 @@ export default function AdminUsers() {
     return <Badge variant={variants[role] || "default"} className="capitalize">{role}</Badge>;
   };
 
+  const getCategoryBadge = (category: string) => {
+    if (!category) return <span className="text-muted-foreground/40 italic">—</span>;
+    const colors: Record<string, string> = {
+      student: "bg-blue-50 text-blue-700 border-blue-200",
+      alumni: "bg-amber-50 text-amber-700 border-amber-200",
+      researcher: "bg-purple-50 text-purple-700 border-purple-200",
+      faculty: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    };
+    const colorClass = colors[category.toLowerCase()] || "bg-gray-50 text-gray-700 border-gray-200";
+    return <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${colorClass}`}>{category}</span>;
+  };
+
+  // Filter: exclude admin/archivist (those belong to Admin Accounts page)
   const filtered = React.useMemo(() => {
-    // Only show admin and archivist accounts on this page
-    let list = (data?.users || []).filter((u: any) => u.role === 'admin' || u.role === 'archivist');
-    if (!search) return list;
-    const q = search.toLowerCase();
-    return list.filter(u =>
-      u.name.toLowerCase().includes(q) ||
-      u.email.toLowerCase().includes(q) ||
-      (u.institution || "").toLowerCase().includes(q)
-    );
-  }, [data?.users, search]);
+    let list = (data?.users || []).filter((u: any) => u.role !== "admin" && u.role !== "archivist");
+    
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter((u: any) =>
+        u.name.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        (u.institution || "").toLowerCase().includes(q) ||
+        (u.userCategory || "").toLowerCase().includes(q)
+      );
+    }
+
+    if (roleFilter !== "all") {
+      list = list.filter((u: any) => (u.userCategory || u.role || "").toLowerCase() === roleFilter);
+    }
+
+    return list;
+  }, [data?.users, search, roleFilter]);
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const paginatedUsers = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  // Count stats
+  const allUsers = (data?.users || []).filter((u: any) => u.role !== "admin" && u.role !== "archivist");
+  const categoryCounts = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+    allUsers.forEach((u: any) => {
+      const cat = (u.userCategory || u.role || "uncategorized").toLowerCase();
+      counts[cat] = (counts[cat] || 0) + 1;
+    });
+    return counts;
+  }, [allUsers]);
 
   const tabConfig = [
-    { id: "active", label: "Active Users", icon: ShieldCheck },
-    { id: "pending", label: "Users Pending Approval", icon: Clock },
-    { id: "rejected", label: "Rejected Users", icon: UserX },
+    { id: "active", label: "Active Users", icon: ShieldCheck, color: "text-emerald-600" },
+    { id: "pending", label: "Pending Approval", icon: Clock, color: "text-amber-600" },
+    { id: "rejected", label: "Rejected Users", icon: UserX, color: "text-red-600" },
   ] as const;
 
   return (
     <AdminLayout>
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
         <div>
-          <h1 className="text-3xl font-display font-bold text-[#0a1628]">Admin Accounts</h1>
-          <p className="text-muted-foreground">Manage Archivist and Administrator accounts with role-based permissions.</p>
+          <h1 className="text-3xl font-display font-bold text-[#0a1628]">User Accounts</h1>
+          <p className="text-muted-foreground">Manage all user accounts — Students, Alumni, Researchers, and Faculty.</p>
         </div>
-        <div className="flex items-center gap-2 bg-primary/5 border border-primary/10 rounded-xl px-4 py-2">
-          <Users className="w-5 h-5 text-primary" />
-          <span className="text-sm font-semibold text-primary">
-            {data?.users?.length || 0} {tab} users
-          </span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 bg-primary/5 border border-primary/10 rounded-xl px-4 py-2">
+            <Users className="w-5 h-5 text-primary" />
+            <span className="text-sm font-semibold text-primary">
+              {filtered.length} user(s)
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Permission Matrix Card (shown on Active tab) */}
-      {tab === "active" && (
-        <Card className="mb-6 shadow-sm border-border/50 bg-white">
-          <CardHeader className="border-b border-border/50 pb-3">
-            <CardTitle className="text-sm font-bold text-[#0a1628] flex items-center gap-2 uppercase tracking-wider">
-              <Shield className="w-4 h-4 text-[#4169E1]" /> Role Permission Matrix
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/30">
-                  <tr>
-                    <th className="text-left py-3 px-4 font-bold text-muted-foreground">Permission</th>
-                    <th className="text-center py-3 px-4 font-bold text-[#960000]">Admin</th>
-                    <th className="text-center py-3 px-4 font-bold text-emerald-600">Archivist</th>
-                    <th className="text-center py-3 px-4 font-bold text-[#4169E1]">Student</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/30">
-                  {PERMISSION_LABELS.map(p => (
-                    <tr key={p.key} className="hover:bg-muted/10">
-                      <td className="py-2.5 px-4">
-                        <div className="flex items-center gap-2">
-                          <p.icon className="w-4 h-4 text-muted-foreground" />
-                          <div>
-                            <span className="font-semibold text-foreground text-xs">{p.label}</span>
-                            <p className="text-[10px] text-muted-foreground">{p.desc}</p>
-                          </div>
-                        </div>
-                      </td>
-                      {(["admin", "archivist", "student"] as const).map(role => (
-                        <td key={role} className="text-center py-2.5 px-4">
-                          {DEFAULT_PERMISSIONS[role][p.key as keyof AdminPermissions] ? (
-                            <span className="text-emerald-500 font-bold">✔</span>
-                          ) : (
-                            <span className="text-red-300">✘</span>
-                          )}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Stats Overview */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+        {[
+          { label: "Total Users", value: allUsers.length, icon: Users, color: "text-indigo-600", bg: "bg-indigo-50 border-indigo-100" },
+          { label: "Students", value: categoryCounts["student"] || 0, icon: UserPlus, color: "text-blue-600", bg: "bg-blue-50 border-blue-100" },
+          { label: "Alumni", value: categoryCounts["alumni"] || 0, icon: ShieldCheck, color: "text-amber-600", bg: "bg-amber-50 border-amber-100" },
+          { label: "Researchers", value: categoryCounts["researcher"] || 0, icon: FileText, color: "text-purple-600", bg: "bg-purple-50 border-purple-100" },
+        ].map(stat => (
+          <Card key={stat.label} className={`shadow-sm border ${stat.bg}`}>
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${stat.bg}`}>
+                <stat.icon className={`w-5 h-5 ${stat.color}`} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-[#0a1628]">{stat.value}</p>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{stat.label}</p>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
       <div className="bg-card border rounded-2xl shadow-sm overflow-hidden mb-6">
+        {/* Tab Navigation */}
         <div className="border-b px-4 flex gap-6">
           {tabConfig.map(t => (
             <button
@@ -209,33 +188,54 @@ export default function AdminUsers() {
               className={`py-4 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors ${tab === t.id ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
               onClick={() => setTab(t.id)}
             >
-              <t.icon className="w-4 h-4" />
+              <t.icon className={`w-4 h-4 ${tab === t.id ? t.color : ''}`} />
               {t.label}
             </button>
           ))}
         </div>
 
-        <div className="p-5 border-b bg-muted/5">
-          <div className="relative max-w-2xl">
+        {/* Search & Filter Bar */}
+        <div className="p-5 border-b bg-muted/5 flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1 max-w-2xl">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
             <Input
               className="pl-9 bg-muted/50"
-              placeholder="Search by name, email, institution..."
+              placeholder="Search by name, email, institution, category..."
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
+            {search && (
+              <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-muted-foreground" />
+            <Select value={roleFilter} onValueChange={(v) => setRoleFilter(v as any)}>
+              <SelectTrigger className="w-[160px] h-9 bg-white">
+                <SelectValue placeholder="Filter by role" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                <SelectItem value="student">Student</SelectItem>
+                <SelectItem value="alumni">Alumni</SelectItem>
+                <SelectItem value="researcher">Researcher</SelectItem>
+                <SelectItem value="faculty">Faculty</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
+        {/* Table */}
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead className="hidden md:table-cell">Email</TableHead>
-                <TableHead>Role</TableHead>
+                <TableHead>Category</TableHead>
                 <TableHead className="hidden lg:table-cell">Institution</TableHead>
-                <TableHead className="hidden sm:table-cell">Category</TableHead>
                 <TableHead className="hidden xl:table-cell">Registered</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -244,36 +244,38 @@ export default function AdminUsers() {
             {isLoading ? (
               [...Array(6)].map((_, i) => (
                 <TableRow key={i}>
-                  <TableCell colSpan={7} className="h-16">
+                  <TableCell colSpan={6} className="h-16">
                     <div className="h-8 w-full rounded-md bg-muted/40 animate-pulse" />
                   </TableCell>
                 </TableRow>
               ))
-            ) : (filtered?.length ?? 0) === 0 ? (
+            ) : paginatedUsers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-32 text-center">
+                <TableCell colSpan={6} className="h-32 text-center">
                   <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                    <ShieldCheck className="w-10 h-10 opacity-20" />
-                    <p>No {tab} users found.</p>
+                    <Users className="w-10 h-10 opacity-20" />
+                    <p>No {tab} users found{search ? ` matching "${search}"` : ""}.</p>
                     {tab === 'pending' && <p className="text-sm">All registrations have been processed.</p>}
                   </div>
                 </TableCell>
               </TableRow>
             ) : (
-              filtered?.map(user => (
+              paginatedUsers.map((user: any) => (
                 <TableRow key={user.id} className="group">
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shrink-0">
                         {user.name.charAt(0).toUpperCase()}
                       </div>
-                      <span className="font-medium">{user.name}</span>
+                      <div>
+                        <span className="font-medium block">{user.name}</span>
+                        <span className="text-[11px] text-muted-foreground md:hidden">{user.email}</span>
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell className="hidden md:table-cell text-muted-foreground text-sm">{user.email}</TableCell>
-                  <TableCell>{getRoleBadge(user.role)}</TableCell>
+                  <TableCell>{getCategoryBadge(user.userCategory || user.role)}</TableCell>
                   <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">{user.institution || <span className="text-muted-foreground/40 italic">—</span>}</TableCell>
-                  <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">{user.userCategory || <span className="text-muted-foreground/40 italic">—</span>}</TableCell>
                   <TableCell className="hidden xl:table-cell text-sm text-muted-foreground whitespace-nowrap">
                     {user.createdAt ? (() => {
                       const date = new Date(user.createdAt);
@@ -286,38 +288,10 @@ export default function AdminUsers() {
                         size="sm"
                         variant="outline"
                         className="text-indigo-600 border-indigo-200 hover:bg-indigo-50 gap-1"
-                        onClick={() => setEditingUser(user)}
+                        onClick={() => setViewingUser(user)}
                       >
-                        <Eye className="w-3.5 h-3.5" /> <span className="hidden sm:inline">View Details</span>
+                        <Eye className="w-3.5 h-3.5" /> <span className="hidden sm:inline">View</span>
                       </Button>
-                      {tab === 'active' && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-[#4169E1] border-[#4169E1]/20 hover:bg-[#4169E1]/10 gap-1 hidden md:flex"
-                            onClick={() => openPermissions(user)}
-                          >
-                            <Settings className="w-3.5 h-3.5" /> Permissions
-                          </Button>
-                          {user.role !== 'admin' && user.role !== 'archivist' && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-1"
-                              onClick={() => handleDelete(user.id, user.name)}
-                              disabled={isDeleting}
-                            >
-                              {isDeleting ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              ) : (
-                                <Trash2 className="w-3.5 h-3.5" />
-                              )}
-                              <span className="hidden sm:inline">Remove</span>
-                            </Button>
-                          )}
-                        </>
-                      )}
                       {tab === 'pending' && (
                         <>
                           <Button
@@ -350,6 +324,22 @@ export default function AdminUsers() {
                           </Button>
                         </>
                       )}
+                      {tab === 'active' && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-1"
+                          onClick={() => handleDelete(user.id, user.name)}
+                          disabled={isDeleting}
+                        >
+                          {isDeleting ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-3.5 h-3.5" />
+                          )}
+                          <span className="hidden sm:inline">Remove</span>
+                        </Button>
+                      )}
                       {tab === 'rejected' && (
                         <>
                           <Button
@@ -378,12 +368,53 @@ export default function AdminUsers() {
           </TableBody>
         </Table>
       </div>
-    </div>
 
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-5 py-3 border-t bg-muted/5">
+            <p className="text-xs text-muted-foreground">
+              Showing {((currentPage - 1) * itemsPerPage) + 1}–{Math.min(currentPage * itemsPerPage, filtered.length)} of {filtered.length} users
+            </p>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(p => p - 1)}
+                className="h-8 w-8 p-0"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).slice(
+                Math.max(0, currentPage - 3),
+                Math.min(totalPages, currentPage + 2)
+              ).map(page => (
+                <Button
+                  key={page}
+                  variant={currentPage === page ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setCurrentPage(page)}
+                  className={`h-8 w-8 p-0 text-xs ${currentPage === page ? 'bg-primary text-white' : ''}`}
+                >
+                  {page}
+                </Button>
+              ))}
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(p => p + 1)}
+                className="h-8 w-8 p-0"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
 
-      
-      {/* ═══ User Details Modal (Eligibility Review) ═══ */}
-      <Dialog open={!!editingUser && !permissionsOpen} onOpenChange={(open) => !open && setEditingUser(null)}>
+      {/* ═══ User Details Modal ═══ */}
+      <Dialog open={!!viewingUser} onOpenChange={(open) => !open && setViewingUser(null)}>
         <DialogContent className="max-w-2xl overflow-hidden rounded-2xl border-none p-0 shadow-2xl">
           <div className="h-2 bg-[#4169E1]" />
           <div className="p-8">
@@ -394,15 +425,15 @@ export default function AdminUsers() {
                     <UserPlus className="w-7 h-7" />
                   </div>
                   <div>
-                    <DialogTitle className="text-2xl font-display font-bold text-[#0a1628]">Application Review</DialogTitle>
+                    <DialogTitle className="text-2xl font-display font-bold text-[#0a1628]">User Details</DialogTitle>
                     <DialogDescription className="text-muted-foreground font-medium">
-                      Reviewing account request for <span className="text-[#0a1628] font-bold">{editingUser?.name}</span>
+                      Reviewing account for <span className="text-[#0a1628] font-bold">{viewingUser?.name}</span>
                     </DialogDescription>
                   </div>
                 </div>
-                {editingUser && (
-                  <Badge variant={editingUser.status === 'pending' ? 'default' : editingUser.status === 'active' ? 'success' : 'outline'} className={`uppercase tracking-widest text-[10px] px-3 py-1 shadow-sm ${editingUser.status === 'rejected' ? 'text-red-600 border-red-200 bg-red-50' : ''}`}>
-                    {editingUser.status}
+                {viewingUser && (
+                  <Badge variant={viewingUser.status === 'pending' ? 'default' : viewingUser.status === 'active' ? 'success' : 'outline'} className={`uppercase tracking-widest text-[10px] px-3 py-1 shadow-sm ${viewingUser.status === 'rejected' ? 'text-red-600 border-red-200 bg-red-50' : ''}`}>
+                    {viewingUser.status}
                   </Badge>
                 )}
               </div>
@@ -419,7 +450,7 @@ export default function AdminUsers() {
                       </div>
                       <div className="min-w-0">
                         <p className="text-[10px] text-muted-foreground font-bold uppercase">Full Name</p>
-                        <p className="text-sm font-bold text-[#0a1628] truncate">{editingUser?.name}</p>
+                        <p className="text-sm font-bold text-[#0a1628] truncate">{viewingUser?.name}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -428,7 +459,7 @@ export default function AdminUsers() {
                       </div>
                       <div className="min-w-0">
                         <p className="text-[10px] text-muted-foreground font-bold uppercase">Email Address</p>
-                        <p className="text-sm font-bold text-[#0a1628] truncate">{editingUser?.email}</p>
+                        <p className="text-sm font-bold text-[#0a1628] truncate">{viewingUser?.email}</p>
                       </div>
                     </div>
                   </div>
@@ -442,7 +473,7 @@ export default function AdminUsers() {
                     </div>
                     <div className="min-w-0">
                       <p className="text-[10px] text-muted-foreground font-bold uppercase">Institution</p>
-                      <p className="text-sm font-bold text-[#0a1628]">{editingUser?.institution || "N/A"}</p>
+                      <p className="text-sm font-bold text-[#0a1628]">{viewingUser?.institution || "N/A"}</p>
                     </div>
                   </div>
                 </div>
@@ -450,7 +481,7 @@ export default function AdminUsers() {
 
               <div className="space-y-6">
                 <div>
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] mb-2 block">System Configuration</label>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] mb-2 block">Account Details</label>
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
@@ -458,7 +489,7 @@ export default function AdminUsers() {
                       </div>
                       <div className="min-w-0">
                         <p className="text-[10px] text-muted-foreground font-bold uppercase">User Category</p>
-                        <div className="mt-0.5">{editingUser ? getRoleBadge(editingUser.userCategory || editingUser.role) : null}</div>
+                        <div className="mt-0.5">{viewingUser ? getCategoryBadge(viewingUser.userCategory || viewingUser.role) : null}</div>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -466,9 +497,9 @@ export default function AdminUsers() {
                         <Clock className="w-4 h-4 text-muted-foreground" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-[10px] text-muted-foreground font-bold uppercase">Submission Date</p>
+                        <p className="text-[10px] text-muted-foreground font-bold uppercase">Registration Date</p>
                         <p className="text-sm font-bold text-[#0a1628]">
-                          {editingUser?.createdAt ? format(new Date(editingUser.createdAt), 'MMMM d, yyyy HH:mm') : "N/A"}
+                          {viewingUser?.createdAt ? format(new Date(viewingUser.createdAt), 'MMMM d, yyyy HH:mm') : "N/A"}
                         </p>
                       </div>
                     </div>
@@ -480,21 +511,21 @@ export default function AdminUsers() {
                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] mb-2 block">Research Purpose / Field</label>
                 <div className="p-5 bg-muted/20 border-2 border-dashed border-muted-foreground/10 rounded-2xl">
                   <p className="text-sm text-[#0a1628] font-medium leading-relaxed italic">
-                    "{editingUser?.purpose || "The user did not specify a research purpose for this account application."}"
+                    "{viewingUser?.purpose || "The user did not specify a research purpose for this account application."}"
                   </p>
                 </div>
               </div>
             </div>
 
             <DialogFooter className="flex-col sm:flex-row gap-3 pt-6 border-t border-muted/50">
-              <Button variant="ghost" onClick={() => setEditingUser(null)} className="font-bold">Close Window</Button>
+              <Button variant="ghost" onClick={() => setViewingUser(null)} className="font-bold">Close</Button>
               
-              {(editingUser?.status === "pending" || tab === "pending") && (
+              {(viewingUser?.status === "pending" || tab === "pending") && (
                 <div className="flex flex-1 gap-3">
                   <Button 
                     variant="outline" 
                     className="flex-1 text-red-600 border-red-200 hover:bg-red-50 font-bold h-12 rounded-xl transition-all active:scale-[0.98]"
-                    onClick={() => { handleReject(editingUser.id, editingUser.name); setEditingUser(null); }}
+                    onClick={() => { handleReject(viewingUser.id, viewingUser.name); setViewingUser(null); }}
                     disabled={isRejecting}
                   >
                     {isRejecting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <UserX className="w-4 h-4 mr-2" />}
@@ -502,7 +533,7 @@ export default function AdminUsers() {
                   </Button>
                   <Button 
                     className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-12 rounded-xl shadow-lg shadow-emerald-600/20 transition-all active:scale-[0.98]"
-                    onClick={() => { handleApprove(editingUser.id); setEditingUser(null); }}
+                    onClick={() => { handleApprove(viewingUser.id); setViewingUser(null); }}
                     disabled={isApproving}
                   >
                     {isApproving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <UserCheck className="w-4 h-4 mr-2" />}
@@ -510,58 +541,8 @@ export default function AdminUsers() {
                   </Button>
                 </div>
               )}
-              
-              {(editingUser?.status === "active" || tab === "active") && (
-                <Button 
-                  className="flex-1 bg-[#4169E1] hover:bg-[#3154b5] text-white font-bold h-12 rounded-xl shadow-lg shadow-[#4169E1]/20 transition-all active:scale-[0.98]"
-                  onClick={() => setPermissionsOpen(true)}
-                >
-                  <Settings className="w-4 h-4 mr-2" /> Manage Permissions
-                </Button>
-              )}
             </DialogFooter>
           </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* ═══ Permissions Dialog ═══ */}
-      <Dialog open={permissionsOpen} onOpenChange={setPermissionsOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Shield className="w-5 h-5 text-primary" /> Configure Permissions
-            </DialogTitle>
-            <DialogDescription>
-              Set access control for <strong>{editingUser?.name}</strong> ({editingUser?.role}).
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-2">
-            {PERMISSION_LABELS.map(p => (
-              <div key={p.key} className="flex items-center justify-between py-2 px-3 rounded-xl hover:bg-muted/30 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <p.icon className="w-4 h-4 text-primary" />
-                  </div>
-                  <div>
-                    <span className="text-sm font-semibold block">{p.label}</span>
-                    <span className="text-[10px] text-muted-foreground">{p.desc}</span>
-                  </div>
-                </div>
-                <Switch
-                  checked={userPerms[p.key as keyof AdminPermissions]}
-                  onCheckedChange={(checked) => setUserPerms({ ...userPerms, [p.key]: checked })}
-                />
-              </div>
-            ))}
-          </div>
-
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setPermissionsOpen(false)}>Cancel</Button>
-            <Button onClick={savePermissions} className="gap-2">
-              <ShieldCheck className="w-4 h-4" /> Save Permissions
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 

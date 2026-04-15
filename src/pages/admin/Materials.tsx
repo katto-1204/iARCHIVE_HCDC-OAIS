@@ -404,9 +404,10 @@ export default function AdminMaterials() {
       setPdfPreviewBlobs(extractedImageBlobs.length > 0 ? extractedImageBlobs : pdfPreviewBlobs);
       setMainMaterialText(extractedText);
       
-      // Smart Fallback Scanning - only use if no metadata text extracted yet
-      if (!rawExtractionText && extractedText) {
-         setRawExtractionText(extractedText);
+      // Always set rawExtractionText to the document content when scanning the main file
+      // This ensures users see the document's actual content
+      if (extractedText) {
+         setRawExtractionText("═══ Scanned from Document: " + file.name + " ═══\n\n" + extractedText);
       }
       
       const fileExt = file.name.split('.').pop()?.toUpperCase() || "FILE";
@@ -471,6 +472,7 @@ export default function AdminMaterials() {
     const isCsv = file.name.toLowerCase().endsWith(".csv");
     const isXlsx = file.name.toLowerCase().endsWith(".xlsx");
     const isPdf = file.name.toLowerCase().endsWith(".pdf");
+    const isTxt = file.name.toLowerCase().endsWith(".txt");
     
     setMetadataProcessingState("scanning");
     setMetadataFileName(file.name);
@@ -492,7 +494,7 @@ export default function AdminMaterials() {
         const arrayBuffer = await file.arrayBuffer();
         const result = await window.mammoth.extractRawText({ arrayBuffer });
         extractedText = result.value;
-      } else if (isCsv) {
+      } else if (isCsv || isTxt) {
         extractedText = await file.text();
       } else if (isXlsx && window.XLSX) {
         const arrayBuffer = await file.arrayBuffer();
@@ -535,7 +537,13 @@ export default function AdminMaterials() {
         }
       }
 
-      setRawExtractionText(prev => prev ? prev + "\n\n═══ Extracted from Metadata File: " + file.name + " ═══\n\n" + extractedText : extractedText);
+      // When metadata file is uploaded, replace the extraction text with metadata content
+      if (extractedText.trim()) {
+        setRawExtractionText("═══ Extracted from Metadata File: " + file.name + " ═══\n\n" + extractedText);
+      } else {
+        // Metadata file had no extractable text — keep existing document scan
+        setRawExtractionText(prev => prev || ("═══ Metadata File: " + file.name + " (no extractable text) ═══"));
+      }
       
       const previewSnippet = extractedText.substring(0, 150).trim();
       setChecklistValues(prev => ({
@@ -568,7 +576,7 @@ export default function AdminMaterials() {
     }
 
     const ogSize = file.size;
-     const newSize = Math.floor(ogSize * 0.1);
+    const newSize = Math.floor(ogSize * 0.1);
     setFileDetails({ name: file.name, ogSize, newSize });
     
     await extractMainFile(file);
@@ -578,14 +586,36 @@ export default function AdminMaterials() {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
+    // Defer heavy processing to next frame to avoid INP blocking
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+
     if (files.length > 1) {
+       setProcessingState("scanning");
        setMetadataProcessingState("scanning");
        const allFiles = Array.from(files);
+
+       // Separate files by type:
+       // - Document files (PDF, DOCX, DOC) → treat FIRST as main material
+       // - Image files → page previews / main material
+       // - Metadata files (CSV, XLSX, TXT) → metadata extraction
+       const docExtensions = ['.pdf', '.doc', '.docx'];
+       const metaExtensions = ['.csv', '.xlsx', '.xls', '.txt'];
        const imageFiles = allFiles
          .filter(f => f.type.startsWith('image/'))
-         .sort((a,b) => a.name.localeCompare(b.name));
-       const metaFiles = allFiles.filter(f => !f.type.startsWith('image/'));
+         .sort((a, b) => a.name.localeCompare(b.name));
+       const documentFiles = allFiles
+         .filter(f => {
+           const ext = f.name.toLowerCase().substring(f.name.lastIndexOf('.'));
+           return docExtensions.includes(ext) && !f.type.startsWith('image/');
+         })
+         .sort((a, b) => a.name.localeCompare(b.name));
+       const metadataFiles = allFiles
+         .filter(f => {
+           const ext = f.name.toLowerCase().substring(f.name.lastIndexOf('.'));
+           return metaExtensions.includes(ext) && !f.type.startsWith('image/');
+         });
        
+       // Process images for preview
        let images: string[] = [];
        let imageBlobs: Blob[] = [];
        for (let i = 0; i < imageFiles.length; i++) {
@@ -593,9 +623,21 @@ export default function AdminMaterials() {
          imageBlobs.push(blob);
          images.push(createObjectUrl(blob));
        }
-       // If no main images present, populate as main preview
-       if (pdfPreviewImages.length === 0 && images.length > 0) {
-          setPdfPreviewImages(images);
+
+       // Process first document file as the MAIN material
+       if (documentFiles.length > 0) {
+         const mainDoc = documentFiles[0];
+         setUploadForm(prev => ({ ...prev, fileData: mainDoc, fileType: mainDoc.type }));
+         setFileDetails({ name: mainDoc.name, ogSize: mainDoc.size, newSize: Math.floor(mainDoc.size * 0.1) });
+         await extractMainFile(mainDoc);
+
+         // Any additional document files → extract as supplementary metadata
+         for (let i = 1; i < documentFiles.length; i++) {
+           await extractMetadataFile(documentFiles[i]);
+         }
+       } else if (images.length > 0) {
+         // No document files — images ARE the main material
+         setPdfPreviewImages(images);
          setPdfPreviewBlobs(imageBlobs);
          setUploadForm(prev => ({ 
             ...prev, 
@@ -604,10 +646,31 @@ export default function AdminMaterials() {
             fileData: imageBlobs[0] || prev.fileData,
             fileType: "image/jpeg"
          }));
+         setProcessingState("done");
+
+         // Auto-fill from first image file properties
+         const firstImg = imageFiles[0];
+         const baseName = firstImg.name.replace(/\.[^/.]+$/, "");
+         const sizeStr = (firstImg.size / 1024 / 1024).toFixed(2) + " MB";
+         const fileDate = firstImg.lastModified ? new Date(firstImg.lastModified).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+         setUploadForm(prev => ({
+           ...prev,
+           title: prev.title || baseName,
+           format: prev.format || firstImg.type || "image/jpeg",
+         }));
+         setChecklistValues(prev => ({
+           ...prev,
+           title: prev.title || baseName,
+           date: prev.date || fileDate,
+           format: prev.format || firstImg.type,
+           extentAndMedium: prev.extentAndMedium || `${images.length} image(s), ${sizeStr}`,
+         }));
+         setMainFileName(firstImg.name);
+         setRawExtractionText(`═══ Scanned ${images.length} Image(s) from Folder ═══\n\nImages loaded as page previews. No extractable text from images.`);
        }
 
-       // Also extract metadata from any non-image files in the folder
-       for (const mf of metaFiles) {
+       // Process metadata-specific files (CSV, XLSX, TXT)
+       for (const mf of metadataFiles) {
          await extractMetadataFile(mf);
        }
 
@@ -622,7 +685,26 @@ export default function AdminMaterials() {
        return;
     }
 
-    await extractMetadataFile(files[0]);
+    // Single file uploaded via folder selector — determine if it's a document or metadata
+    const singleFile = files[0];
+    const ext = singleFile.name.toLowerCase().substring(singleFile.name.lastIndexOf('.'));
+    const isDoc = ['.pdf', '.doc', '.docx'].includes(ext);
+    const isImg = singleFile.type.startsWith('image/');
+
+    if (isDoc || isImg) {
+      // Single document/image → treat as main material and scan its content
+      if (isImg) {
+        const blob = await compressImageToBlob(singleFile, 1200, 0.5);
+        setUploadForm(prev => ({ ...prev, fileData: blob, fileType: blob.type || singleFile.type }));
+      } else {
+        setUploadForm(prev => ({ ...prev, fileData: singleFile, fileType: singleFile.type }));
+      }
+      setFileDetails({ name: singleFile.name, ogSize: singleFile.size, newSize: Math.floor(singleFile.size * 0.1) });
+      await extractMainFile(singleFile);
+    } else {
+      // It's a metadata file (CSV, XLSX, TXT)
+      await extractMetadataFile(singleFile);
+    }
   };
 
   const filteredMaterials = React.useMemo(() => {
