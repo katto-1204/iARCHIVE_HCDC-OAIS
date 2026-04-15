@@ -141,7 +141,8 @@ router.post("/auth/login", async (req, res) => {
           return;
         }
       }
-    } catch {
+    } catch (dbErr: any) {
+      console.error("Auth me/login Firestore error:", dbErr.message);
       // Firebase DB failed (SA error). Let's check jsonStore for approval state.
       profile = jsonStoreGetUserByEmail(decoded.email || email);
       if (!profile) {
@@ -168,7 +169,8 @@ router.post("/auth/login", async (req, res) => {
         createdAt: profile?.createdAt || new Date().toISOString(),
       },
     });
-  } catch (outerErr) {
+  } catch (outerErr: any) {
+    console.error("Auth Login outer error:", outerErr.message, outerErr.stack);
     // If it's one of the demo accounts, never attempt bcrypt compare
     // with an absent/blank DB password hash.
     const demoUser = getDemoUserByEmail(email);
@@ -271,7 +273,8 @@ router.post("/auth/register", async (req, res) => {
       updatedAt: now,
     });
     res.status(201).json({ message: "Registration submitted. Awaiting admin approval." });
-  } catch {
+  } catch (err: any) {
+    console.error("Registration error:", err.message, err.stack);
     const result = jsonStoreRegisterUser({ name, email, password, role, institution, purpose });
     if (!result.ok) {
       res.status(400).json({ error: result.error });
