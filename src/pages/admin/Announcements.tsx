@@ -2,7 +2,7 @@ import * as React from "react";
 import { format } from "date-fns";
 import { AdminLayout } from "@/components/layout";
 import { Card, CardHeader, CardTitle, CardContent, Button, Input } from "@/components/ui-components";
-import { Plus, Megaphone, Trash2, X, Save, Eye, EyeOff } from "lucide-react";
+import { Plus, Megaphone, Trash2, X, Save, Eye, EyeOff, Loader2 } from "lucide-react";
 import { useGetAnnouncements, useCreateAnnouncement, useDeleteAnnouncement } from "@workspace/api-client-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
