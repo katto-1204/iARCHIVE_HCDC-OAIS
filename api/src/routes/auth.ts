@@ -275,12 +275,11 @@ router.post("/auth/register", async (req, res) => {
     res.status(201).json({ message: "Registration submitted. Awaiting admin approval." });
   } catch (err: any) {
     console.error("Registration error:", err.message, err.stack);
-    const result = jsonStoreRegisterUser({ name, email, password, role, institution, purpose });
-    if (!result.ok) {
-      res.status(400).json({ error: result.error });
+    if (/email already/i.test(err.message)) {
+      res.status(400).json({ error: "Email already registered" });
       return;
     }
-    res.status(201).json({ message: "Registration submitted. Awaiting admin approval." });
+    res.status(500).json({ error: "Failed to register user to database" });
   }
 });
 

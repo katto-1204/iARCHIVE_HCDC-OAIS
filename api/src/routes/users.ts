@@ -36,14 +36,7 @@ router.get("/users", requireAuth, requireRole("admin", "archivist"), async (req,
     const snapshot = await query.get();
     let users = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     
-    // Safety check: ensure we didn't just get an empty array if Firebase is partially down
-    if (users.length === 0 && !status && page === 1) {
-       const localUsers = jsonStoreGetUsers({ status, page });
-       if (localUsers.users.length > 0) {
-         console.log("Empty Firestore users, falling back to local for display");
-         return res.json(localUsers);
-       }
-    }
+    // Removed local fallback logic
 
     if (status && ["pending", "active", "inactive", "rejected"].includes(status)) {
       users = users.filter((u: any) => u.status === status);
@@ -63,7 +56,7 @@ router.get("/users", requireAuth, requireRole("admin", "archivist"), async (req,
     res.json({ users: pageItems.map(formatUser), total, page, totalPages });
   } catch (error: any) {
     console.error("Firestore Users Fetch Error:", error.message);
-    res.json(jsonStoreGetUsers({ status, page }));
+    res.status(500).json({ error: "Failed to fetch users", details: error.message });
   }
 });
 
@@ -78,10 +71,9 @@ router.post("/users/:id/approve", requireAuth, requireRole("admin"), async (req,
     await db.collection("users").doc(id).update({ status: "active", updatedAt: new Date().toISOString() });
     await logAudit({ action: "APPROVE_USER", entityType: "user", entityId: id, userId: admin.userId, userName: admin.name, details: `Approved user: ${u.name}` });
     res.json({ message: "User approved" });
-  } catch {
-    const ok = jsonStoreApproveUser(id);
-    if (!ok) { res.status(404).json({ error: "User not found" }); return; }
-    res.json({ message: "User approved" });
+  } catch (err: any) {
+    console.error("Error approving user in Firestore:", err);
+    res.status(500).json({ error: "Failed to approve user", details: err.message });
   }
 });
 
@@ -97,10 +89,9 @@ router.post("/users/:id/reject", requireAuth, requireRole("admin"), async (req, 
     await db.collection("users").doc(id).update({ status: "rejected", rejectionReason: reason || "", updatedAt: new Date().toISOString() });
     await logAudit({ action: "REJECT_USER", entityType: "user", entityId: id, userId: admin.userId, userName: admin.name, details: `Rejected user: ${u.name}${reason ? ` — Reason: ${reason}` : ""}` });
     res.json({ message: "User rejected" });
-  } catch {
-    const ok = jsonStoreRejectUser(id);
-    if (!ok) { res.status(404).json({ error: "User not found" }); return; }
-    res.json({ message: "User rejected" });
+  } catch (err: any) {
+    console.error("Error rejecting user in Firestore:", err);
+    res.status(500).json({ error: "Failed to reject user", details: err.message });
   }
 });
 
@@ -121,10 +112,9 @@ router.delete("/users/:id", requireAuth, requireRole("admin"), async (req, res) 
     }
     await logAudit({ action: "DELETE_USER", entityType: "user", entityId: id, userId: admin.userId, userName: admin.name, details: `Deleted user: ${u.name}` });
     res.json({ message: "User deleted" });
-  } catch {
-    const ok = jsonStoreDeleteUser(id);
-    if (!ok) { res.status(404).json({ error: "User not found" }); return; }
-    res.json({ message: "User deleted" });
+  } catch (err: any) {
+    console.error("Error deleting user from Firestore:", err);
+    res.status(500).json({ error: "Failed to delete user", details: err.message });
   }
 });
 

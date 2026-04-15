@@ -82,16 +82,9 @@ router.get("/materials", async (req, res) => {
     const catMap = Object.fromEntries(catsSnap.docs.map((c) => [c.id, (c.data() as any).name]));
     const materials = pageItems.map((m) => formatMaterial(m, m.categoryId ? catMap[m.categoryId] : undefined));
     res.json({ materials, total, page, limit, totalPages });
-  } catch {
-    res.json(
-      jsonStoreGetMaterials({
-        search,
-        access,
-        category: categoryId,
-        page,
-        limit,
-      }),
-    );
+  } catch (err: any) {
+    console.error("Error fetching materials from Firestore:", err);
+    res.status(500).json({ error: "Failed to fetch materials", details: err.message });
   }
 });
 
@@ -177,9 +170,9 @@ router.post("/materials", requireAuth, async (req, res) => {
     await logAudit({ action: "CREATE_MATERIAL", entityType: "material", entityId: id, userId: user.userId, userName: user.name, details: `Created material: ${body.title}` });
     const catName = body.categoryId ? (cats.find((c: any) => c.id === body.categoryId) as any)?.name : undefined;
     res.status(201).json(formatMaterial(newMat, catName));
-  } catch {
-    const created = jsonStoreCreateMaterial({ data: body, user: { userId: user.userId, name: user.name } });
-    res.status(201).json(created);
+  } catch (err: any) {
+    console.error("Error creating material in Firestore:", err);
+    res.status(500).json({ error: "Failed to create material", details: err.message });
   }
 });
 
@@ -217,10 +210,9 @@ router.get("/materials/:id", async (req, res) => {
       fixityStatus: m.fixityStatus, preferredCitation: m.preferredCitation, fileUrl: m.fileUrl,
       relatedItems: related.map((r) => formatMaterial(r, r.categoryId ? catMap[r.categoryId] : undefined)),
     });
-  } catch {
-    const mat = jsonStoreGetMaterial(id);
-    if (!mat) { res.status(404).json({ error: "Material not found" }); return; }
-    res.json(mat);
+  } catch (err: any) {
+    console.error("Error fetching material by ID from Firestore:", err);
+    res.status(500).json({ error: "Failed to fetch material", details: err.message });
   }
 });
 
@@ -254,10 +246,9 @@ router.put("/materials/:id", requireAuth, async (req, res) => {
     await logAudit({ action: "UPDATE_MATERIAL", entityType: "material", entityId: id, userId: user.userId, userName: user.name, details: `Updated material: ${m.title}` });
     const updated = await db.collection("materials").doc(id).get();
     res.json(formatMaterial({ id, ...updated.data() }));
-  } catch {
-    const updated = jsonStoreUpdateMaterial(id, body, { userId: user.userId, name: user.name });
-    if (!updated) { res.status(404).json({ error: "Material not found" }); return; }
-    res.json(updated);
+  } catch (err: any) {
+    console.error("Error updating material in Firestore:", err);
+    res.status(500).json({ error: "Failed to update material", details: err.message });
   }
 });
 
@@ -292,10 +283,9 @@ router.patch("/materials/:id", requireAuth, async (req, res) => {
     await logAudit({ action: "UPDATE_MATERIAL", entityType: "material", entityId: id, userId: user.userId, userName: user.name, details: `Updated material: ${m.title}` });
     const updated = await db.collection("materials").doc(id).get();
     res.json(formatMaterial({ id, ...updated.data() }));
-  } catch {
-    const updated = jsonStoreUpdateMaterial(id, body, { userId: user.userId, name: user.name });
-    if (!updated) { res.status(404).json({ error: "Material not found" }); return; }
-    res.json(updated);
+  } catch (err: any) {
+    console.error("Error updating material in Firestore:", err);
+    res.status(500).json({ error: "Failed to update material", details: err.message });
   }
 });
 
@@ -312,10 +302,8 @@ router.delete("/materials/:id", requireAuth, async (req, res) => {
     await logAudit({ action: "DELETE_MATERIAL", entityType: "material", entityId: id, userId: user.userId, userName: user.name, details: `Deleted material: ${m.title}` });
     res.json({ message: "Material deleted" });
   } catch (err: any) {
-    console.warn("Delete Material fallback:", err.message);
-    const ok = jsonStoreDeleteMaterial(id);
-    if (!ok) { res.status(404).json({ error: "Material not found" }); return; }
-    res.json({ message: "Material deleted" });
+    console.error("Error deleting material from Firestore:", err);
+    res.status(500).json({ error: "Failed to delete material", details: err.message });
   }
 });
 

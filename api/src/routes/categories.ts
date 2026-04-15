@@ -31,8 +31,8 @@ router.get("/categories", async (_req, res) => {
 
     res.json(cats.map((c: any) => ({ ...c, materialCount: matCounts[c.id] || 0 })));
   } catch (err: any) {
-    console.warn("Categories Firebase fallback:", err.message);
-    res.json(jsonStoreGetCategories());
+    console.error("Error fetching categories from Firestore:", err);
+    res.status(500).json({ error: "Failed to fetch categories", details: err.message });
   }
 });
 
@@ -58,9 +58,9 @@ router.post("/categories", requireAuth, requireRole("admin", "archivist"), async
     });
     await logAudit({ action: "CREATE_CATEGORY", entityType: "category", entityId: id, userId: user.userId, userName: user.name, details: `Created category: ${name}` });
     res.status(201).json({ id, name, description: description ?? null, level, parentId: parentId ?? null, categoryNo, createdAt: now, updatedAt: now, materialCount: 0 });
-  } catch {
-    const created = jsonStoreCreateCategory({ name, description, level, parentId });
-    res.status(201).json(created);
+  } catch (err: any) {
+    console.error("Error creating category in Firestore:", err);
+    res.status(500).json({ error: "Failed to create category", details: err.message });
   }
 });
 
@@ -84,10 +84,9 @@ router.put("/categories/:id", requireAuth, requireRole("admin", "archivist"), as
     const countSnap = await db.collection("materials").where("categoryId", "==", id).count().get();
     const updated = await db.collection("categories").doc(id).get();
     res.json({ id, ...updated.data(), materialCount: Number(countSnap.data().count) });
-  } catch {
-    const updated = jsonStoreUpdateCategory({ id, name, description, level, parentId });
-    if (!updated) { res.status(404).json({ error: "Category not found" }); return; }
-    res.json(updated);
+  } catch (err: any) {
+    console.error("Error updating category in Firestore:", err);
+    res.status(500).json({ error: "Failed to update category", details: err.message });
   }
 });
 
@@ -112,10 +111,9 @@ router.patch("/categories/:id", requireAuth, requireRole("admin", "archivist"), 
     const countSnap = await db.collection("materials").where("categoryId", "==", id).count().get();
     const updated = await db.collection("categories").doc(id).get();
     res.json({ id, ...updated.data(), materialCount: Number(countSnap.data().count) });
-  } catch {
-    const updated = jsonStoreUpdateCategory({ id, name, description, level, parentId });
-    if (!updated) { res.status(404).json({ error: "Category not found" }); return; }
-    res.json(updated);
+  } catch (err: any) {
+    console.error("Error patching category in Firestore:", err);
+    res.status(500).json({ error: "Failed to update category", details: err.message });
   }
 });
 
@@ -136,10 +134,9 @@ router.delete("/categories/:id", requireAuth, requireRole("admin"), async (req, 
     }
     await logAudit({ action: "DELETE_CATEGORY", entityType: "category", entityId: id, userId: user.userId, userName: user.name, details: `Deleted category: ${cat.name}` });
     res.json({ message: "Category deleted" });
-  } catch {
-    const ok = jsonStoreDeleteCategory(id);
-    if (!ok) { res.status(404).json({ error: "Category not found" }); return; }
-    res.json({ message: "Category deleted" });
+  } catch (err: any) {
+    console.error("Error deleting category from Firestore:", err);
+    res.status(500).json({ error: "Failed to delete category", details: err.message });
   }
 });
 
