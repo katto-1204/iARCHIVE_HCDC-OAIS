@@ -1577,7 +1577,7 @@ export default function AdminMaterials() {
                   <Select value={uploadForm.subfonds} onValueChange={v => setUploadForm(p => ({ ...p, subfonds: v }))}>
                     <SelectTrigger className="h-10 bg-white border-border/60 hover:border-[#4169E1]/50 focus:ring-[#4169E1]/20 transition-all font-semibold text-[#0a1628]"><SelectValue placeholder="Select Department" /></SelectTrigger>
                     <SelectContent className="max-h-[300px] overflow-y-auto">
-                      {categories.map((c: any) => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
+                      {["College of Engineering and Technology", "College of Business", "College of Education", "College of Criminal Justice Education", "College of Arts and Sciences", "College of Maritime Education", "Bachelor of Library and Information Science", "Basic Education Department", "Administration", "Library"].map((dept) => <SelectItem key={dept} value={dept}>{dept}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>

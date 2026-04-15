@@ -4,7 +4,7 @@ import {
   Search, Shield, Database, Lock, CheckCircle, GitBranch, BookOpen,
   Users, FileSearch, ChevronRight, ArrowRight, LayoutDashboard,
   FolderOpen, Eye, ClipboardList, Settings, LogIn, Sparkles, Activity,
-  FileText, ShieldCheck
+  FileText, ShieldCheck, Menu, X
 } from "lucide-react";
 import { motion, useScroll, useTransform, useSpring } from "framer-motion";
 import { PublicLayout } from "@/components/layout";
@@ -29,6 +29,7 @@ export default function Home() {
   const { data: materials, isError: materialsError } = useGetMaterials({ limit: 3 });
   const { data: user } = useGetMe();
   const [scrollY, setScrollY] = React.useState(0);
+  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const { toast } = useToast();
 
   React.useEffect(() => {
@@ -195,20 +196,84 @@ export default function Home() {
               </Link>
             </nav>
             {user ? (
-              <Link href={user.role === 'admin' ? "/admin" : user.role === 'archivist' ? "/archivist" : "/student"}>
-                <button className="flex items-center gap-2 bg-[#4169E1] hover:bg-[#3558c8] text-white text-sm font-semibold px-4 py-1.5 rounded-full transition-all border border-[#4169E1] hover:border-white/20 cursor-pointer shadow-lg shadow-black/20">
-                  <LayoutDashboard className="w-3.5 h-3.5" /> Dashboard
-                </button>
-              </Link>
+              <div className="hidden md:flex">
+                <Link href={user.role === 'admin' ? "/admin" : user.role === 'archivist' ? "/archivist" : "/student"}>
+                  <button className="flex items-center gap-2 bg-[#4169E1] hover:bg-[#3558c8] text-white text-sm font-semibold px-4 py-1.5 rounded-full transition-all border border-[#4169E1] hover:border-white/20 cursor-pointer shadow-lg shadow-black/20">
+                    <LayoutDashboard className="w-3.5 h-3.5" /> Dashboard
+                  </button>
+                </Link>
+              </div>
             ) : (
-              <Link href="/login">
-                <button className="flex items-center gap-2 bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white text-sm font-semibold px-4 py-1.5 rounded-full transition-all border border-white/10 hover:border-white/20 cursor-pointer">
-                  <LogIn className="w-3.5 h-3.5" /> Login
-                </button>
-              </Link>
+              <div className="hidden md:flex">
+                <Link href="/login">
+                  <button className="flex items-center gap-2 bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white text-sm font-semibold px-4 py-1.5 rounded-full transition-all border border-white/10 hover:border-white/20 cursor-pointer">
+                    <LogIn className="w-3.5 h-3.5" /> Login
+                  </button>
+                </Link>
+              </div>
             )}
+
+            <button
+              className="md:hidden p-2 text-white/80 hover:text-white"
+              onClick={() => setMobileMenuOpen(true)}
+            >
+              <Menu className="w-5 h-5" />
+            </button>
           </div>
         </div>
+
+        {/* Mobile Navigation Menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm">
+            <div className="absolute right-0 top-0 bottom-0 w-64 bg-[#0a1628] border-l border-white/10 shadow-2xl p-6 flex flex-col">
+              <div className="flex justify-between items-center mb-10">
+                <span className="text-white font-display font-bold">Menu</span>
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-2 text-white/60 hover:text-white bg-white/5 rounded-full"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="flex flex-col gap-4 text-white font-medium">
+                <Link href="/collections">
+                  <span className="py-2 border-b border-white/10 block cursor-pointer" onClick={() => setMobileMenuOpen(false)}>Collections</span>
+                </Link>
+                <button
+                  className="py-2 border-b border-white/10 text-left"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    const el = document.getElementById('how-it-works');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                >
+                  Features
+                </button>
+                <Link href="/about">
+                  <span className="py-2 border-b border-white/10 block cursor-pointer" onClick={() => setMobileMenuOpen(false)}>About iARCHIVE</span>
+                </Link>
+                <Link href="/terms">
+                  <span className="py-2 border-b border-white/10 block cursor-pointer" onClick={() => setMobileMenuOpen(false)}>Terms</span>
+                </Link>
+              </div>
+              <div className="mt-auto">
+                {user ? (
+                  <Link href={user.role === 'admin' ? "/admin" : user.role === 'archivist' ? "/archivist" : "/student"}>
+                    <button className="w-full flex justify-center items-center gap-2 bg-[#4169E1] text-white py-3 rounded-xl font-bold">
+                      <LayoutDashboard className="w-4 h-4" /> Dashboard
+                    </button>
+                  </Link>
+                ) : (
+                  <Link href="/login">
+                    <button className="w-full flex justify-center items-center gap-2 bg-white/10 text-white py-3 rounded-xl font-bold">
+                      <LogIn className="w-4 h-4" /> Login
+                    </button>
+                  </Link>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Error toasts replace the old banner */}
@@ -422,9 +487,17 @@ export default function Home() {
                       <p className="text-muted-foreground leading-relaxed text-[15px] font-light group-hover:text-[#0a1628]/80 transition-colors">
                         {f.desc}
                       </p>
-                      <div className="mt-6 flex items-center gap-2 text-[#4169E1] font-bold text-[10px] uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 group-hover:translate-x-3 transition-all duration-500">
-                        View Capability <ArrowRight className="w-3 h-3" />
-                      </div>
+                      {f.title === "OAIS Aligned" ? (
+                        <Link href="/about#about-oais">
+                          <div className="mt-6 flex items-center gap-2 text-[#4169E1] font-bold text-[10px] uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 group-hover:translate-x-3 transition-all duration-500 cursor-pointer">
+                            View Capability <ArrowRight className="w-3 h-3" />
+                          </div>
+                        </Link>
+                      ) : (
+                        <div className="mt-6 flex items-center gap-2 text-[#4169E1] font-bold text-[10px] uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 group-hover:translate-x-3 transition-all duration-500">
+                          View Capability <ArrowRight className="w-3 h-3" />
+                        </div>
+                      )}
                     </div>
                   </div>
 

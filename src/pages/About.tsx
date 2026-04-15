@@ -19,6 +19,16 @@ const staggerContainer = {
 };
 
 export default function About() {
+  React.useEffect(() => {
+    if (window.location.hash) {
+      const id = window.location.hash.substring(1);
+      setTimeout(() => {
+        const el = document.getElementById(id);
+        if (el) el.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+    }
+  }, []);
+
   return (
     <PublicLayout>
       <div className="min-h-screen bg-[#f7f8fc] pt-24 pb-16">
@@ -94,7 +104,7 @@ export default function About() {
           </motion.div>
 
           {/* OAIS section */}
-          <motion.div variants={fadeInUp} className="bg-white rounded-2xl border border-border/60 shadow-sm overflow-hidden">
+          <motion.div id="about-oais" variants={fadeInUp} className="bg-white rounded-2xl border border-border/60 shadow-sm overflow-hidden">
             <div className="px-7 py-5 border-b border-border/60 bg-[#f7f8fc]">
               <div className="flex items-center gap-3">
                 <ScrollText className="w-5 h-5 text-[#4169E1]" />

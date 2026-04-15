@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Link, useLocation } from "wouter";
-import { Library, LayoutDashboard, Database, Users, GitPullRequest, Search, FileText, Settings, LogOut, Menu, X, Bell, Loader2, User, UserCog } from "lucide-react";
+import { Library, LayoutDashboard, Database, Users, GitPullRequest, Search, FileText, Settings, LogOut, Menu, X, Bell, Loader2, User, UserCog, LogIn } from "lucide-react";
 import { useGetMe, useLogout, useGetAccessRequests, useGetAuditLogs, useGetUsers } from "@workspace/api-client-react";
 import { Button } from "./ui-components";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const { data: user } = useGetMe();
   const [isScrolled, setIsScrolled] = React.useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
   React.useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
@@ -53,7 +54,69 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
               <Button variant="accent" size="sm" onClick={() => setLocation('/login')}>Sign In / Register</Button>
             )}
           </nav>
+
+          <button 
+            className="md:hidden p-2 text-foreground/80 hover:text-accent"
+            onClick={() => setMobileMenuOpen(true)}
+          >
+            <Menu className="w-6 h-6" />
+          </button>
         </div>
+
+        {/* Mobile menu overlay */}
+        {mobileMenuOpen && (
+          <div className="md:hidden fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm shadow-xl">
+            <div className="absolute right-0 top-0 bottom-0 w-64 bg-white shadow-2xl p-6 flex flex-col items-stretch space-y-4">
+              <div className="flex justify-between items-center mb-4">
+                <span className="font-display font-bold text-xl text-primary">Menu</span>
+                <button 
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-2 text-muted-foreground hover:text-primary rounded-full hover:bg-muted"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <Link href="/collections">
+                <span className="py-2 border-b border-border font-bold text-foreground hover:text-accent cursor-pointer block" onClick={() => setMobileMenuOpen(false)}>Collections</span>
+              </Link>
+              <button 
+                className="py-2 border-b border-border font-bold text-foreground hover:text-accent text-left" 
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  if (location !== '/') setLocation('/#features');
+                  else {
+                    setTimeout(() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' }), 100);
+                  }
+                }}
+              >
+                Features
+              </button>
+              <Link href="/about">
+                <span className="py-2 border-b border-border font-bold text-foreground hover:text-accent cursor-pointer block" onClick={() => setMobileMenuOpen(false)}>About iARCHIVE</span>
+              </Link>
+              <Link href="/terms">
+                <span className="py-2 border-b border-border font-bold text-foreground hover:text-accent cursor-pointer block" onClick={() => setMobileMenuOpen(false)}>Terms</span>
+              </Link>
+              
+              <div className="mt-auto pt-8">
+                {user ? (
+                   <div className="flex flex-col gap-3">
+                     <span className="text-xs text-muted-foreground uppercase font-bold text-center">Hello, {user.name}</span>
+                     <Button className="w-full" onClick={() => { setMobileMenuOpen(false); setLocation(user.role === 'admin' ? '/admin' : user.role === 'archivist' ? '/archivist' : '/student'); }}>
+                       <LayoutDashboard className="w-4 h-4 mr-2" />
+                       Dashboard
+                     </Button>
+                   </div>
+                ) : (
+                  <Button className="w-full bg-accent hover:bg-accent/90" onClick={() => { setMobileMenuOpen(false); setLocation('/login'); }}>
+                    <LogIn className="w-4 h-4 mr-2" />
+                    Sign In / Register
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </header>
 
       <main className="flex-1">
