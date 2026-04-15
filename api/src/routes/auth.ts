@@ -136,6 +136,11 @@ router.post("/auth/login", async (req, res) => {
         return;
       } else {
         profile = profileSnap.data() as any;
+        if (profile.status === "rejected") {
+          const reason = profile.rejectionReason || "";
+          res.status(403).json({ error: "Your account has been rejected.", rejectionReason: reason });
+          return;
+        }
         if (profile.status !== "active") {
           res.status(403).json({ error: "Account is not active. Please wait for approval." });
           return;
@@ -180,8 +185,12 @@ router.post("/auth/login", async (req, res) => {
       res.status(401).json({ error: "Invalid credentials" });
       return;
     }
+    if (jsonUser.status === "rejected") {
+      res.status(403).json({ error: "Your account has been rejected.", rejectionReason: (jsonUser as any).rejectionReason || "" });
+      return;
+    }
     if (jsonUser.status !== "active") {
-      res.status(401).json({ error: "Account is not active. Please wait for approval." });
+      res.status(403).json({ error: "Account is not active. Please wait for approval." });
       return;
     }
 

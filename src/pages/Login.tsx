@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { ShieldCheck, Search, Users, LogIn, Sparkles, Database, Lock, Clock, AlertTriangle, XCircle, ShieldAlert, X } from "lucide-react";
+import { ShieldCheck, Search, LogIn, Sparkles, Lock, Clock, AlertTriangle, XCircle, ShieldAlert, X, Ban } from "lucide-react";
 import { useLogin } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -13,7 +13,7 @@ const schema = z.object({
 });
 
 type ErrorModalData = {
-  type: "pending" | "not_found" | "invalid" | "error";
+  type: "pending" | "not_found" | "invalid" | "rejected" | "error";
   title: string;
   message: string;
   suggestion?: string;
@@ -23,7 +23,6 @@ export default function Login() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { mutate, isPending } = useLogin();
-  const [activeDemo, setActiveDemo] = React.useState<string | null>(null);
   const [errorModal, setErrorModal] = React.useState<ErrorModalData | null>(null);
 
   const form = useForm<z.infer<typeof schema>>({
@@ -42,7 +41,9 @@ export default function Login() {
       },
       onError: (err) => {
         const message = (err as any)?.message || "Something went wrong. Please try again.";
-        if (/pending|approval|not active|wait/i.test(message)) {
+        if (/rejected/i.test(message)) {
+          setErrorModal({ type: "rejected", title: "Account Rejected", message, suggestion: "If you believe this was a mistake, please contact the HCDC Archival Administration team." });
+        } else if (/pending|approval|not active|wait/i.test(message)) {
           setErrorModal({ type: "pending", title: "Account Pending Approval", message, suggestion: "Your registration was received. An administrator will review and activate your account shortly." });
         } else if (/not found|no account|register first/i.test(message)) {
           setErrorModal({ type: "not_found", title: "Account Not Found", message, suggestion: "Would you like to create a new account?" });
@@ -55,23 +56,12 @@ export default function Login() {
     });
   };
 
-  const demoUsers = [
-    { label: "Admin", email: "admin@hcdc.edu.ph", role: "Full system control", icon: ShieldCheck, color: "bg-[#0a1628]" },
-    { label: "Archivist", email: "archivist@hcdc.edu.ph", role: "Catalog & manage", icon: Database, color: "bg-[#4169E1]" },
-    { label: "User", email: "student@hcdc.edu.ph", role: "Browse & request", icon: Users, color: "bg-[#960000]" },
-  ];
-
-  const fillAndSubmit = (email: string) => {
-    setActiveDemo(email);
-    form.setValue("email", email, { shouldDirty: true, shouldValidate: true });
-    form.setValue("password", "admin123", { shouldDirty: true, shouldValidate: true });
-    setTimeout(() => form.handleSubmit(onSubmit)(), 300);
-  };
 
   const modalConfig = {
     pending: { icon: Clock, color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20", gradient: "from-amber-500 to-amber-600" },
     not_found: { icon: AlertTriangle, color: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20", gradient: "from-blue-500 to-blue-600" },
     invalid: { icon: ShieldAlert, color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/20", gradient: "from-red-500 to-red-600" },
+    rejected: { icon: Ban, color: "text-red-500", bg: "bg-red-500/10", border: "border-red-500/20", gradient: "from-red-600 to-red-800" },
     error: { icon: XCircle, color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/20", gradient: "from-red-500 to-red-600" },
   };
 
@@ -124,29 +114,7 @@ export default function Login() {
           <img src={`${import.meta.env.BASE_URL}logos/iarchive%20white%20logo.png`} alt="iArchive" className="h-8 w-auto object-contain" />
         </Link>
         <div className="w-full max-w-md">
-          {/* Quick-login cards */}
-          <div className="mb-6">
-            <p className="text-white/40 text-xs font-semibold uppercase tracking-widest mb-3">Quick Sign In</p>
-            <div className="grid grid-cols-3 gap-2">
-              {demoUsers.map((u) => (
-                <button key={u.email} type="button" onClick={() => fillAndSubmit(u.email)} disabled={isPending}
-                  className={`group relative overflow-hidden rounded-xl border border-white/10 p-3 text-center transition-all duration-300 hover:border-white/25 hover:scale-[1.02] ${activeDemo === u.email ? 'ring-2 ring-white/30 bg-white/10' : 'bg-white/5'}`}>
-                  <div className={`w-9 h-9 rounded-lg ${u.color} flex items-center justify-center mx-auto mb-2`}>
-                    <u.icon className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="text-white text-xs font-bold">{u.label}</div>
-                  <div className="text-white/35 text-[10px] mt-0.5">{u.role}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 mb-6">
-            <div className="flex-1 h-px bg-white/10" />
-            <span className="text-white/30 text-xs font-medium">or sign in manually</span>
-            <div className="flex-1 h-px bg-white/10" />
-          </div>
-
+          {/* Form */}
           <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-7">
             <div className="mb-6">
               <h2 className="text-2xl font-bold text-white mb-1">Sign In</h2>
@@ -173,15 +141,6 @@ export default function Login() {
             <div className="mt-6 text-center text-sm text-white/40">
               Don't have an account?{" "}
               <Link href="/register" className="text-[#4169E1] font-semibold hover:underline">Sign Up</Link>
-            </div>
-          </div>
-
-          <div className="mt-4 rounded-xl border border-white/8 bg-white/3 p-3.5 text-xs text-white/35">
-            <p className="font-semibold text-white/50 mb-1.5">Demo Credentials <span className="text-white/25">(password: admin123)</span></p>
-            <div className="flex gap-4">
-              <span>admin@hcdc.edu.ph</span>
-              <span>archivist@hcdc.edu.ph</span>
-              <span>student@hcdc.edu.ph</span>
             </div>
           </div>
         </div>
@@ -215,6 +174,8 @@ export default function Login() {
                     </>
                   ) : errorModal.type === "pending" ? (
                     <button onClick={() => setErrorModal(null)} className="w-full h-11 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-300 text-sm font-semibold hover:bg-amber-500/30 transition-colors">Understood</button>
+                  ) : errorModal.type === "rejected" ? (
+                    <button onClick={() => setErrorModal(null)} className="w-full h-11 rounded-xl bg-red-500/20 border border-red-500/30 text-red-300 text-sm font-semibold hover:bg-red-500/30 transition-colors">I Understand</button>
                   ) : (
                     <button onClick={() => setErrorModal(null)} className="w-full h-11 rounded-xl bg-white/10 border border-white/10 text-white text-sm font-semibold hover:bg-white/15 transition-colors">Try Again</button>
                   )}

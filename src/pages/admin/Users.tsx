@@ -57,10 +57,22 @@ export default function AdminUsers() {
     });
   };
 
-  const handleReject = (id: string) => {
-    reject({ id }, {
+  // Rejection reason modal state
+  const [rejectDialog, setRejectDialog] = React.useState<{id: string, name: string} | null>(null);
+  const [rejectReason, setRejectReason] = React.useState("");
+
+  const handleReject = (id: string, name: string) => {
+    setRejectDialog({ id, name });
+    setRejectReason("");
+  };
+
+  const confirmReject = () => {
+    if (!rejectDialog) return;
+    reject({ id: rejectDialog.id, data: { reason: rejectReason } }, {
       onSuccess: () => {
-        toast({ title: "User Rejected", description: "The registration has been denied." });
+        toast({ title: "User Rejected", description: `${rejectDialog.name}'s registration has been denied.` });
+        setRejectDialog(null);
+        setRejectReason("");
         refetch();
       },
       onError: () => toast({ title: "Error", description: "Failed to reject user.", variant: "destructive" })
@@ -268,39 +280,41 @@ export default function AdminUsers() {
                     })() : "N/A"}
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center justify-end gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                       <Button
                         size="sm"
                         variant="outline"
                         className="text-indigo-600 border-indigo-200 hover:bg-indigo-50 gap-1"
                         onClick={() => setEditingUser(user)}
                       >
-                        <Eye className="w-3.5 h-3.5" /> View Details
+                        <Eye className="w-3.5 h-3.5" /> <span className="hidden sm:inline">View Details</span>
                       </Button>
                       {tab === 'active' && (
                         <>
                           <Button
                             size="sm"
                             variant="outline"
-                            className="text-[#4169E1] border-[#4169E1]/20 hover:bg-[#4169E1]/10 gap-1"
+                            className="text-[#4169E1] border-[#4169E1]/20 hover:bg-[#4169E1]/10 gap-1 hidden md:flex"
                             onClick={() => openPermissions(user)}
                           >
                             <Settings className="w-3.5 h-3.5" /> Permissions
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-1"
-                            onClick={() => handleDelete(user.id, user.name)}
-                            disabled={isDeleting}
-                          >
-                            {isDeleting ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            ) : (
-                              <Trash2 className="w-3.5 h-3.5" />
-                            )}
-                            Remove
-                          </Button>
+                          {user.role !== 'admin' && user.role !== 'archivist' && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-1"
+                              onClick={() => handleDelete(user.id, user.name)}
+                              disabled={isDeleting}
+                            >
+                              {isDeleting ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-3.5 h-3.5" />
+                              )}
+                              <span className="hidden sm:inline">Remove</span>
+                            </Button>
+                          )}
                         </>
                       )}
                       {tab === 'pending' && (
@@ -323,7 +337,7 @@ export default function AdminUsers() {
                             size="sm"
                             variant="outline"
                             className="text-destructive border-destructive/20 hover:bg-destructive/10 gap-1"
-                            onClick={() => handleReject(user.id)}
+                            onClick={() => handleReject(user.id, user.name)}
                             disabled={isApproving || isRejecting}
                           >
                             {isRejecting ? (
@@ -576,6 +590,52 @@ export default function AdminUsers() {
               )}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══ Rejection Reason Modal ═══ */}
+      <Dialog open={!!rejectDialog} onOpenChange={(open) => !open && setRejectDialog(null)}>
+        <DialogContent className="max-w-md overflow-hidden rounded-2xl border-none p-0 shadow-2xl">
+          <div className="h-1.5 bg-gradient-to-r from-red-500 to-red-700" />
+          <div className="p-6">
+            <DialogHeader className="mb-4">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center border border-red-100">
+                  <UserX className="w-6 h-6 text-red-500" />
+                </div>
+                <div>
+                  <DialogTitle className="text-lg font-bold text-[#0a1628]">Reject Application</DialogTitle>
+                  <DialogDescription className="text-sm text-muted-foreground">
+                    Rejecting <span className="font-semibold text-[#0a1628]">{rejectDialog?.name}</span>
+                  </DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-[#0a1628]">Reason for Rejection</label>
+              <textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="e.g. Incomplete information, unverifiable institution, duplicate account..."
+                className="w-full min-h-[100px] rounded-xl border border-border/60 bg-muted/30 p-3 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500/40 resize-none"
+              />
+              <p className="text-[11px] text-muted-foreground">This reason will be shown to the user when they try to log in.</p>
+            </div>
+            <DialogFooter className="mt-6 gap-2 sm:gap-0">
+              <Button variant="ghost" onClick={() => setRejectDialog(null)} disabled={isRejecting}>Cancel</Button>
+              <Button
+                className="bg-red-600 text-white hover:bg-red-700 font-bold gap-2"
+                onClick={confirmReject}
+                disabled={isRejecting}
+              >
+                {isRejecting ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Rejecting...</>
+                ) : (
+                  <><UserX className="w-4 h-4" /> Confirm Rejection</>
+                )}
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </AdminLayout>

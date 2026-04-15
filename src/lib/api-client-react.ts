@@ -64,6 +64,13 @@ export function useLogin() {
       } catch (err: any) {
         // Parse backend error into user-friendly message
         const raw = err?.data?.error || err?.message || "";
+        const rejectionReason = err?.data?.rejectionReason || "";
+        if (/rejected/i.test(raw)) {
+          const msg = rejectionReason
+            ? `Your account application has been rejected. Reason: "${rejectionReason}"`
+            : "Your account application has been rejected by an administrator.";
+          throw new Error(msg);
+        }
         if (/not active|approval|pending/i.test(raw)) {
           throw new Error("Your account is pending approval. Please wait for an administrator to activate your account.");
         }
@@ -395,8 +402,11 @@ export function useApproveUser() {
 export function useRejectUser() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (args: MutationArgs) =>
-      apiRequest(`/api/users/${args.id}/reject`, { method: "POST" }),
+    mutationFn: (args: MutationArgs<{ reason?: string }>) =>
+      apiRequest(`/api/users/${args.id}/reject`, {
+        method: "POST",
+        body: JSON.stringify({ reason: args.data?.reason || "" }),
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
     },

@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Link, useLocation } from "wouter";
 import { Library, LayoutDashboard, Database, Users, GitPullRequest, Search, FileText, Settings, LogOut, Menu, X, Bell, Loader2, User } from "lucide-react";
-import { useGetMe, useLogout, useGetAccessRequests, useGetAuditLogs } from "@workspace/api-client-react";
+import { useGetMe, useLogout, useGetAccessRequests, useGetAuditLogs, useGetUsers } from "@workspace/api-client-react";
 import { Button } from "./ui-components";
 import { cn } from "@/lib/utils";
 
@@ -96,11 +96,22 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const { data: user, isLoading } = useGetMe();
   const { data: reqData } = useGetAccessRequests({ status: 'pending' });
-  const pendingCount = reqData?.requests?.length || 0;
+  const pendingReqCount = reqData?.requests?.length || 0;
+  const { data: pendingUsersData } = useGetUsers({ status: 'pending' });
+  const pendingUsersCount = pendingUsersData?.users?.length || 0;
   const { data: auditData } = useGetAuditLogs({ limit: 5 });
   const auditBadge = auditData?.logs?.length ? "New" : undefined;
   const { mutate: logoutMutate } = useLogout();
-  const [sidebarOpen, setSidebarOpen] = React.useState(true);
+  const [sidebarOpen, setSidebarOpen] = React.useState(false);
+
+  // Auto-open sidebar on desktop, closed on mobile
+  React.useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    setSidebarOpen(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setSidebarOpen(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
 
   React.useEffect(() => {
     if (!isLoading && !user) {
@@ -121,8 +132,8 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         { icon: LayoutDashboard, label: "Metadata Dashboard", href: "/admin" },
         { icon: Database, label: "Archival Materials", href: "/admin/collections" },
         { icon: FileText, label: "Categories", href: "/admin/categories" },
-        { icon: GitPullRequest, label: "Requests", href: "/admin/requests", badge: pendingCount },
-        { icon: Users, label: "Admin Accounts", href: "/admin/users" },
+        { icon: GitPullRequest, label: "Requests", href: "/admin/requests", badge: pendingReqCount },
+        { icon: Users, label: "Admin Accounts", href: "/admin/users", badge: pendingUsersCount },
         { icon: Bell, label: "Announcements", href: "/admin/announcements" },
         { icon: Search, label: "Audit Logs", href: "/admin/audit", badge: auditBadge },
         { icon: User, label: "My Profile", href: "/admin/profile" },
@@ -132,7 +143,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           { icon: LayoutDashboard, label: "Dashboard", href: "/archivist" },
           { icon: Database, label: "Archival Materials", href: "/archivist/collections" },
           { icon: FileText, label: "Categories", href: "/archivist/categories" },
-          { icon: GitPullRequest, label: "Requests", href: "/archivist/requests", badge: pendingCount },
+          { icon: GitPullRequest, label: "Requests", href: "/archivist/requests", badge: pendingReqCount },
           { icon: User, label: "My Profile", href: "/archivist/profile" },
         ]
       : [
@@ -201,9 +212,13 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           </Button>
         </div>
       </aside>
+      {/* Mobile backdrop */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-30 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
 
       {/* Main Content */}
-      <div className={cn("flex-1 transition-all duration-300 flex flex-col min-h-screen", sidebarOpen ? "ml-64" : "ml-0")}>
+      <div className={cn("flex-1 transition-all duration-300 flex flex-col min-h-screen", sidebarOpen ? "lg:ml-64" : "ml-0")}>
         <header className="h-16 bg-white border-b border-border/50 flex items-center justify-between px-6 sticky top-0 z-30 shadow-sm">
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
             {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}

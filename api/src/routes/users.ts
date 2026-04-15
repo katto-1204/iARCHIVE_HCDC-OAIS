@@ -88,13 +88,14 @@ router.post("/users/:id/approve", requireAuth, requireRole("admin"), async (req,
 router.post("/users/:id/reject", requireAuth, requireRole("admin"), async (req, res) => {
   const admin = req.user!;
   const id = String(req.params.id);
+  const { reason } = req.body || {};
   try {
     const db = getFirestoreDb();
     const snap = await db.collection("users").doc(id).get();
     if (!snap.exists) { res.status(404).json({ error: "User not found" }); return; }
     const u = snap.data() as any;
-    await db.collection("users").doc(id).update({ status: "rejected", updatedAt: new Date().toISOString() });
-    await logAudit({ action: "REJECT_USER", entityType: "user", entityId: id, userId: admin.userId, userName: admin.name, details: `Rejected user: ${u.name}` });
+    await db.collection("users").doc(id).update({ status: "rejected", rejectionReason: reason || "", updatedAt: new Date().toISOString() });
+    await logAudit({ action: "REJECT_USER", entityType: "user", entityId: id, userId: admin.userId, userName: admin.name, details: `Rejected user: ${u.name}${reason ? ` — Reason: ${reason}` : ""}` });
     res.json({ message: "User rejected" });
   } catch {
     const ok = jsonStoreRejectUser(id);
