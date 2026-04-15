@@ -24,6 +24,7 @@ import AdminCategories from "./pages/admin/Categories";
 import AdminAnnouncements from "./pages/admin/Announcements";
 import ArchivistDashboard from "./pages/archivist/Dashboard";
 import StudentDashboard from "./pages/student/Dashboard";
+import Profile from "./pages/Profile";
 import RequestAccess from "./pages/RequestAccess";
 import NotFound from "@/pages/not-found";
 
@@ -81,11 +82,16 @@ function Router() {
       <Route path="/admin/categories" component={AdminCategories} />
       <Route path="/admin/users" component={AdminUsers} />
       <Route path="/admin/announcements" component={AdminAnnouncements} />
+      <Route path="/admin/profile" component={Profile} />
+      
       <Route path="/archivist" component={ArchivistDashboard} />
       <Route path="/archivist/collections" component={AdminMaterials} />
       <Route path="/archivist/categories" component={AdminCategories} />
       <Route path="/archivist/requests" component={AdminRequests} />
+      <Route path="/archivist/profile" component={Profile} />
+      
       <Route path="/student" component={StudentDashboard} />
+      <Route path="/student/profile" component={Profile} />
       <Route path="/request-access" component={RequestAccess} />
       
       <Route component={NotFound} />

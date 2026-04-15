@@ -129,10 +129,10 @@ export function useRegister() {
 }
 
 export function useGetMe() {
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem("iarchive_token") : null;
   return useQuery({
-    queryKey: ["/api/auth/me"],
+    queryKey: ["/api/auth/me", token],
     queryFn: async () => {
-      const token = localStorage.getItem("iarchive_token");
       if (!token) {
         return null;
       }
@@ -140,6 +140,21 @@ export function useGetMe() {
     },
     retry: false,
     staleTime: 30_000,
+    enabled: !!token,
+  });
+}
+
+export function useUpdateProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: MutationArgs<any>) =>
+      apiRequest("/api/auth/profile", {
+        method: "PATCH",
+        body: JSON.stringify(args.data),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    },
   });
 }
 

@@ -9,8 +9,8 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function AdminAnnouncements() {
   const { data: announcements, isLoading, refetch } = useGetAnnouncements();
-  const { mutate: create } = useCreateAnnouncement();
-  const { mutate: remove } = useDeleteAnnouncement();
+  const { mutate: create, isPending: isCreating } = useCreateAnnouncement();
+  const { mutate: remove, isPending: isDeleting } = useDeleteAnnouncement();
   const { toast } = useToast();
 
   const [isAdding, setIsAdding] = React.useState(false);
@@ -110,10 +110,15 @@ export default function AdminAnnouncements() {
               </label>
             </div>
             <div className="flex gap-3 pt-2">
-              <Button onClick={handleCreate} disabled={!title.trim() || !content.trim()} className="gap-2">
-                <Save className="w-4 h-4" /> Post Announcement
+              <Button 
+                onClick={handleCreate} 
+                disabled={!title.trim() || !content.trim() || isCreating} 
+                className="gap-2"
+              >
+                {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Post Announcement
               </Button>
-              <Button variant="ghost" onClick={() => { setIsAdding(false); setTitle(""); setContent(""); }}>
+              <Button variant="ghost" onClick={() => { setIsAdding(false); setTitle(""); setContent(""); }} disabled={isCreating}>
                 <X className="w-4 h-4 mr-1" /> Cancel
               </Button>
             </div>
@@ -184,8 +189,15 @@ export default function AdminAnnouncements() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setDeleteDialog(null)}>Cancel</Button>
-            <Button className="bg-red-600 text-white hover:bg-red-700" onClick={confirmDelete}>Delete</Button>
+            <Button variant="ghost" onClick={() => setDeleteDialog(null)} disabled={isDeleting}>Cancel</Button>
+            <Button 
+              className="bg-red-600 text-white hover:bg-red-700 gap-2" 
+              onClick={confirmDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              Delete
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

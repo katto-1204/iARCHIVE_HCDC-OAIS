@@ -8,28 +8,52 @@ import { getFirebaseAuth, getFirestoreDb } from "../lib/firebase.js";
 const router = Router();
 
 function formatUser(u: any) {
-  return { id: u.id, name: u.name, email: u.email, role: u.role, userCategory: u.userCategory, institution: u.institution, status: u.status, createdAt: u.createdAt };
+  return { 
+    id: u.id, 
+    name: u.name, 
+    email: u.email, 
+    role: u.role, 
+    userCategory: u.userCategory, 
+    institution: u.institution, 
+    status: u.status, 
+    createdAt: u.createdAt,
+    purpose: u.purpose || u.researchPurpose || null
+  };
 }
 
 router.get("/users", requireAuth, requireRole("admin", "archivist"), async (req, res) => {
   const page = Math.max(1, parseInt(req.query.page as string) || 1);
-  const limit = 20;
+  const limit = 50; // Increased limit for easier management
   const status = req.query.status as string;
   try {
     const db = getFirestoreDb();
     let query: Query = db.collection("users");
-    if (status && ["pending", "active", "inactive", "rejected"].includes(status)) {
-      query = query.where("status", "==", status);
-    }
-    query = query.orderBy("createdAt", "desc");
+    
+    // If we have a status filter, we should ideally use it in Firestore.
+    // However, combining status filter with orderBy("createdAt") requires a composite index.
+    // To ensure it works "right away" without manual index creation, 
+    // we'll fetch all and filter/sort in memory if the collection is reasonably sized.
     const snapshot = await query.get();
-    const users = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    let users = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    
+    if (status && ["pending", "active", "inactive", "rejected"].includes(status)) {
+      users = users.filter((u: any) => u.status === status);
+    }
+    
+    users.sort((a: any, b: any) => {
+      const dateA = new Date(a.createdAt || 0).getTime();
+      const dateB = new Date(b.createdAt || 0).getTime();
+      return dateB - dateA;
+    });
+
     const total = users.length;
     const totalPages = Math.ceil(total / limit);
     const offset = (page - 1) * limit;
     const pageItems = users.slice(offset, offset + limit);
+    
     res.json({ users: pageItems.map(formatUser), total, page, totalPages });
-  } catch {
+  } catch (error: any) {
+    console.error("Firestore Users Fetch Error:", error.message);
     res.json(jsonStoreGetUsers({ status, page }));
   }
 });

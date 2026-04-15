@@ -361,6 +361,30 @@ router.get("/auth/me", requireAuth, async (req, res) => {
   }
 });
 
+router.patch("/auth/profile", requireAuth, async (req, res) => {
+  const { name, institution, purpose } = req.body;
+  const userId = req.user!.userId;
+  try {
+    const db = getFirestoreDb();
+    const snap = await db.collection("users").doc(userId).get();
+    if (!snap.exists) {
+      res.status(404).json({ error: "Profile not found" });
+      return;
+    }
+    const update: any = { updatedAt: new Date().toISOString() };
+    if (name) update.name = name;
+    if (institution !== undefined) update.institution = institution;
+    if (purpose !== undefined) update.purpose = purpose;
+    
+    await db.collection("users").doc(userId).update(update);
+    const updated = await db.collection("users").doc(userId).get();
+    res.json({ id: updated.id, ...updated.data() });
+  } catch (error: any) {
+    console.error("Profile Update Error:", error.message);
+    res.status(500).json({ error: "Failed to update profile" });
+  }
+});
+
 router.post("/auth/logout", (_req, res) => {
   res.json({ message: "Logged out" });
 });

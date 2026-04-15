@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Link, useLocation } from "wouter";
-import { Library, LayoutDashboard, Database, Users, GitPullRequest, Search, FileText, Settings, LogOut, Menu, X, Bell, Loader2 } from "lucide-react";
+import { Library, LayoutDashboard, Database, Users, GitPullRequest, Search, FileText, Settings, LogOut, Menu, X, Bell, Loader2, User } from "lucide-react";
 import { useGetMe, useLogout, useGetAccessRequests, useGetAuditLogs } from "@workspace/api-client-react";
 import { Button } from "./ui-components";
 import { cn } from "@/lib/utils";
@@ -125,6 +125,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         { icon: Users, label: "Admin Accounts", href: "/admin/users" },
         { icon: Bell, label: "Announcements", href: "/admin/announcements" },
         { icon: Search, label: "Audit Logs", href: "/admin/audit", badge: auditBadge },
+        { icon: User, label: "My Profile", href: "/admin/profile" },
       ]
     : user.role === "archivist"
       ? [
@@ -132,10 +133,12 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           { icon: Database, label: "Archival Materials", href: "/archivist/collections" },
           { icon: FileText, label: "Categories", href: "/archivist/categories" },
           { icon: GitPullRequest, label: "Requests", href: "/archivist/requests", badge: pendingCount },
+          { icon: User, label: "My Profile", href: "/archivist/profile" },
         ]
       : [
           { icon: LayoutDashboard, label: "Dashboard", href: "/student" },
           { icon: Database, label: "Browse Collections", href: "/collections" },
+          { icon: User, label: "My Profile", href: "/student/profile" },
         ];
 
   const roleAsideBg =

@@ -11,13 +11,9 @@ function getServiceAccountJson() {
   const raw = process.env["FIREBASE_SERVICE_ACCOUNT_JSON"];
   if (raw) {
     try {
-      // Fix potential extra escaping if the variable was wrapped in unnecessary quotes in Vercel UI
-      let sanitizedRaw = raw.trim();
-      if (sanitizedRaw.startsWith("'") && sanitizedRaw.endsWith("'")) sanitizedRaw = sanitizedRaw.slice(1, -1);
-      if (sanitizedRaw.startsWith('"') && sanitizedRaw.endsWith('"')) sanitizedRaw = sanitizedRaw.slice(1, -1);
-      
-      const sa = JSON.parse(sanitizedRaw);
+      const sa = JSON.parse(raw);
       if (sa.private_key && typeof sa.private_key === "string") {
+        // Fix potential escaped newline issues in env vars
         sa.private_key = sa.private_key.replace(/\\n/g, "\n");
       }
       return sa;
@@ -72,36 +68,16 @@ export function ensureFirebaseApp() {
   }
 
   try {
-    const projectId = getProjectId();
-    const serviceAccount = getServiceAccountJson();
-
-    if (!projectId || !serviceAccount) {
-      _firebaseInitError = `Firebase not configured correctly. ProjectID: ${!!projectId}, ServiceAccount: ${!!serviceAccount}`;
-      console.warn(_firebaseInitError);
-      throw new Error(_firebaseInitError);
-    }
-
-    console.log("Attempting to initialize Firebase Admin for project:", projectId);
-    
-    // Check if some apps already exist to avoid double-init
-    if (getApps().length === 0) {
-      initializeApp({
-        credential: cert(serviceAccount),
-        projectId,
-      });
-      console.log("Firebase Admin initialized successfully.");
-    } else {
-      console.log("Firebase Admin already initialized (app exists).");
-    }
-    
+    initializeApp({
+      credential: cert(serviceAccount),
+      projectId,
+    });
     _firebaseInitialized = true;
+    console.log("Firebase Admin initialized successfully for project:", projectId);
   } catch (err: any) {
     _firebaseInitError = `Firebase init failed: ${err.message}`;
-    console.error("FATAL FIREBASE ERROR:", _firebaseInitError);
-    // Log the stack for more context in Vercel logs
-    console.error(err.stack);
-    _firebaseInitialized = false;
-    throw err;
+    console.error(_firebaseInitError);
+    throw new Error(_firebaseInitError);
   }
 }
 

@@ -659,16 +659,28 @@ export default function AdminMaterials() {
         });
         
         toast({ title: "Deleted", description: "Material removed from repository." });
-      } catch (err) {
-        console.error("Cloud Deletion Failed:", err);
-        toast({ 
-          title: "Network Trace Failure", 
-          description: "Could not remove from Firestore, but local record cleared. Check connection.", 
-          variant: "destructive" 
-        });
-      } finally {
         setDeleteDialogOpen(false);
         setMaterialToDelete(null);
+      } catch (err: any) {
+        console.error("Cloud Deletion Failed:", err);
+        const status = err?.status;
+        const errorMsg = err?.data?.error || err?.message || "Check your connection and try again.";
+        
+        toast({ 
+          title: status === 404 ? "Material Sync Issue" : "Deletion Failed", 
+          description: status === 404 
+            ? "Record not found in Firestore. It may have already been deleted or exists as a local record only." 
+            : `Server returned error: ${errorMsg}`,
+          variant: "destructive" 
+        });
+        
+        // If it's a 404, we might want to clear it locally anyway if it's orphaned
+        if (status === 404) {
+           const updated = await deleteMaterial(materialToDelete);
+           setMaterials(updated);
+           setDeleteDialogOpen(false);
+           setMaterialToDelete(null);
+        }
       }
     }
   };

@@ -1,7 +1,15 @@
-import type { Request, Response, NextFunction } from "express";
-import { extractToken, type JwtPayload, verifyToken } from "../lib/auth.js";
+import { Request, Response, NextFunction } from "express";
+import { extractToken, JwtPayload, verifyToken } from "../lib/auth.js";
 import { getFirebaseAuth } from "../lib/firebase.js";
 import { getFirestoreDb } from "../lib/firebase.js";
+
+declare global {
+  namespace Express {
+    interface Request {
+      user?: JwtPayload;
+    }
+  }
+}
 
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   const token = extractToken(req.headers.authorization);
