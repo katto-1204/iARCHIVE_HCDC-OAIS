@@ -13,7 +13,12 @@ function getServiceAccountJson() {
     try {
       const sa = JSON.parse(raw);
       if (sa.private_key && typeof sa.private_key === "string") {
+        // Handle BOTH single and double escaped newlines (e.g. \n vs \\n)
         sa.private_key = sa.private_key.replace(/\\n/g, "\n");
+        // Extra resilience: Ensure actual newlines are preserved if they escaped as literals
+        if (!sa.private_key.includes("\n") && sa.private_key.includes("PRIVATE KEY")) {
+           sa.private_key = sa.private_key.split(" ").join("\n");
+        }
       }
       return sa;
     } catch (err: any) {

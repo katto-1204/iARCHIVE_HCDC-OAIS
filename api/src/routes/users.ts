@@ -36,6 +36,15 @@ router.get("/users", requireAuth, requireRole("admin", "archivist"), async (req,
     const snapshot = await query.get();
     let users = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     
+    // Safety check: ensure we didn't just get an empty array if Firebase is partially down
+    if (users.length === 0 && !status && page === 1) {
+       const localUsers = jsonStoreGetUsers({ status, page });
+       if (localUsers.users.length > 0) {
+         console.log("Empty Firestore users, falling back to local for display");
+         return res.json(localUsers);
+       }
+    }
+
     if (status && ["pending", "active", "inactive", "rejected"].includes(status)) {
       users = users.filter((u: any) => u.status === status);
     }

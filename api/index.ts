@@ -54,6 +54,7 @@ app.get("/api/debug", (req, res) => {
     env: {
       NODE_ENV: process.env.NODE_ENV,
       PROJECT_ID: process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || "MISSING",
+      HAS_SA_JSON: !!process.env.FIREBASE_SERVICE_ACCOUNT_JSON,
       HAS_SA_FILE: fs.existsSync(path.join(process.cwd(), "service-account.json")),
       VERCEL: process.env.VERCEL,
     },
