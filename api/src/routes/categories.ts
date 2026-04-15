@@ -15,17 +15,23 @@ const router = Router();
 router.get("/categories", async (_req, res) => {
   try {
     const db = getFirestoreDb();
+    if (!db) throw new Error("Firebase Unavailable");
+    
     const catsSnap = await db.collection("categories").orderBy("categoryNo", "asc").get();
     const cats = catsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    const counts = await Promise.all(
-      cats.map(async (c: any) => {
-        const countSnap = await db.collection("materials").where("categoryId", "==", c.id).count().get();
-        return [c.id, Number(countSnap.data().count)] as const;
-      }),
-    );
-    const matCounts = Object.fromEntries(counts);
+    
+    // Efficiently get counts for all categories at once if needed, or just return cats
+    // Since we want to be safe, we'll try a simpler approach if many categories exist
+    const materialsSnap = await db.collection("materials").select("categoryId").get();
+    const matCounts: Record<string, number> = {};
+    materialsSnap.docs.forEach(doc => {
+      const cid = doc.data().categoryId;
+      if (cid) matCounts[cid] = (matCounts[cid] || 0) + 1;
+    });
+
     res.json(cats.map((c: any) => ({ ...c, materialCount: matCounts[c.id] || 0 })));
-  } catch {
+  } catch (err: any) {
+    console.warn("Categories Firebase fallback:", err.message);
     res.json(jsonStoreGetCategories());
   }
 });

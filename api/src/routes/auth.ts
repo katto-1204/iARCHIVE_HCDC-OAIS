@@ -19,9 +19,9 @@ function getDemoUserByEmail(email?: string) {
 }
 
 async function signInWithPassword(email: string, password: string) {
-  const apiKey = process.env["FIREBASE_API_KEY"];
+  const apiKey = process.env["FIREBASE_API_KEY"] || process.env["VITE_FIREBASE_API_KEY"];
   if (!apiKey) {
-    throw new Error("Missing FIREBASE_API_KEY");
+    throw new Error("Missing FIREBASE_API_KEY (or VITE_FIREBASE_API_KEY)");
   }
   const res = await fetch(
     `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
@@ -40,7 +40,7 @@ async function signInWithPassword(email: string, password: string) {
 }
 
 async function verifyIdTokenRestFallback(idToken: string) {
-  const apiKey = process.env["FIREBASE_API_KEY"];
+  const apiKey = process.env["FIREBASE_API_KEY"] || process.env["VITE_FIREBASE_API_KEY"];
   if (!apiKey) {
     throw new Error("Missing FIREBASE_API_KEY for token lookup");
   }

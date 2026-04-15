@@ -19,24 +19,29 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   }
   try {
     const auth = getFirebaseAuth();
+    if (!auth) throw new Error("Firebase Auth Unavailable");
+    
     const decoded = await auth.verifyIdToken(token);
     const db = getFirestoreDb();
-    const profileSnap = await db.collection("users").doc(decoded.uid).get();
-    if (profileSnap.exists) {
-      const profile = profileSnap.data() as any;
-      const status = profile?.status || "active";
-      if (status !== "active") {
-        res.status(403).json({ error: "Account is not active. Please wait for approval." });
+    
+    if (db) {
+      const profileSnap = await db.collection("users").doc(decoded.uid).get();
+      if (profileSnap.exists) {
+        const profile = profileSnap.data() as any;
+        const status = profile?.status || "active";
+        if (status !== "active") {
+          res.status(403).json({ error: "Account is not active. Please wait for approval." });
+          return;
+        }
+        req.user = {
+          userId: decoded.uid,
+          email: profile?.email || decoded.email || "",
+          role: profile?.role || "student",
+          name: profile?.name || decoded.name || decoded.email || "User",
+        };
+        next();
         return;
       }
-      req.user = {
-        userId: decoded.uid,
-        email: profile?.email || decoded.email || "",
-        role: profile?.role || "student",
-        name: profile?.name || decoded.name || decoded.email || "User",
-      };
-      next();
-      return;
     }
 
     req.user = {

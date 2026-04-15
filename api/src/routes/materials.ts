@@ -304,13 +304,15 @@ router.delete("/materials/:id", requireAuth, async (req, res) => {
   const id = String(req.params.id);
   try {
     const db = getFirestoreDb();
+    if (!db) throw new Error("Firebase Unavailable");
     const snap = await db.collection("materials").doc(id).get();
     if (!snap.exists) { res.status(404).json({ error: "Material not found" }); return; }
     const m = snap.data() as any;
     await db.collection("materials").doc(id).delete();
     await logAudit({ action: "DELETE_MATERIAL", entityType: "material", entityId: id, userId: user.userId, userName: user.name, details: `Deleted material: ${m.title}` });
     res.json({ message: "Material deleted" });
-  } catch {
+  } catch (err: any) {
+    console.warn("Delete Material fallback:", err.message);
     const ok = jsonStoreDeleteMaterial(id);
     if (!ok) { res.status(404).json({ error: "Material not found" }); return; }
     res.json({ message: "Material deleted" });
@@ -320,22 +322,28 @@ router.delete("/materials/:id", requireAuth, async (req, res) => {
 router.get("/stats", async (_req, res) => {
   try {
     const db = getFirestoreDb();
-    const matCount = await db.collection("materials").where("status", "==", "published").count().get();
-    const catCount = await db.collection("categories").count().get();
-    const userCount = await db.collection("users").where("status", "==", "active").count().get();
-    const pendingReqs = await db.collection("accessRequests").where("status", "==", "pending").count().get();
-    const pendingUsers = await db.collection("users").where("status", "==", "pending").count().get();
-    const recentActivitySnap = await db.collection("auditLogs").orderBy("createdAt", "desc").limit(10).get();
-    const recentActivity = recentActivitySnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    if (!db) throw new Error("Firebase Unavailable");
+    
+    // Safer counting
+    const matCount = await db.collection("materials").where("status", "==", "published").count().get().then(s => s.data()?.count || 0).catch(() => 0);
+    const catCount = await db.collection("categories").count().get().then(s => s.data()?.count || 0).catch(() => 0);
+    const userCount = await db.collection("users").where("status", "==", "active").count().get().then(s => s.data()?.count || 0).catch(() => 0);
+    const pendingReqs = await db.collection("accessRequests").where("status", "==", "pending").count().get().then(s => s.data()?.count || 0).catch(() => 0);
+    const pendingUsers = await db.collection("users").where("status", "==", "pending").count().get().then(s => s.data()?.count || 0).catch(() => 0);
+    
+    const recentActivitySnap = await db.collection("auditLogs").orderBy("createdAt", "desc").limit(10).get().catch(() => ({ docs: [] }));
+    const recentActivity = recentActivitySnap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+
     res.json({
-      totalMaterials: Number(matCount.data().count),
-      totalCategories: Number(catCount.data().count),
-      totalUsers: Number(userCount.data().count),
-      pendingRequests: Number(pendingReqs.data().count),
-      pendingUsers: Number(pendingUsers.data().count),
+      totalMaterials: Number(matCount),
+      totalCategories: Number(catCount),
+      totalUsers: Number(userCount),
+      pendingRequests: Number(pendingReqs),
+      pendingUsers: Number(pendingUsers),
       recentActivity,
     });
-  } catch {
+  } catch (err: any) {
+    console.warn("Stats Firebase fallback:", err.message);
     res.json(jsonStoreGetStats());
   }
 });

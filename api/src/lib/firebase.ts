@@ -6,7 +6,6 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 let _firebaseInitialized = false;
-let _firebaseInitError: string | null = null;
 
 function getServiceAccountJson() {
   const raw = process.env["FIREBASE_SERVICE_ACCOUNT_JSON"];
@@ -14,7 +13,6 @@ function getServiceAccountJson() {
     try {
       const sa = JSON.parse(raw);
       if (sa.private_key && typeof sa.private_key === "string") {
-        // Fix potential escaped newline issues in env vars
         sa.private_key = sa.private_key.replace(/\\n/g, "\n");
       }
       return sa;
@@ -23,53 +21,50 @@ function getServiceAccountJson() {
     }
   }
   
-  // Setup paths relative to this file to handle different CWDs
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
   
   const possiblePaths = [
     process.env["FIREBASE_SERVICE_ACCOUNT_PATH"],
     path.join(process.cwd(), "service-account.json"),
-    path.resolve(__dirname, "../../../api-server/service-account.json"), // Root project path
-    path.resolve(__dirname, "../../service-account.json"), // Relative to lib
+    path.resolve(__dirname, "../../../api-server/service-account.json"),
+    path.resolve(__dirname, "../../service-account.json"),
   ].filter(Boolean) as string[];
 
   for (const saPath of possiblePaths) {
     try {
       const resolvedPath = path.resolve(saPath);
       if (fs.existsSync(resolvedPath)) {
-        const fileRaw = fs.readFileSync(resolvedPath, "utf8");
-        return JSON.parse(fileRaw);
+        return JSON.parse(fs.readFileSync(resolvedPath, "utf8"));
       }
     } catch {
-      // Ignore parse errors from files and try the next path
+      continue;
     }
   }
-
-  console.warn("No valid service account JSON found — falling back to JSON store where handled");
   return null;
 }
 
 function getProjectId() {
-  return process.env["FIREBASE_PROJECT_ID"] || getServiceAccountJson()?.project_id || undefined;
+  return (
+    process.env["FIREBASE_PROJECT_ID"] || 
+    process.env["VITE_FIREBASE_PROJECT_ID"] || 
+    getServiceAccountJson()?.project_id || 
+    undefined
+  );
 }
 
 export function ensureFirebaseApp() {
-  if (_firebaseInitError) {
-    throw new Error(_firebaseInitError);
-  }
-  if (_firebaseInitialized || getApps().length > 0) {
+  if (_firebaseInitialized) return true;
+  if (getApps().length > 0) {
     _firebaseInitialized = true;
-    return;
+    return true;
   }
 
   const projectId = getProjectId();
   const serviceAccount = getServiceAccountJson();
 
   if (!projectId || !serviceAccount) {
-    _firebaseInitError = "Firebase not configured: missing FIREBASE_PROJECT_ID or service account credentials. Falling back to JSON local storage.";
-    console.warn(_firebaseInitError);
-    throw new Error(_firebaseInitError);
+    return false;
   }
 
   try {
@@ -78,31 +73,37 @@ export function ensureFirebaseApp() {
       projectId,
     });
     _firebaseInitialized = true;
-    console.log("Firebase Admin initialized successfully for project:", projectId);
-  } catch (err: any) {
-    _firebaseInitError = `Firebase init failed: ${err.message}`;
-    console.error(_firebaseInitError);
-    throw new Error(_firebaseInitError);
-  }
-}
-
-export function getFirestoreDb() {
-  ensureFirebaseApp();
-  return getFirestore();
-}
-
-export function getFirebaseAuth() {
-  ensureFirebaseApp();
-  return getAuth();
-}
-
-export function isFirebaseAvailable(): boolean {
-  try {
-    ensureFirebaseApp();
+    console.log("Firebase Admin initialized successfully");
     return true;
-  } catch {
+  } catch (err: any) {
+    console.warn("Firebase Admin failed to initialize:", err.message);
     return false;
   }
 }
 
+export function getFirestoreDb() {
+  const ok = ensureFirebaseApp();
+  if (!ok) return null;
+  try {
+    return getFirestore();
+  } catch {
+    return null;
+  }
+}
+
+export function getFirebaseAuth() {
+  const ok = ensureFirebaseApp();
+  if (!ok) return null;
+  try {
+    return getAuth();
+  } catch {
+    return null;
+  }
+}
+
+export function isFirebaseAvailable(): boolean {
+  return ensureFirebaseApp();
+}
+
 export { Timestamp };
+
