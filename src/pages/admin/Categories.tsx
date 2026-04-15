@@ -1,7 +1,7 @@
 import * as React from "react";
 import { AdminLayout } from "@/components/layout";
 import { Card, CardHeader, CardTitle, CardContent, Button, Input } from "@/components/ui-components";
-import { Plus, Edit, Trash2, FolderTree, Save, X, Search, ChevronRight, ChevronDown, PlusCircle } from "lucide-react";
+import { Plus, Edit, Trash2, FolderTree, Save, X, Search, ChevronRight, ChevronDown, PlusCircle, FileText } from "lucide-react";
 import { useGetCategories, useCreateCategory, useUpdateCategory, useDeleteCategory } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
