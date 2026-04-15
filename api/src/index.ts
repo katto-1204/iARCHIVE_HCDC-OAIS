@@ -18,23 +18,15 @@ try {
 
 import app from "./app.js";
 import { logger } from "./lib/logger.js";
-import fs from "fs";
-import path from "path";
 
 const rawPort = process.env["PORT"] || "5000";
-
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
-}
-
 const port = Number(rawPort);
 
 if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
+// Maintenance debugging endpoints
 app.get("/api/test", (req, res) => {
   res.json({ message: "API is working", cwd: process.cwd(), node_env: process.env.NODE_ENV });
 });
@@ -53,13 +45,6 @@ app.get("/api/debug", (req, res) => {
   });
 });
 
-app.use("/api", router);
-
-app.listen(port, (err) => {
-  if (err) {
-    logger.error({ err }, "Error listening on port");
-    process.exit(1);
-  }
-
+app.listen(port, () => {
   logger.info({ port }, "Server listening");
 });
