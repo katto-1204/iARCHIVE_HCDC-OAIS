@@ -139,6 +139,24 @@ export default function AdminCategories() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const LEVEL_COLORS: any = {
+    fonds: "#ef4444",
+    subfonds: "#f97316",
+    series: "#eab308",
+    subseries: "#22c55e",
+    file: "#3b82f6",
+    item: "#a855f7",
+  };
+
+  const LEVEL_ICONS: any = {
+    fonds: FolderTree,
+    subfonds: FolderTree,
+    series: FolderTree,
+    subseries: FolderTree,
+    file: FileText,
+    item: FileText,
+  };
+
   const renderTree = (nodes: CategoryNode[], depth: number = 0) => {
     if (nodes.length === 0) return null;
     return (
@@ -154,20 +172,29 @@ export default function AdminCategories() {
             node.level === 'subfonds' ? 'series' : 
             node.level === 'series' ? 'subseries' : 
             node.level === 'subseries' ? 'file' : 'item';
+          
+          const color = LEVEL_COLORS[node.level];
+          const Icon = LEVEL_ICONS[node.level] || FolderTree;
 
           return (
-            <div key={node.id} className="border-b last:border-b-0 border-border/40">
+            <div key={node.id} className="relative mb-2 last:mb-0">
+              {depth > 0 && (
+                <div 
+                  className="absolute top-0 bottom-0 w-px bg-border/40"
+                  style={{ left: `${-14}px` }} 
+                />
+              )}
               <div 
                 className={cn(
-                  "flex items-center group transition-colors py-3 pr-4 hover:bg-muted/10",
-                  isExpanded && hasChildren ? "bg-muted/5" : ""
+                  "flex items-center group transition-all py-3 pr-4 pl-2 rounded-xl border relative z-10",
+                  isExpanded && hasChildren ? "bg-[#f7f8fc] border-border/80 shadow-sm" : "bg-white border-border/40 hover:border-[#4169E1]/40 hover:shadow-sm"
                 )}
-                style={{ paddingLeft: `${Math.max(16, depth * 32 + 16)}px` }}
+                style={{ marginLeft: `${depth * 28}px` }}
               >
                 {/* Expander Icon */}
                 <button 
                   className={cn(
-                    "w-6 h-6 flex items-center justify-center shrink-0 mr-2 rounded hover:bg-muted-foreground/10 transition-colors",
+                    "w-6 h-6 flex items-center justify-center shrink-0 mr-1 rounded-md hover:bg-muted-foreground/10 transition-colors",
                     !hasChildren && "opacity-0 cursor-default"
                   )}
                   onClick={(e) => hasChildren && toggleNode(node.id, e)}
@@ -176,17 +203,13 @@ export default function AdminCategories() {
                   {isExpanded ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
                 </button>
 
-                {/* Level Badge */}
-                <Badge variant="outline" className={cn(
-                  "mr-3 px-2 py-0 text-[10px] w-20 justify-center uppercase shrink-0 font-bold",
-                  node.level === 'fonds' ? "bg-blue-50 text-blue-700 border-blue-200" :
-                  node.level === 'subfonds' ? "bg-indigo-50 text-indigo-700 border-indigo-200" :
-                  node.level === 'series' ? "bg-purple-50 text-purple-700 border-purple-200" :
-                  node.level === 'subseries' ? "bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200" :
-                  node.level === 'file' ? "bg-slate-100 text-slate-700" : "bg-neutral-100"
-                )}>
-                  {node.level}
-                </Badge>
+                {/* Level Icon */}
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mr-3 shadow-sm border border-black/5"
+                  style={{ backgroundColor: color + "18" }}
+                >
+                  {React.createElement(Icon || FolderTree, { className: "w-4 h-4", style: { color } })}
+                </div>
 
                 {/* Content */}
                 <div className="flex-1 min-w-0 pr-4">
@@ -208,11 +231,16 @@ export default function AdminCategories() {
                   )}
                 </div>
 
+                {/* Level Badge */}
+                <Badge variant="outline" className="mr-4 px-2.5 py-0.5 text-[10px] uppercase font-bold tracking-wider rounded-md border-opacity-30 shadow-none shrink-0" style={{ color, backgroundColor: color + "12", borderColor: color + "40" }}>
+                  {node.level}
+                </Badge>
+
                 {/* Actions */}
-                <div className="shrink-0 flex items-center gap-1">
+                <div className="shrink-0 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                   {isEditing ? (
                     <>
-                      <Button size="sm" className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700" onClick={() => {
+                      <Button size="sm" className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 shadow-sm" onClick={() => {
                         const n = (document.getElementById(`edit-name-${node.id}`) as HTMLInputElement).value;
                         const d = (document.getElementById(`edit-desc-${node.id}`) as HTMLInputElement).value;
                         handleUpdate(node.id, n, d);
@@ -220,9 +248,9 @@ export default function AdminCategories() {
                       <Button size="sm" variant="ghost" className="h-8" onClick={() => setEditingId(null)}>Cancel</Button>
                     </>
                   ) : (
-                    <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <>
                       {node.level !== 'item' && (
-                        <Button size="sm" variant="ghost" className="h-8 px-2 text-primary hover:text-primary hover:bg-primary/10 gap-1 text-[11px]" onClick={() => openAddForm(node.id, nextLevel)}>
+                        <Button size="sm" variant="secondary" className="h-8 px-3 text-primary text-[11px] font-semibold bg-primary/5 hover:bg-primary/15 border-primary/10 shadow-none border gap-1.5" onClick={() => openAddForm(node.id, nextLevel)}>
                           <PlusCircle className="w-3.5 h-3.5" /> Add {nextLevel}
                         </Button>
                       )}
@@ -237,14 +265,14 @@ export default function AdminCategories() {
                       <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleDelete(node.id, node.name)}>
                         <Trash2 className="w-4 h-4" />
                       </Button>
-                    </div>
+                    </>
                   )}
                 </div>
               </div>
 
               {/* Children recursive render */}
               {isExpanded && hasChildren && (
-                <div className="animate-in slide-in-from-top-2 fade-in duration-200 border-t border-border/20 bg-muted/3">
+                <div className="animate-in slide-in-from-top-2 fade-in duration-300 mt-2">
                   {renderTree(node.children, depth + 1)}
                 </div>
               )}

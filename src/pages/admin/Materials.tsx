@@ -1577,7 +1577,19 @@ export default function AdminMaterials() {
                   <Select value={uploadForm.subfonds} onValueChange={v => setUploadForm(p => ({ ...p, subfonds: v }))}>
                     <SelectTrigger className="h-10 bg-white border-border/60 hover:border-[#4169E1]/50 focus:ring-[#4169E1]/20 transition-all font-semibold text-[#0a1628]"><SelectValue placeholder="Select Department" /></SelectTrigger>
                     <SelectContent className="max-h-[300px] overflow-y-auto">
-                      {["College of Engineering and Technology", "College of Business", "College of Education", "College of Criminal Justice Education", "College of Arts and Sciences", "College of Maritime Education", "Bachelor of Library and Information Science", "Basic Education Department", "Administration", "Library"].map((dept) => <SelectItem key={dept} value={dept}>{dept}</SelectItem>)}
+                      {[
+                        "COLLEGE OF ENGINEERING AND TECHNOLOGY (CET)",
+                        "SCHOOL OF BUSINESS MANAGEMENT (SBME)",
+                        "COLLEGE OF MARITIME EDUCATION (COME)",
+                        "COLLEGE OF CRIMINAL JUSTICE EDUCATION (CCJE)",
+                        "SCHOOL OF TEACHERS EDUCATION (STE)",
+                        "College of Humanities, Social Sciences and Communication (HUSOCOM)",
+                        "College of Hospitality and Tourism Management Education (CHATME)",
+                        "Library and Information Science (BLIS)",
+                        "Basic Education Department",
+                        "Administration",
+                        "Library"
+                      ].map((dept) => <SelectItem key={dept} value={dept}>{dept}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1586,11 +1598,17 @@ export default function AdminMaterials() {
                      Series
                    </label>
                    <Input 
+                     list="series-suggestions"
                      placeholder="e.g. Research Papers, Yearbooks..." 
                      value={uploadForm.series || ""} 
                      onChange={e => setUploadForm(p => ({ ...p, series: e.target.value }))}
                      className="h-10 bg-white"
                    />
+                   <datalist id="series-suggestions">
+                     {categories
+                       .filter((c: any) => c.level === 'series' && (!uploadForm.subfonds || c.parentId === categories.find((cat: any) => cat.name === uploadForm.subfonds)?.id))
+                       .map((c: any) => <option key={c.id} value={c.name} />)}
+                   </datalist>
                 </div>
               </div>
 

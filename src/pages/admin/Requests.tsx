@@ -121,27 +121,30 @@ export default function AdminRequests() {
       </div>
 
       <div className="bg-card border rounded-2xl shadow-sm overflow-hidden mb-6">
-        <div className="border-b px-4 flex gap-6">
-          {(["access", "ingest"] as const).map((m) => (
-            <button
-              key={m}
-              className={`py-4 text-sm font-semibold capitalize border-b-2 transition-colors ${mode === m ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-              onClick={() => setMode(m)}
-            >
-              {m === "access" ? "Access Requests" : "Ingest Approvals"}
-            </button>
-          ))}
-        </div>
-        <div className="border-b px-4 flex gap-6">
-          {(["pending", "approved", "rejected"] as const).map(t => (
-            <button 
-              key={t}
-              className={`py-4 text-sm font-semibold capitalize border-b-2 transition-colors ${tab === t ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-              onClick={() => setTab(t)}
-            >
-              {t} Requests
-            </button>
-          ))}
+        <div className="px-6 pt-6 pb-2">
+          <div className="bg-muted/30 p-1.5 rounded-xl inline-flex mb-6 w-full max-w-md shadow-inner">
+            {(["access", "ingest"] as const).map((m) => (
+              <button
+                key={m}
+                className={`flex-1 py-2.5 text-sm font-bold capitalize rounded-lg transition-all duration-200 ${mode === m ? 'bg-white text-[#4169E1] shadow-sm ring-1 ring-black/5' : 'text-muted-foreground hover:text-foreground'}`}
+                onClick={() => setMode(m)}
+              >
+                {m === "access" ? "Access Requests" : "Ingest Approvals"}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2 border-b border-border/40">
+            {(["pending", "approved", "rejected"] as const).map(t => (
+              <button 
+                key={t}
+                className={`px-6 py-3 text-sm font-bold capitalize transition-colors border-b-2 relative -mb-px ${tab === t ? 'border-[#4169E1] text-[#4169E1]' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border/60'}`}
+                onClick={() => setTab(t)}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
         </div>
 
         <Table>
@@ -175,8 +178,8 @@ export default function AdminRequests() {
                     <p className="font-medium text-primary">{mode === "access" ? req.userName : req.requestedBy}</p>
                     <p className="text-xs text-muted-foreground">{mode === "access" ? req.userEmail : "Archivist"}</p>
                   </TableCell>
-                  <TableCell className="max-w-[200px] truncate" title={mode === "access" ? req.materialTitle : req.materialTitle}>{mode === "access" ? req.materialTitle : req.materialTitle}</TableCell>
-                  <TableCell className="max-w-[250px] truncate" title={mode === "access" ? req.purpose : req.hierarchyPath || "Unassigned"}>
+                  <TableCell className="max-w-[200px] truncate font-medium text-[#0a1628]" title={mode === "access" ? req.materialTitle : req.materialTitle}>{mode === "access" ? req.materialTitle : req.materialTitle}</TableCell>
+                  <TableCell className="max-w-[250px] truncate text-muted-foreground" title={mode === "access" ? req.purpose : req.hierarchyPath || "Unassigned"}>
                     {mode === "access" ? req.purpose : req.hierarchyPath || "Unassigned"}
                   </TableCell>
                   <TableCell>
