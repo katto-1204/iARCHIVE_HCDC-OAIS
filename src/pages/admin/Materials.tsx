@@ -113,6 +113,7 @@ export default function AdminMaterials() {
   const [dateSort, setDateSort] = React.useState<"newest" | "oldest" | "none">("newest");
   const [folderSummaryOpen, setFolderSummaryOpen] = React.useState(false);
   const [folderSummaryData, setFolderSummaryData] = React.useState<{count: number, names: string[]}>({count: 0, names: []});
+  const [showHierarchy, setShowHierarchy] = React.useState(false);
 
   // Pagination
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -943,6 +944,9 @@ export default function AdminMaterials() {
           <p className="text-muted-foreground">Browse hierarchy, manage metadata, and catalog items using ISAD(G) standards.</p>
         </div>
         <div className="flex gap-2 flex-wrap sm:flex-nowrap">
+           <Button variant="outline" className={cn("shrink-0 gap-2 w-full sm:w-auto transition-all", showHierarchy ? "bg-primary/10 text-primary border-primary/30" : "")} onClick={() => setShowHierarchy(!showHierarchy)}>
+              <FolderTree className="w-4 h-4" /> {showHierarchy ? "Hide Hierarchy" : "Show Hierarchy"}
+           </Button>
            <Button variant="outline" className="shrink-0 gap-2 w-full sm:w-auto hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 transition-all" onClick={handleExportMetadata}>
               <Download className="w-4 h-4" /> Export Metadata
            </Button>
@@ -991,26 +995,32 @@ export default function AdminMaterials() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className={cn("grid grid-cols-1 gap-6", showHierarchy ? "lg:grid-cols-4" : "lg:grid-cols-1")}>
         {/* ═══ Left: Archival Hierarchy Tree ═══ */}
-        <div className="lg:col-span-1 hidden lg:block">
+        {showHierarchy && (
+        <div className="lg:col-span-1">
           <Card className="shadow-sm border-border/50 bg-white sticky top-20">
-            <CardHeader className="border-b border-border/50 pb-3 px-4 pt-4">
+            <CardHeader className="border-b border-border/50 pb-3 px-4 pt-4 flex flex-row items-center justify-between">
               <CardTitle className="text-[11px] font-bold text-[#0a1628] flex items-center gap-2 uppercase tracking-widest">
                 <FolderTree className="w-4 h-4 text-primary" /> Archival Hierarchy
               </CardTitle>
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-red-500" onClick={() => setShowHierarchy(false)}>
+                <X className="w-4 h-4" />
+              </Button>
             </CardHeader>
             <CardContent className="p-2 max-h-[700px] overflow-y-auto custom-scrollbar">
               <ArchivalTree node={hierarchyTree} selectedId={selectedHierarchyItem} onSelectItem={(id) => {
                 setSelectedHierarchyItem(prev => prev === id ? null : id);
                 setSelectedMaterial(null);
+                setShowHierarchy(true);
               }} />
             </CardContent>
           </Card>
         </div>
+        )}
 
         {/* ═══ Right: Materials List & Inline Details ═══ */}
-        <div className="lg:col-span-3">
+        <div className={showHierarchy ? "lg:col-span-3" : "lg:col-span-1"}>
           <Card className="shadow-sm border-border/50 bg-white">
             <div className="p-4 border-b flex flex-col items-center gap-4 bg-muted/5 border-dashed border-2 rounded-t-xl text-center cursor-pointer m-4 py-8 hover:bg-muted/10 transition-colors" onClick={() => {
                 setProcessingState("idle"); setFileDetails(null); setNeedsManualInput(true); setValidationErrors([]); setUploadOpen(true);
