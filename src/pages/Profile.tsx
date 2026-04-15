@@ -4,7 +4,7 @@ import { Button, Input } from "@/components/ui-components";
 import { Textarea } from "@/components/ui/textarea";
 import { useGetMe, useUpdateProfile } from "@/lib/api-client-react";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Building, FileText, Save, Loader2, ShieldCheck, Settings, Pencil, Calendar } from "lucide-react";
+import { Mail, Building, FileText, Save, Loader2, ShieldCheck, Settings, Pencil, MapPin, Briefcase } from "lucide-react";
 
 export default function Profile() {
   const { data: user, isLoading } = useGetMe();
@@ -32,7 +32,7 @@ export default function Profile() {
     e.preventDefault();
     update({ data: form }, {
       onSuccess: () => {
-        toast({ title: "Profile Updated", description: "Your profile information has been saved." });
+        toast({ title: "Profile Updated", description: "Your profile information has been saved successfully." });
         setIsEditing(false);
       },
       onError: (err: any) => {
@@ -44,144 +44,158 @@ export default function Profile() {
   if (isLoading) return <AdminLayout><div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div></AdminLayout>;
 
   const roleLabel = (user?.userCategory || user?.role || "student").toUpperCase();
-  const memberSince = user?.createdAt ? new Date(user.createdAt).toLocaleDateString("en-US", { month: "long", year: "numeric" }) : "N/A";
   const initials = (user?.name || "U").split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2);
 
   return (
     <AdminLayout>
-      <div className="max-w-4xl mx-auto">
-        {/* Profile Card */}
-        <div className="bg-white rounded-2xl border border-border/50 shadow-sm overflow-hidden">
-          {/* Cover Banner */}
-          <div className="h-36 bg-gradient-to-r from-[#960000] to-[#6b0000] relative">
-            <div className="absolute inset-0 opacity-20 bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22100%22%20height%3D%22100%22%3E%3Cfilter%20id%3D%22n%22%3E%3CfeTurbulence%20type%3D%22fractalNoise%22%20baseFrequency%3D%220.8%22%20numOctaves%3D%224%22/%3E%3C/filter%3E%3Crect%20width%3D%22100%22%20height%3D%22100%22%20filter%3D%22url(%23n)%22/%3E%3C/svg%3E')]" />
+      <div className="max-w-5xl mx-auto space-y-6">
+        
+        {/* Header Section */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-display font-medium text-[#0a1628] tracking-tight">Account Profile</h1>
+            <p className="text-muted-foreground mt-1 text-sm">Manage your personal information and research preferences.</p>
           </div>
+          <div className="flex gap-2 w-full sm:w-auto">
+            {!isEditing ? (
+              <Button onClick={() => setIsEditing(true)} className="w-full sm:w-auto bg-[#4169E1] hover:bg-[#3558c0] text-white shadow-lg shadow-[#4169E1]/20 rounded-xl h-11 px-6 gap-2 transition-all">
+                <Pencil className="w-4 h-4" /> Edit Profile
+              </Button>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => { setIsEditing(false); if(user) setForm({name: user.name, institution: user.institution||"", purpose: user.purpose||""}); }} className="flex-1 sm:flex-none border-border/60 hover:bg-muted/50 rounded-xl h-11 px-6">
+                  Cancel
+                </Button>
+                <Button type="submit" form="profile-form" disabled={isPending} className="flex-1 sm:flex-none bg-[#960000] hover:bg-[#7a0000] text-white shadow-lg shadow-[#960000]/20 rounded-xl h-11 px-6 gap-2 transition-all">
+                  {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  Save Changes
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
 
-          {/* Avatar & Name Section */}
-          <div className="px-8 pb-8">
-            <div className="flex flex-col sm:flex-row sm:items-end gap-5 -mt-10 relative z-10">
-              {/* Avatar */}
-              <div className="w-20 h-20 rounded-full bg-white border-4 border-white shadow-lg flex items-center justify-center text-2xl font-bold text-[#960000] shrink-0">
-                {initials}
-              </div>
-
-              {/* Name & Meta */}
-              <div className="flex-1 pt-2 sm:pt-0">
-                <h2 className="text-2xl font-bold text-[#0a1628]">{user?.name || "User"}</h2>
-                <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#960000] text-white">
-                    <span className="w-1.5 h-1.5 rounded-full bg-white/60" />
-                    {roleLabel}
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Calendar className="w-3.5 h-3.5" />
-                    Member Since {memberSince}
-                  </span>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          {/* Left Column: Identity Card */}
+          <div className="lg:col-span-1 space-y-6">
+            <div className="bg-white rounded-3xl border border-border/60 shadow-sm overflow-hidden relative">
+              {/* Background accent */}
+              <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-br from-[#0a1628] to-[#1e3a8a] opacity-90" />
+              <div className="absolute top-0 left-0 right-0 h-32 bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2240%22%20height%3D%2240%22%3E%3Cpath%20d%3D%22M0%200h40v40H0z%22%20fill%3D%22none%22/%3E%3Cpath%20d%3D%22M20%200l20%2020-20%2020L0%2020z%22%20fill%3D%22rgba(255,255,255,0.03)%22/%3E%3C/svg%3E')] opacity-30 mix-blend-overlay pointer-events-none" />
+              
+              <div className="px-6 pb-8 pt-16 relative z-10 flex flex-col items-center text-center">
+                <div className="w-28 h-28 rounded-full bg-white p-1.5 shadow-xl mb-4">
+                  <div className="w-full h-full rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-4xl font-display font-bold text-[#0a1628]">
+                    {initials}
+                  </div>
+                </div>
+                
+                <h2 className="text-2xl font-bold text-[#0a1628] tracking-tight">{user?.name}</h2>
+                <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#4169E1]/10 text-[#4169E1] text-xs font-bold uppercase tracking-widest">
+                  <ShieldCheck className="w-3.5 h-3.5" /> {roleLabel}
+                </div>
+                
+                <div className="w-full h-px bg-border/40 my-6" />
+                
+                <div className="w-full space-y-3 text-sm">
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span className="flex items-center gap-2"><MapPin className="w-4 h-4" /> Location</span>
+                    <span className="text-[#0a1628] font-medium text-right">Davao City, PH</span>
+                  </div>
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span className="flex items-center gap-2"><Briefcase className="w-4 h-4" /> Account</span>
+                    <span className="text-emerald-600 font-bold text-right flex items-center gap-1">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Active
+                    </span>
+                  </div>
                 </div>
               </div>
+            </div>
 
-              {/* Action Buttons */}
-              <div className="flex gap-2 shrink-0">
-                {!isEditing ? (
-                  <>
-                    <Button variant="outline" className="gap-2 h-10 rounded-xl border-border/60" onClick={() => setIsEditing(true)}>
-                      <Pencil className="w-3.5 h-3.5" /> Edit Profile
-                    </Button>
-                    <Button variant="default" className="gap-2 h-10 rounded-xl bg-[#0a1628] hover:bg-[#0a1628]/90">
-                      <Settings className="w-3.5 h-3.5" /> Account Settings
-                    </Button>
-                  </>
+            {/* Verification Notice */}
+            <div className="bg-emerald-50/50 border border-emerald-100 rounded-3xl p-6 flex flex-col items-center text-center">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mb-3">
+                <ShieldCheck className="w-6 h-6" />
+              </div>
+              <h3 className="font-bold text-emerald-900 mb-1">Identity Verified</h3>
+              <p className="text-xs text-emerald-700/80 leading-relaxed mb-4">Your account is fully verified for accessing restricted digital materials.</p>
+              <Button variant="outline" className="w-full border-emerald-200 text-emerald-700 hover:bg-emerald-100 rounded-xl h-10 text-xs font-bold uppercase tracking-wider">
+                <Settings className="w-3.5 h-3.5 mr-2" /> Security Preferences
+              </Button>
+            </div>
+          </div>
+
+          {/* Right Column: Edit Forms & Details */}
+          <div className="lg:col-span-2 space-y-6">
+            <form id="profile-form" onSubmit={handleSubmit} className="bg-white rounded-3xl border border-border/60 shadow-sm p-6 sm:p-8">
+              <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest mb-6 flex items-center gap-2">
+                <Mail className="w-4 h-4" /> General Information
+              </h3>
+              
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-[#0a1628]">Full Name</label>
+                    <Input 
+                      value={isEditing ? form.name : (user?.name || "")} 
+                      onChange={e => setForm({...form, name: e.target.value})}
+                      disabled={!isEditing}
+                      className="h-12 rounded-xl bg-muted/20 border-border/50 disabled:opacity-80 disabled:bg-muted/40 font-medium"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-[#0a1628]">Email Address (Cannot be changed)</label>
+                    <Input 
+                      value={user?.email || ""} 
+                      disabled 
+                      className="h-12 rounded-xl border-border/50 bg-muted/40 opacity-80"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-[#0a1628]">Institution / Affiliation</label>
+                  <div className="relative">
+                    <Building className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input 
+                      value={isEditing ? form.institution : (user?.institution || "None provided")} 
+                      onChange={e => setForm({...form, institution: e.target.value})}
+                      disabled={!isEditing}
+                      placeholder="e.g. Holy Cross of Davao College"
+                      className="pl-11 h-12 rounded-xl bg-muted/20 border-border/50 disabled:opacity-80 disabled:bg-muted/40 font-medium"
+                    />
+                  </div>
+                </div>
+              </div>
+            </form>
+
+            <div className="bg-white rounded-3xl border border-border/60 shadow-sm p-6 sm:p-8">
+              <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest mb-6 flex items-center gap-2">
+                <FileText className="w-4 h-4" /> Research Profile
+              </h3>
+              
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-[#0a1628]">Primary Research Purpose</label>
+                {isEditing ? (
+                  <Textarea 
+                    value={form.purpose} 
+                    onChange={e => setForm({...form, purpose: e.target.value})}
+                    placeholder="Describe your research focus or why you are accessing the digital archives..."
+                    className="min-h-[140px] rounded-xl bg-muted/20 border-border/50 p-4 font-medium resize-none"
+                  />
                 ) : (
-                  <>
-                    <Button variant="outline" className="h-10 rounded-xl border-border/60" onClick={() => { setIsEditing(false); if (user) setForm({ name: user.name || "", institution: user.institution || "", purpose: user.purpose || "" }); }}>
-                      Cancel
-                    </Button>
-                    <Button type="submit" form="profile-form" disabled={isPending} className="gap-2 h-10 rounded-xl bg-[#4169E1] hover:bg-[#3558c0]">
-                      {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                      Save Changes
-                    </Button>
-                  </>
+                  <div className="min-h-[140px] rounded-xl bg-muted/30 border border-border/30 p-5">
+                    {user?.purpose ? (
+                      <p className="text-sm leading-relaxed text-[#0a1628]">{user.purpose}</p>
+                    ) : (
+                      <p className="text-sm leading-relaxed text-muted-foreground italic">No research purpose has been specified. Click 'Edit Profile' to add your research goals and assist archivists in providing better recommendations.</p>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
-
-            {/* Info Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-              {/* Contact Information */}
-              <div>
-                <h3 className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-4">Contact Information</h3>
-                <div className="space-y-4">
-                  <div className="flex items-start gap-3 p-4 rounded-xl bg-muted/30 border border-border/30">
-                    <div className="w-9 h-9 rounded-lg bg-[#4169E1]/10 flex items-center justify-center shrink-0">
-                      <Mail className="w-4 h-4 text-[#4169E1]" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Primary Email</p>
-                      <p className="text-sm font-semibold text-[#0a1628] truncate">{user?.email || "—"}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-4 rounded-xl bg-muted/30 border border-border/30">
-                    <div className="w-9 h-9 rounded-lg bg-[#4169E1]/10 flex items-center justify-center shrink-0">
-                      <Building className="w-4 h-4 text-[#4169E1]" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Institution / Affiliation</p>
-                      {isEditing ? (
-                        <Input value={form.institution} onChange={e => setForm({...form, institution: e.target.value})} placeholder="e.g. HCDC" className="mt-1 h-9 text-sm" />
-                      ) : (
-                        <p className="text-sm font-semibold text-[#0a1628]">{user?.institution || "Not specified"}</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Research Profile */}
-              <div>
-                <h3 className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-4">Research Profile</h3>
-                <div className="p-4 rounded-xl bg-muted/30 border border-border/30 min-h-[124px]">
-                  <div className="flex items-start gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-[#960000]/10 flex items-center justify-center shrink-0">
-                      <FileText className="w-4 h-4 text-[#960000]" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Primary Research Purpose</p>
-                      {isEditing ? (
-                        <Textarea value={form.purpose} onChange={e => setForm({...form, purpose: e.target.value})} placeholder="Describe your research purpose..." className="mt-1 min-h-[80px] text-sm" />
-                      ) : (
-                        <p className={`text-sm mt-1 leading-relaxed ${user?.purpose ? 'font-medium text-[#0a1628]' : 'text-muted-foreground italic'}`}>
-                          {user?.purpose || '"No research purpose has been specified for this account. You can update this in your profile settings."'}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Edit form (hidden, for submit binding) */}
-            {isEditing && (
-              <form id="profile-form" onSubmit={handleSubmit} className="mt-6">
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Full Name</label>
-                    <Input value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="Your full name" required className="mt-1" />
-                  </div>
-                </div>
-              </form>
-            )}
-
-            {/* Verified Account Banner */}
-            <div className="mt-8 flex items-center gap-4 p-4 rounded-xl bg-emerald-50 border border-emerald-100">
-              <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                <ShieldCheck className="w-5 h-5 text-emerald-600" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-emerald-900">Verified Research Account</p>
-                <p className="text-xs text-emerald-600">Your credentials have been verified by the HCDC Archival Administration team.</p>
-              </div>
-              <a href="/terms" className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider hover:underline shrink-0">Privacy Charter</a>
-            </div>
+            
           </div>
         </div>
       </div>

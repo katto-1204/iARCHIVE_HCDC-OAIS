@@ -164,18 +164,23 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         `fixed inset-y-0 left-0 z-40 w-64 ${roleAsideBg} text-white transition-transform duration-300 flex flex-col border-r border-white/10 shadow-2xl`,
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
-        <div className="h-16 flex items-center px-6 border-b border-white/10 bg-black/10">
-          <img src={`${import.meta.env.BASE_URL}logos/iarchive%20icon.png`} className="w-8 h-8 object-contain mr-3" alt="Logo" />
-          <h2 className="font-display font-bold text-xl tracking-tight uppercase">
-            {user.role === "admin" ? "Admin" : user.role === "archivist" ? "Archivist" : "User"}
-          </h2>
+        <div className="h-16 flex items-center justify-between px-6 border-b border-white/10 bg-black/10">
+          <div className="flex items-center">
+            <img src={`${import.meta.env.BASE_URL}logos/iarchive%20icon.png`} className="w-8 h-8 object-contain mr-3" alt="Logo" />
+            <h2 className="font-display font-bold text-xl tracking-tight uppercase">
+              {user.role === "admin" ? "Admin" : user.role === "archivist" ? "Archivist" : "User"}
+            </h2>
+          </div>
+          <button className="lg:hidden p-1.5 rounded-lg hover:bg-white/10" onClick={() => setSidebarOpen(false)}>
+            <X className="w-5 h-5 text-white/60" />
+          </button>
         </div>
         <div className="flex-1 py-6 overflow-y-auto custom-scrollbar">
           <nav className="space-y-1 px-3">
             {links.map((link) => {
               const active = location === link.href || (link.href !== '/admin' && link.href !== '/archivist' && location.startsWith(link.href));
               return (
-                <Link key={link.href} href={link.href} className={cn(
+                <Link key={link.href} href={link.href} onClick={() => { if (window.innerWidth < 1024) setSidebarOpen(false); }} className={cn(
                   "flex items-center px-3 py-2.5 rounded-lg transition-colors font-medium text-sm group",
                   active ? `${roleActiveBg} text-white shadow-md` : "text-white/70 hover:bg-white/10 hover:text-white"
                 )}>

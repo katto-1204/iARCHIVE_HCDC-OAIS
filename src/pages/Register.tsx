@@ -116,7 +116,13 @@ export default function Register() {
       </div>
 
       {/* Main Content Form */}
-      <div className="flex-1 flex flex-col justify-center items-center p-6 md:p-12 lg:p-24 bg-muted/10 overflow-y-auto">
+      <div className="flex-1 flex flex-col justify-center items-center px-4 py-8 sm:px-8 sm:py-12 md:p-12 lg:p-24 bg-muted/10 overflow-y-auto min-h-screen">
+        <div className="lg:hidden flex justify-center w-full mb-8 shrink-0">
+          <Link href="/" className="flex items-center">
+            <img src={`${import.meta.env.BASE_URL}logos/iarchive%20icon.png`} alt="iArchive" className="h-10 w-auto object-contain drop-shadow" />
+            <span className="ml-3 font-display font-bold text-2xl tracking-tight text-[#050a14]">iArchive</span>
+          </Link>
+        </div>
         <div className="w-full max-w-xl space-y-10">
           <div className="space-y-3">
             <Button variant="ghost" className="text-muted-foreground hover:text-foreground -ml-4" onClick={() => window.history.back()}>

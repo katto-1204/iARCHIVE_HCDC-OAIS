@@ -66,7 +66,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex bg-[#0a1628] relative overflow-hidden">
+    <div className="min-h-screen flex flex-col lg:flex-row bg-[#0a1628] relative overflow-hidden">
       {/* Animated background */}
       <div className="absolute inset-0">
         <div className="absolute inset-0 bg-gradient-to-br from-[#3a0000]/60 via-[#0a1628] to-[#0a1628]" />
@@ -109,13 +109,15 @@ export default function Login() {
       </div>
 
       {/* Right: Login form */}
-      <div className="flex-1 flex items-center justify-center p-6 sm:p-12 relative z-10">
-        <Link href="/" className="absolute top-6 left-6 lg:hidden flex items-center gap-2">
-          <img src={`${import.meta.env.BASE_URL}logos/iarchive%20white%20logo.png`} alt="iArchive" className="h-8 w-auto object-contain" />
-        </Link>
+      <div className="flex-1 flex items-center justify-center px-5 py-12 sm:p-12 relative z-10">
+        <div className="lg:hidden flex items-center justify-center mb-8 w-full">
+          <Link href="/" className="flex items-center gap-3">
+            <img src={`${import.meta.env.BASE_URL}logos/iarchive%20white%20logo.png`} alt="iArchive" className="h-9 w-auto object-contain" />
+          </Link>
+        </div>
         <div className="w-full max-w-md">
           {/* Form */}
-          <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-7">
+          <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-5 sm:p-7">
             <div className="mb-6">
               <h2 className="text-2xl font-bold text-white mb-1">Sign In</h2>
               <p className="text-white/40 text-sm">Enter your credentials to continue</p>
