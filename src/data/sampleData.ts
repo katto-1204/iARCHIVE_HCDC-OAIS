@@ -133,68 +133,139 @@ export const SAMPLE_HIERARCHY: HierarchyNode = {
   name: "HCDC — Holy Cross of Davao College",
   level: "fonds",
   children: [
-    // --- The ORIGINAL ONES (that have items pointing to them) ---
     {
-      id: "h-cet",
-      name: "College of Engineering and Technology (CET)",
+      id: "dept_fonds",
+      name: "Departmental Sub-fonds",
       level: "subfonds",
       children: [
         {
-          id: "h-cet-research",
-          name: "Faculty Research",
-          level: "series",
+          id: "h-cet",
+          name: "College of Engineering and Technology (CET)",
+          level: "subfonds",
           children: [
             {
-              id: "h-cet-papers",
-              name: "Research Papers",
-              level: "subseries",
+              id: "h-cet-research",
+              name: "Faculty Research",
+              level: "series",
               children: [
                 {
-                  id: "h-cet-papers-file",
-                  name: "2023 Faculty Publications",
-                  level: "file",
-                  children: [
-                    { id: "h-item-quality", name: "Quality Education in Philippine HEIs", level: "item", materialId: "26iA020000004" },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-        // BLIS MOVED HERE
-        {
-          id: "h-blis",
-          name: "BLIS",
-          level: "series",
-          children: [
-            {
-              id: "h-blis-research",
-              name: "Student Research",
-              level: "subseries",
-              children: [
-                {
-                  id: "h-blis-capstone",
-                  name: "Capstone Projects",
-                  level: "file",
+                  id: "h-cet-papers",
+                  name: "Research Papers",
+                  level: "subseries",
                   children: [
                     {
-                      id: "h-blis-cap-2024",
-                      name: "2024 Capstone Projects",
-                      level: "item",
+                      id: "h-cet-papers-file",
+                      name: "2023 Faculty Publications",
+                      level: "file",
                       children: [
-                        { id: "h-item-elearn", name: "Implementing E-Learning in HCDC: A Capstone Study", level: "item", materialId: "26iA040000006" },
+                        { id: "h-item-quality", name: "Quality Education in Philippine HEIs", level: "item", materialId: "26iA020000004" },
                       ],
                     },
                   ],
                 },
               ],
             },
+            {
+              id: "h-blis",
+              name: "BLIS",
+              level: "series",
+              children: [
+                {
+                  id: "h-blis-research",
+                  name: "Student Research",
+                  level: "subseries",
+                  children: [
+                    {
+                      id: "h-blis-capstone",
+                      name: "Capstone Projects",
+                      level: "file",
+                      children: [
+                        {
+                          id: "h-blis-cap-2024",
+                          name: "2024 Capstone Projects",
+                          level: "item",
+                          children: [
+                            { id: "h-item-elearn", name: "Implementing E-Learning in HCDC: A Capstone Study", level: "item", materialId: "26iA040000006" },
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+            { id: "s_bscpe", name: "BSCpE", level: "series" },
+            { id: "s_bsece", name: "BSECE", level: "series" },
+            { id: "s_bsit", name: "BSIT", level: "series" }
           ],
         },
-        { id: "s_bscpe", name: "BSCpE", level: "series" },
-        { id: "s_bsece", name: "BSECE", level: "series" },
-        { id: "s_bsit", name: "BSIT", level: "series" }
-      ],
+        {
+          id: "ccje_sub",
+          name: "College of Criminal Justice Education (CCJE)",
+          level: "subfonds",
+          children: [
+            { id: "s_crim", name: "BS Criminology", level: "series" }
+          ]
+        },
+        {
+          id: "chatme_sub",
+          name: "College of Hospitality & Tourism Management (CHATME)",
+          level: "subfonds",
+          children: [
+            { id: "s_bshm", name: "BSHM", level: "series" },
+            { id: "s_bstm", name: "BSTM", level: "series" }
+          ]
+        },
+        {
+          id: "husocom_sub",
+          name: "College of Arts & Sciences (HUSOCOM)",
+          level: "subfonds",
+          children: [
+            { id: "s_polsci", name: "AB PolSci", level: "series" },
+            { id: "s_econ", name: "AB Econ", level: "series" },
+            { id: "s_history", name: "AB History", level: "series" },
+            { id: "s_phil", name: "AB Philosophy", level: "series" },
+            { id: "s_comm", name: "BA Comm", level: "series" },
+            { id: "s_els", name: "BA ELS", level: "series" },
+            { id: "s_psych", name: "BS Psych", level: "series" },
+            { id: "s_sw", name: "BSSW", level: "series" }
+          ]
+        },
+        {
+          id: "come_sub",
+          name: "College of Maritime Education (COME)",
+          level: "subfonds",
+          children: [
+            { id: "s_bsmt", name: "BSMT", level: "series" }
+          ]
+        },
+        {
+          id: "sbme_sub",
+          name: "School of Business & Management (SBME)",
+          level: "subfonds",
+          children: [
+            { id: "s_bsa", name: "BSA", level: "series" },
+            { id: "s_bsba_fm", name: "BSBA-FM", level: "series" },
+            { id: "s_bsba_hrm", name: "BSBA-HRM", level: "series" },
+            { id: "s_bsba_mm", name: "BSBA-MM", level: "series" },
+            { id: "s_bsca", name: "BSCA", level: "series" },
+            { id: "s_bsma", name: "BSMA", level: "series" },
+            { id: "s_bsrem", name: "BSREM", level: "series" }
+          ]
+        },
+        {
+          id: "ste_sub",
+          name: "School of Teacher Education (STE)",
+          level: "subfonds",
+          children: [
+            { id: "s_beced", name: "BECEd", level: "series" },
+            { id: "s_beed", name: "BEEd", level: "series" },
+            { id: "s_bped", name: "BPEd", level: "series" },
+            { id: "s_bsed", name: "BSEd", level: "series" },
+            { id: "s_bsned", name: "BSNEd", level: "series" }
+          ]
+        },
+      ]
     },
     {
       id: "h-admin",
@@ -277,74 +348,6 @@ export const SAMPLE_HIERARCHY: HierarchyNode = {
         },
       ],
     },
-
-    // --- The NEWLY APPENDED DEPARTMENTS based on HCDC Course List ---
-    {
-      id: "ccje_sub",
-      name: "College of Criminal Justice Education (CCJE)",
-      level: "subfonds",
-      children: [
-        { id: "s_crim", name: "BS Criminology", level: "series" }
-      ]
-    },
-    {
-      id: "chatme_sub",
-      name: "College of Hospitality & Tourism Management (CHATME)",
-      level: "subfonds",
-      children: [
-        { id: "s_bshm", name: "BSHM", level: "series" },
-        { id: "s_bstm", name: "BSTM", level: "series" }
-      ]
-    },
-    {
-      id: "husocom_sub",
-      name: "College of Arts & Sciences (HUSOCOM)",
-      level: "subfonds",
-      children: [
-        { id: "s_polsci", name: "AB PolSci", level: "series" },
-        { id: "s_econ", name: "AB Econ", level: "series" },
-        { id: "s_history", name: "AB History", level: "series" },
-        { id: "s_phil", name: "AB Philosophy", level: "series" },
-        { id: "s_comm", name: "BA Comm", level: "series" },
-        { id: "s_els", name: "BA ELS", level: "series" },
-        { id: "s_psych", name: "BS Psych", level: "series" },
-        { id: "s_sw", name: "BSSW", level: "series" }
-      ]
-    },
-    {
-      id: "come_sub",
-      name: "College of Maritime Education (COME)",
-      level: "subfonds",
-      children: [
-        { id: "s_bsmt", name: "BSMT", level: "series" }
-      ]
-    },
-    {
-      id: "sbme_sub",
-      name: "School of Business & Management (SBME)",
-      level: "subfonds",
-      children: [
-        { id: "s_bsa", name: "BSA", level: "series" },
-        { id: "s_bsba_fm", name: "BSBA-FM", level: "series" },
-        { id: "s_bsba_hrm", name: "BSBA-HRM", level: "series" },
-        { id: "s_bsba_mm", name: "BSBA-MM", level: "series" },
-        { id: "s_bsca", name: "BSCA", level: "series" },
-        { id: "s_bsma", name: "BSMA", level: "series" },
-        { id: "s_bsrem", name: "BSREM", level: "series" }
-      ]
-    },
-    {
-      id: "ste_sub",
-      name: "School of Teacher Education (STE)",
-      level: "subfonds",
-      children: [
-        { id: "s_beced", name: "BECEd", level: "series" },
-        { id: "s_beed", name: "BEEd", level: "series" },
-        { id: "s_bped", name: "BPEd", level: "series" },
-        { id: "s_bsed", name: "BSEd", level: "series" },
-        { id: "s_bsned", name: "BSNEd", level: "series" }
-      ]
-    }
   ]
 };
 
@@ -354,46 +357,46 @@ export interface ArchivalMaterial {
   id: string;
   uniqueId: string;           // YYiACCNNNNNNN format
   // All 36 metadata fields
-  referenceCode: string | null;
-  title: string | null;
-  date: string | null;
-  levelOfDescription: string | null;
-  extentAndMedium: string | null;
-  creator: string | null;
-  adminBioHistory: string | null;
-  archivalHistory: string | null;
-  immediateSource: string | null;
-  scopeContent: string | null;
-  appraisal: string | null;
-  accruals: string | null;
-  arrangement: string | null;
-  accessConditions: string | null;
-  reproductionConditions: string | null;
-  language: string | null;
-  physicalCharacteristics: string | null;
-  findingAids: string | null;
-  existenceOriginals: string | null;
-  existenceCopies: string | null;
-  relatedUnits: string | null;
-  publicationNote: string | null;
-  note: string | null;
-  archivistNote: string | null;
-  rulesConventions: string | null;
-  dateOfDescription: string | null;
+  referenceCode?: string | null;
+  title?: string | null;
+  date?: string | null;
+  levelOfDescription?: string | null;
+  extentAndMedium?: string | null;
+  creator?: string | null;
+  adminBioHistory?: string | null;
+  archivalHistory?: string | null;
+  immediateSource?: string | null;
+  scopeContent?: string | null;
+  appraisal?: string | null;
+  accruals?: string | null;
+  arrangement?: string | null;
+  accessConditions?: string | null;
+  reproductionConditions?: string | null;
+  language?: string | null;
+  physicalCharacteristics?: string | null;
+  findingAids?: string | null;
+  existenceOriginals?: string | null;
+  existenceCopies?: string | null;
+  relatedUnits?: string | null;
+  publicationNote?: string | null;
+  note?: string | null;
+  archivistNote?: string | null;
+  rulesConventions?: string | null;
+  dateOfDescription?: string | null;
   // Supplementary Dublin Core fields (non-duplicate)
-  subject: string | null;
-  description: string | null;
-  publisher: string | null;
-  contributor: string | null;
-  type: string | null;
-  format: string | null;
-  identifier: string | null;
-  source: string | null;
-  relation: string | null;
-  coverage: string | null;
-  rights: string | null;
+  subject?: string | null;
+  description?: string | null;
+  publisher?: string | null;
+  contributor?: string | null;
+  type?: string | null;
+  format?: string | null;
+  identifier?: string | null;
+  source?: string | null;
+  relation?: string | null;
+  coverage?: string | null;
+  rights?: string | null;
   // System fields
-  termsOfUse: string | null;
+  termsOfUse?: string | null;
   access: "public" | "restricted" | "confidential";
   hierarchyPath: string;
   fileUrl?: string;
@@ -581,7 +584,7 @@ const material3: ArchivalMaterial = {
   rights: "Educational use permitted with proper citation.",
   termsOfUse: "Available for educational and research use with proper citation.",
   access: "public",
-  hierarchyPath: "HCDC > CET > Faculty Research > Research Papers > 2023 Faculty Publications",
+  hierarchyPath: "HCDC > Departmental Sub-fonds > College of Engineering and Technology (CET) > Faculty Research > Research Papers > 2023 Faculty Publications",
   pages: 45,
   pageImages: [
     "https://images.unsplash.com/photo-1532012197267-da84d127e765?q=80&w=800&auto=format&fit=crop",
@@ -638,7 +641,7 @@ const material4: ArchivalMaterial = {
   rights: null,
   termsOfUse: null,
   access: "public",
-  hierarchyPath: "HCDC > BLIS > Student Research > Capstone Projects > 2024 Capstone Projects",
+  hierarchyPath: "HCDC > Departmental Sub-fonds > College of Engineering and Technology (CET) > BLIS > Student Research > Capstone Projects > 2024 Capstone Projects",
   pages: 89,
   pageImages: [
     "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=800&auto=format&fit=crop",
@@ -769,6 +772,102 @@ const material6: ArchivalMaterial = {
   createdBy: "M. Santos",
 };
 
+const materialCCJE: ArchivalMaterial = {
+  id: "ccje-1",
+  uniqueId: "26iA060000008",
+  title: "CCJE Internship Program Records 2023",
+  date: "2023-06-30",
+  creator: "CCJE Department",
+  description: "Records of student internships and field training for the College of Criminal Justice Education.",
+  access: "restricted",
+  hierarchyPath: "HCDC > Departmental Sub-fonds > College of Criminal Justice Education (CCJE) > Internship > Records 2023",
+  pages: 12,
+  pageImages: ["https://images.unsplash.com/photo-1589829545856-d10d557cf95f?q=80&w=800&auto=format&fit=crop"],
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  createdBy: "M. Santos"
+};
+
+const materialCHATME: ArchivalMaterial = {
+  id: "chatme-1",
+  uniqueId: "26iA070000009",
+  title: "CHATME Culinary Arts Expo 2024",
+  date: "2024-02-15",
+  creator: "CHATME Department",
+  description: "Documentation and results of the 2024 Culinary Arts Expo.",
+  access: "public",
+  hierarchyPath: "HCDC > Departmental Sub-fonds > College of Hospitality & Tourism Management (CHATME) > Events > Expo 2024",
+  pages: 8,
+  pageImages: ["https://images.unsplash.com/photo-1556910103-1c02745aae4d?q=80&w=800&auto=format&fit=crop"],
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  createdBy: "M. Santos"
+};
+
+const materialHUSOCOM: ArchivalMaterial = {
+  id: "husocom-1",
+  uniqueId: "26iA080000010",
+  title: "HUSOCOM Humanities Symposium 2023",
+  date: "2023-11-20",
+  creator: "HUSOCOM Department",
+  description: "Collection of papers and presentations from the annual Humanities and Social Communication symposium.",
+  access: "public",
+  hierarchyPath: "HCDC > Departmental Sub-fonds > College of Arts & Sciences (HUSOCOM) > Symposiums > 2023",
+  pages: 156,
+  pageImages: ["https://images.unsplash.com/photo-1524178232363-1fb28f71b671?q=80&w=800&auto=format&fit=crop"],
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  createdBy: "M. Santos"
+};
+
+const materialCOME: ArchivalMaterial = {
+  id: "come-1",
+  uniqueId: "26iA090000011",
+  title: "COME Maritime Safety Training Manual",
+  date: "2023-01-10",
+  creator: "COME Department",
+  description: "Official training manual for maritime safety and emergency procedures.",
+  access: "restricted",
+  hierarchyPath: "HCDC > Departmental Sub-fonds > College of Maritime Education (COME) > Training > Safety Manual",
+  pages: 85,
+  pageImages: ["https://images.unsplash.com/photo-1544465544-1b71aee9dfa3?q=80&w=800&auto=format&fit=crop"],
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  createdBy: "M. Santos"
+};
+
+const materialSBME: ArchivalMaterial = {
+  id: "sbme-1",
+  uniqueId: "26iA100000012",
+  title: "SBME Business Excellence Awards 2023",
+  date: "2023-12-05",
+  creator: "SBME Department",
+  description: "Official records and awardees of the School of Business and Management Excellence Awards.",
+  access: "public",
+  hierarchyPath: "HCDC > Departmental Sub-fonds > School of Business & Management (SBME) > Awards > 2023",
+  pages: 5,
+  pageImages: ["https://images.unsplash.com/photo-1513542789411-b6a5d4f31634?q=80&w=800&auto=format&fit=crop"],
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  createdBy: "M. Santos"
+};
+
+const materialSTE: ArchivalMaterial = {
+  id: "ste-1",
+  uniqueId: "26iA110000013",
+  title: "STE Practice Teaching Journals 2024",
+  date: "2024-03-20",
+  creator: "STE Department",
+  description: "Reflective journals from student teachers during their 2024 practice teaching deployment.",
+  access: "confidential",
+  hierarchyPath: "HCDC > Departmental Sub-fonds > School of Teacher Education (STE) > Student Teaching > Journals 2024",
+  pages: 240,
+  pageImages: ["https://images.unsplash.com/photo-1497633762265-9a177c809852?q=80&w=800&auto=format&fit=crop"],
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  createdBy: "M. Santos"
+};
+
 export const SAMPLE_MATERIALS: ArchivalMaterial[] = [
   material1,
   material2,
@@ -776,6 +875,12 @@ export const SAMPLE_MATERIALS: ArchivalMaterial[] = [
   material4,
   material5,
   material6,
+  materialCCJE,
+  materialCHATME,
+  materialHUSOCOM,
+  materialCOME,
+  materialSBME,
+  materialSTE,
 ];
 
 // ─── Activity Log ─────────────────────────────────────────────────────────────

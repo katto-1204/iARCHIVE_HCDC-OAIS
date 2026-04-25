@@ -9,7 +9,7 @@ import type { Plugin } from "vite";
 /* ─── Demo Auth Mock Plugin ─── */
 const DEMO_PASSWORD = "admin123";
 const DEMO_USERS = [
-  { id: "demo-admin", name: "Demo Admin", email: "admin@hcdc.edu.ph", role: "admin", userCategory: "administrator", institution: "HCDC", status: "active" },
+  { id: "demo-admin", name: "Katto Administrator", email: "admin@hcdc.edu.ph", role: "admin", userCategory: "administrator", institution: "HCDC", status: "active" },
   { id: "demo-archivist", name: "Demo Archivist", email: "archivist@hcdc.edu.ph", role: "archivist", userCategory: "staff", institution: "HCDC", status: "active" },
   { id: "demo-student", name: "Demo Student", email: "student@hcdc.edu.ph", role: "student", userCategory: "student", institution: "HCDC", status: "active" },
 ];
@@ -28,10 +28,12 @@ function parseToken(token: string): any {
   } catch { return null; }
 }
 
-function mockAuthPlugin(): Plugin {
+function mockAuthPlugin(enabled: boolean): Plugin {
   return {
     name: "mock-auth",
     configureServer(server) {
+      if (!enabled) return;
+      
       server.middlewares.use("/api/auth/login", (req, res) => {
         if (req.method !== "POST") { res.statusCode = 405; res.end(); return; }
         let body = "";
@@ -78,6 +80,7 @@ function mockAuthPlugin(): Plugin {
       const pendingAccounts: any[] = [];
       const materialRequests: any[] = [];
       const users: any[] = [...DEMO_USERS];
+      const feedbacks: any[] = [];
       
       try {
         const matPath = path.resolve(import.meta.dirname, "materials.json");
@@ -242,22 +245,15 @@ function mockAuthPlugin(): Plugin {
             req.on("end", () => {
               try {
                 const data = JSON.parse(body);
-                // Try to find material title for better UI
                 const mat = materials.find(m => m.id === data.materialId);
-                const newReq = { 
-                  id: `req-${Date.now()}`, 
-                  ...data, 
-                  materialTitle: mat?.title || "Unknown Material",
-                  status: "pending", 
-                  createdAt: new Date().toISOString() 
-                };
+                const newReq = { id: `req-${Date.now()}`, ...data, materialTitle: mat?.title || "Unknown Material", status: "pending", createdAt: new Date().toISOString() };
                 materialRequests.push(newReq);
                 res.statusCode = 201; res.end(JSON.stringify(newReq));
               } catch { res.statusCode = 400; res.end(); }
             });
             return;
           }
-          
+
           const parsedUrl = new URL(req.url || "", "http://localhost/");
           const status = parsedUrl.searchParams.get("status");
           const filtered = status ? materialRequests.filter(r => r.status === status) : materialRequests;
@@ -265,6 +261,41 @@ function mockAuthPlugin(): Plugin {
           return;
         }
 
+        // Feedback Management
+        if (url.startsWith("/feedback")) {
+          if (method === "GET") {
+            res.end(JSON.stringify(feedbacks));
+            return;
+          }
+          if (method === "POST") {
+            let body = ""; req.on("data", c => body += c.toString());
+            req.on("end", () => {
+              try {
+                const data = JSON.parse(body);
+                const newFeedback = { id: `fb-${Date.now()}`, ...data, createdAt: new Date().toISOString(), read: false };
+                feedbacks.push(newFeedback);
+                res.statusCode = 201; res.end(JSON.stringify(newFeedback));
+              } catch { res.statusCode = 400; res.end(); }
+            });
+            return;
+          }
+          const idMatch = url.match(/^\/feedback\/([^/?]+)$/);
+          if (method === "PATCH" && idMatch) {
+             let body = ""; req.on("data", c => body += c.toString());
+             req.on("end", () => {
+               try {
+                 const data = JSON.parse(body);
+                 const fb = feedbacks.find(f => f.id === idMatch[1]);
+                 if (fb) {
+                   Object.assign(fb, data);
+                   res.end(JSON.stringify(fb));
+                 } else { res.statusCode = 404; res.end(); }
+               } catch { res.statusCode = 400; res.end(); }
+             });
+             return;
+          }
+        }
+      
         // Announcements CRUD
         if (url.startsWith("/announcements")) {
           const deleteMatch = url.match(/^\/announcements\/([^/?]+)/);
@@ -373,29 +404,50 @@ function mockAuthPlugin(): Plugin {
 
           // GET /materials logic with filtering
           if (method === "GET") {
-            const mapMaterial = (m: any) => ({
-              ...m,
-              materialId: m.material_id,
-              categoryId: m.category_id,
-              fileUrl: m.file_url,
-              thumbnailUrl: m.thumbnail_url,
-              createdAt: m.created_at,
-              updatedAt: m.updated_at,
-              aipId: m.aip_id,
-              sipId: m.sip_id,
-              fixityStatus: m.fixity_status,
-              accessionNo: m.accession_no,
-              scopeContent: m.scope_content,
-              archivalHistory: m.archival_history,
-              custodialHistory: m.custodial_history,
-              physicalLocation: m.physical_location,
-              physicalCondition: m.physical_condition,
-              bindingType: m.binding_type,
-              preferredCitation: m.preferred_citation,
-            });
+            const mapMaterial = (m: any) => {
+              // Dynamically build hierarchy path if not preset
+              let hPath = m.hierarchy_path || m.hierarchyPath;
+              if (!hPath && m.category_id && categories.length > 0) {
+                const pathParts: string[] = [];
+                let currentCat = categories.find(c => c.id === m.category_id);
+                while (currentCat) {
+                  pathParts.unshift(currentCat.name);
+                  currentCat = categories.find(c => c.id === currentCat.parentId);
+                }
+                if (pathParts.length > 0) hPath = pathParts.join(" > ");
+              }
+
+              const idVal = m.id || m.material_id || m.materialId;
+              const regId = m.material_id || m.materialId || m.id;
+
+              return {
+                ...m,
+                id: idVal,
+                uniqueId: regId,
+                materialId: regId,
+                categoryId: m.category_id,
+                hierarchyPath: hPath || `HCDC > Uncategorized > General Series`,
+                fileUrl: m.file_url || m.fileUrl,
+                thumbnailUrl: m.thumbnail_url || m.thumbnailUrl,
+                createdAt: m.created_at || m.createdAt,
+                updatedAt: m.updated_at || m.updatedAt,
+                aipId: m.aip_id,
+                sipId: m.sip_id,
+                fixityStatus: m.fixity_status,
+                accessionNo: m.accession_no,
+                scopeContent: m.scope_content,
+                archivalHistory: m.archival_history,
+                custodialHistory: m.custodial_history,
+                physicalLocation: m.physical_location,
+                physicalCondition: m.physical_condition,
+                bindingType: m.binding_type,
+                preferredCitation: m.preferred_citation,
+              };
+            };
 
             if (idMatch && idMatch[1]) {
-               const mat = materials.find(m => m.id === idMatch[1]);
+               const searchId = idMatch[1];
+               const mat = materials.find(m => m.id === searchId || m.material_id === searchId || m.materialId === searchId);
                if (mat) res.end(JSON.stringify(mapMaterial(mat)));
                else { res.statusCode = 404; res.end(JSON.stringify({ error: "Not found" })); }
                return;
@@ -489,7 +541,7 @@ export default defineConfig(({ mode }) => {
       react(),
       tailwindcss(),
       runtimeErrorOverlay(),
-      ...(useRealApi ? [] : [mockAuthPlugin()]),
+      mockAuthPlugin(!useRealApi),
       ...replitPlugins,
     ],
   resolve: {

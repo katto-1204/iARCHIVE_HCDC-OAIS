@@ -370,7 +370,136 @@ On first visit per session, a premium animated splash screen displays:
 
 ---
 
-## 13. License
+## 13. Database Schema (ERD)
+
+The iArchive platform organizes data into several core collections in Firestore (or Local JSON during development). Below is the Entity-Relationship Diagram representing the relationships between Users, Materials, Categories, Access Requests, Audit Logs, and Announcements.
+
+```mermaid
+erDiagram
+    users {
+        string id PK
+        string name
+        string email
+        string passwordHash
+        string role
+        string userCategory
+        string institution
+        string purpose
+        string status
+        string createdAt
+        string updatedAt
+    }
+
+    materials {
+        string id PK
+        string material_id
+        string title
+        string alt_title
+        string creator
+        string description
+        string date
+        string category_id FK "References categories.id"
+        string access
+        string format
+        string file_size
+        int pages
+        string language
+        string publisher
+        string contributor
+        string subject
+        string type
+        string source
+        string rights
+        string relation
+        string coverage
+        string identifier
+        string archival_history
+        string custodial_history
+        string accession_no
+        string scope_content
+        string arrangement
+        string sha256
+        string scanner
+        string resolution
+        string physical_location
+        string physical_condition
+        string binding_type
+        string cataloger
+        string date_cataloged
+        string sip_id
+        string aip_id
+        string ingest_date
+        string ingest_by FK "References users.id"
+        string fixity_status
+        string preferred_citation
+        string file_url
+        string thumbnail_url
+        string status
+        string created_by FK "References users.id"
+        string created_at
+        string updated_at
+    }
+
+    categories {
+        string id PK
+        string name
+        string description
+        number category_no
+        string level
+        string parent_id FK "References categories.id"
+        string created_at
+        string updated_at
+    }
+
+    accessRequests {
+        string id PK
+        string materialId FK "References materials.id"
+        string userId FK "References users.id"
+        string purpose
+        string status
+        string rejectionReason
+        string createdAt
+        string updatedAt
+        string reviewedBy FK "References users.id"
+    }
+
+    auditLogs {
+        string id PK
+        string action
+        string entityType
+        string entityId
+        string userId FK "References users.id"
+        string userName
+        string details
+        string createdAt
+    }
+
+    announcements {
+        string id PK
+        string title
+        string content
+        boolean isActive
+        string createdBy FK "References users.id"
+        string createdAt
+        string updatedAt
+    }
+
+    %% Relationships
+    users ||--o{ materials : creates
+    users ||--o{ materials : ingests
+    users ||--o{ accessRequests : requests
+    users ||--o{ auditLogs : performs
+    users ||--o{ announcements : posts
+    users ||--o{ accessRequests : reviews
+    categories ||--o{ categories : "parent category"
+    categories ||--o{ materials : contains
+    materials ||--o{ accessRequests : "requested in"
+```
+
+---
+
+## 14. License
 
 © 2026 Holy Cross of Davao College. All rights reserved.
 Unauthorized reproduction prohibited.
+

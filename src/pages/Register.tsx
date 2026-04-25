@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Lock, UserPlus, ArrowLeft, ChevronRight, CheckCircle2, X, AlertTriangle, MailWarning, PartyPopper } from "lucide-react";
+import { Lock, UserPlus, ArrowLeft, ChevronRight, CheckCircle2, X, AlertTriangle, MailWarning, PartyPopper, Eye, EyeOff } from "lucide-react";
 import { Button, Input, Label, Badge } from "@/components/ui-components";
 import { useRegister } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
@@ -29,6 +29,7 @@ export default function Register() {
   const { toast } = useToast();
   const { mutate: mutateRegister, isPending } = useRegister();
   const [modal, setModal] = React.useState<ModalData | null>(null);
+  const [showPassword, setShowPassword] = React.useState(false);
 
   const form = useForm<z.infer<typeof registerSchema>>({
     resolver: zodResolver(registerSchema),
@@ -147,8 +148,11 @@ export default function Register() {
             <div className="space-y-2">
               <Label htmlFor="password" className="text-sm font-bold text-[#050a14]">Password</Label>
               <div className="relative">
-                <Input {...form.register("password")} id="password" type="password" placeholder="••••••••" className="h-12 pl-11 border-muted-foreground/20 focus:border-[#4169E1] focus:ring-[#4169E1]/10 bg-white" />
+                <Input {...form.register("password")} id="password" type={showPassword ? "text" : "password"} placeholder="••••••••" className="h-12 pl-11 pr-10 border-muted-foreground/20 focus:border-[#4169E1] focus:ring-[#4169E1]/10 bg-white" />
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
               {form.formState.errors.password && <p className="text-xs text-red-500 font-medium">{form.formState.errors.password.message}</p>}
             </div>

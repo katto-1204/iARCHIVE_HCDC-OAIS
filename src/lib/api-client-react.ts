@@ -244,6 +244,28 @@ export function useGetMaterials(params?: { limit?: number; access?: string; sear
   });
 }
 
+export function useGetMaterial(id: string | undefined | null) {
+  return useQuery({
+    queryKey: ["/api/materials", id],
+    queryFn: async () => {
+      if (!id) return null;
+      return apiRequest<any>(`/api/materials/${id}`);
+    },
+    enabled: !!id,
+  });
+}
+
+export function useDeleteMaterial() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiRequest<any>(`/api/materials/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
+    },
+  });
+}
+
 export function useCreateMaterial() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -274,19 +296,6 @@ export function useUpdateMaterial() {
   });
 }
 
-export function useDeleteMaterial() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (args: MutationArgs) =>
-      apiRequest(`/api/materials/${args.id}`, {
-        method: "DELETE",
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
-    },
-  });
-}
 
 export function useGetAnnouncements() {
   return useQuery({
@@ -464,6 +473,40 @@ export function useGetAuditLogs(params?: { limit?: number }) {
 
       const limited = params?.limit ? merged.slice(0, params.limit) : merged;
       return { logs: limited };
+    },
+  });
+}
+
+export function useGetFeedbacks() {
+  return useQuery({
+    queryKey: ["/api/feedback"],
+    queryFn: () => apiRequest<any[]>("/api/feedback"),
+  });
+}
+
+export function useSubmitFeedback() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (args: MutationArgs<any>) =>
+      apiRequest("/api/feedback", {
+        method: "POST",
+        body: JSON.stringify(args.data || {}),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/feedback"] });
+    },
+  });
+}
+
+export function useMarkFeedbackRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (args: MutationArgs) =>
+      apiRequest(`/api/feedback/${args.id}/read`, {
+        method: "PATCH",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/feedback"] });
     },
   });
 }

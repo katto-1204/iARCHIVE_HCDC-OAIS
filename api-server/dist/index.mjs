@@ -20898,27 +20898,27 @@ var require_router = __commonJS({
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var methods = METHODS.map((method) => method.toLowerCase());
-    module.exports = Router10;
+    module.exports = Router11;
     module.exports.Route = Route;
-    function Router10(options) {
-      if (!(this instanceof Router10)) {
-        return new Router10(options);
+    function Router11(options) {
+      if (!(this instanceof Router11)) {
+        return new Router11(options);
       }
       const opts = options || {};
-      function router10(req, res, next) {
-        router10.handle(req, res, next);
+      function router11(req, res, next) {
+        router11.handle(req, res, next);
       }
-      Object.setPrototypeOf(router10, this);
-      router10.caseSensitive = opts.caseSensitive;
-      router10.mergeParams = opts.mergeParams;
-      router10.params = {};
-      router10.strict = opts.strict;
-      router10.stack = [];
-      return router10;
+      Object.setPrototypeOf(router11, this);
+      router11.caseSensitive = opts.caseSensitive;
+      router11.mergeParams = opts.mergeParams;
+      router11.params = {};
+      router11.strict = opts.strict;
+      router11.stack = [];
+      return router11;
     }
-    Router10.prototype = function() {
+    Router11.prototype = function() {
     };
-    Router10.prototype.param = function param(name, fn) {
+    Router11.prototype.param = function param(name, fn) {
       if (!name) {
         throw new TypeError("argument name is required");
       }
@@ -20938,7 +20938,7 @@ var require_router = __commonJS({
       params.push(fn);
       return this;
     };
-    Router10.prototype.handle = function handle(req, res, callback) {
+    Router11.prototype.handle = function handle(req, res, callback) {
       if (!callback) {
         throw new TypeError("argument callback is required");
       }
@@ -21065,7 +21065,7 @@ var require_router = __commonJS({
         }
       }
     };
-    Router10.prototype.use = function use(handler) {
+    Router11.prototype.use = function use(handler) {
       let offset = 0;
       let path3 = "/";
       if (typeof handler !== "function") {
@@ -21098,7 +21098,7 @@ var require_router = __commonJS({
       }
       return this;
     };
-    Router10.prototype.route = function route(path3) {
+    Router11.prototype.route = function route(path3) {
       const route2 = new Route(path3);
       const layer = new Layer(path3, {
         sensitive: this.caseSensitive,
@@ -21113,7 +21113,7 @@ var require_router = __commonJS({
       return route2;
     };
     methods.concat("all").forEach(function(method) {
-      Router10.prototype[method] = function(path3) {
+      Router11.prototype[method] = function(path3) {
         const route = this.route(path3);
         route[method].apply(route, slice.call(arguments, 1));
         return this;
@@ -21296,13 +21296,13 @@ var require_application = __commonJS({
     var compileTrust = require_utils3().compileTrust;
     var resolve = __require("node:path").resolve;
     var once = require_once();
-    var Router10 = require_router();
+    var Router11 = require_router();
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var app2 = exports = module.exports = {};
     var trustProxyDefaultSymbol = "@@symbol:trust_proxy_default";
     app2.init = function init() {
-      var router10 = null;
+      var router11 = null;
       this.cache = /* @__PURE__ */ Object.create(null);
       this.engines = /* @__PURE__ */ Object.create(null);
       this.settings = /* @__PURE__ */ Object.create(null);
@@ -21311,13 +21311,13 @@ var require_application = __commonJS({
         configurable: true,
         enumerable: true,
         get: function getrouter() {
-          if (router10 === null) {
-            router10 = new Router10({
+          if (router11 === null) {
+            router11 = new Router11({
               caseSensitive: this.enabled("case sensitive routing"),
               strict: this.enabled("strict routing")
             });
           }
-          return router10;
+          return router11;
         }
       });
     };
@@ -21388,15 +21388,15 @@ var require_application = __commonJS({
       if (fns.length === 0) {
         throw new TypeError("app.use() requires a middleware function");
       }
-      var router10 = this.router;
+      var router11 = this.router;
       fns.forEach(function(fn2) {
         if (!fn2 || !fn2.handle || !fn2.set) {
-          return router10.use(path3, fn2);
+          return router11.use(path3, fn2);
         }
         debug(".use app under %s", path3);
         fn2.mountpath = path3;
         fn2.parent = this;
-        router10.use(path3, function mounted_app(req, res, next) {
+        router11.use(path3, function mounted_app(req, res, next) {
           var orig = req.app;
           fn2.handle(req, res, function(err) {
             Object.setPrototypeOf(req, orig.request);
@@ -23969,7 +23969,7 @@ var require_express = __commonJS({
     var EventEmitter = __require("node:events").EventEmitter;
     var mixin = require_merge_descriptors();
     var proto = require_application();
-    var Router10 = require_router();
+    var Router11 = require_router();
     var req = require_request();
     var res = require_response();
     exports = module.exports = createApplication;
@@ -23991,8 +23991,8 @@ var require_express = __commonJS({
     exports.application = proto;
     exports.request = req;
     exports.response = res;
-    exports.Route = Router10.Route;
-    exports.Router = Router10;
+    exports.Route = Router11.Route;
+    exports.Router = Router11;
     exports.json = bodyParser.json;
     exports.raw = bodyParser.raw;
     exports.static = require_serve_static();
@@ -32611,13 +32611,13 @@ var require_jsonwebtoken = __commonJS({
 })();
 
 // src/app.ts
-var import_express10 = __toESM(require_express2(), 1);
+var import_express11 = __toESM(require_express2(), 1);
 var import_cors = __toESM(require_lib3(), 1);
 var import_pino_http = __toESM(require_logger(), 1);
 var import_jsonwebtoken2 = __toESM(require_jsonwebtoken(), 1);
 
 // src/routes/index.ts
-var import_express9 = __toESM(require_express2(), 1);
+var import_express10 = __toESM(require_express2(), 1);
 
 // src/routes/health.ts
 var import_express = __toESM(require_express2(), 1);
@@ -34755,7 +34755,7 @@ function jsonStoreGetMaterials(params) {
   const search = (params.search ?? "").trim().toLowerCase();
   const access = params.access?.trim();
   const categoryId = params.category?.trim();
-  const filtered = materials.filter((m) => m.status === "published").filter((m) => {
+  const filtered = materials.filter((m) => !m.status || m.status === "published").filter((m) => {
     if (!search) return true;
     return (m.title ?? "").toLowerCase().includes(search) || (m.material_id ?? "").toLowerCase().includes(search) || (m.creator ?? "").toLowerCase().includes(search) || (m.description ?? "").toLowerCase().includes(search);
   }).filter((m) => {
@@ -34970,6 +34970,19 @@ function jsonStoreGetUserById(id) {
     createdAt: (/* @__PURE__ */ new Date()).toISOString(),
     passwordHash: ""
   };
+}
+function jsonStoreUpdateUserProfile(id, updates) {
+  const usersPath = USERS_PATH;
+  if (!fs2.existsSync(usersPath)) return null;
+  const users = JSON.parse(fs2.readFileSync(usersPath, "utf-8"));
+  const index = users.findIndex((u) => u.id === id);
+  if (index === -1) return null;
+  if (updates.name) users[index].name = updates.name;
+  if (updates.institution !== void 0) users[index].institution = updates.institution;
+  if (updates.purpose !== void 0) users[index].purpose = updates.purpose;
+  users[index].updatedAt = (/* @__PURE__ */ new Date()).toISOString();
+  fs2.writeFileSync(usersPath, JSON.stringify(users, null, 2));
+  return users[index];
 }
 function jsonStoreRegisterUser(input) {
   const users = safeReadJson(USERS_PATH, []);
@@ -35549,6 +35562,16 @@ router2.patch("/auth/profile", requireAuth, async (req, res) => {
     const updated = await db.collection("users").doc(userId).get();
     res.json({ id: updated.id, ...updated.data() });
   } catch (error) {
+    const jsonUser = jsonStoreUpdateUserProfile(userId, { name, institution, purpose });
+    if (jsonUser) {
+      res.json(jsonUser);
+      return;
+    }
+    const demoUserIndex = DEMO_USERS2.findIndex((u) => u.id === userId);
+    if (demoUserIndex !== -1) {
+      res.json({ ...DEMO_USERS2[demoUserIndex], name: name || DEMO_USERS2[demoUserIndex].name });
+      return;
+    }
     console.error("Profile Update Error:", error.message);
     res.status(500).json({ error: "Failed to update profile" });
   }
@@ -35603,26 +35626,11 @@ var audit_default = router3;
 // src/routes/materials.ts
 var router4 = (0, import_express4.Router)();
 function formatMaterial(m, categoryName) {
+  const catName = categoryName || m.categoryName || "Uncategorized";
   return {
-    id: m.id,
-    materialId: m.materialId,
-    title: m.title,
-    altTitle: m.altTitle,
-    creator: m.creator,
-    description: m.description,
-    date: m.date,
-    categoryId: m.categoryId,
-    categoryName: categoryName || null,
-    access: m.access,
-    format: m.format,
-    fileSize: m.fileSize,
-    pages: m.pages,
-    language: m.language,
-    publisher: m.publisher,
-    status: m.status,
-    thumbnailUrl: m.thumbnailUrl,
-    createdAt: m.createdAt,
-    createdBy: m.createdBy
+    ...m,
+    categoryName: catName,
+    hierarchyPath: m.hierarchyPath || `HCDC > ${catName} > General Series`
   };
 }
 function materialSeqFromMaterialId2(materialId) {
@@ -35638,22 +35646,36 @@ function matchesSearch(m, search) {
 }
 router4.get("/materials", async (req, res) => {
   const page = Math.max(1, parseInt(req.query.page) || 1);
-  const limit = Math.min(50, parseInt(req.query.limit) || 12);
+  const limit = Math.min(1e3, parseInt(req.query.limit) || 50);
   const search = req.query.search;
   const access = req.query.access;
   const categoryId = req.query.category;
   try {
     const db = getFirestoreDb();
-    let query = db.collection("materials").where("status", "==", "published");
+    let query = db.collection("materials");
     if (access && ["public", "restricted", "confidential"].includes(access)) {
       query = query.where("access", "==", access);
     }
     if (categoryId) {
       query = query.where("categoryId", "==", categoryId);
     }
-    query = query.orderBy("createdAt", "desc");
     const snapshot = await query.get();
-    const rows = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    let rows = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    try {
+      const mockData = jsonStoreGetMaterials({ limit: 1e4, access, category: categoryId });
+      if (mockData && mockData.materials) {
+        const firestoreIds = new Set(rows.map((r) => r.id));
+        const mockRows = mockData.materials.filter((m) => !firestoreIds.has(m.id));
+        rows = [...rows, ...mockRows];
+      }
+    } catch (e) {
+      console.warn("Failed to merge mock materials", e);
+    }
+    rows.sort((a, b) => {
+      const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const db2 = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return db2 - da;
+    });
     const filtered = search ? rows.filter((m) => matchesSearch(m, search)) : rows;
     const total = filtered.length;
     const totalPages = Math.ceil(total / limit);
@@ -35663,7 +35685,8 @@ router4.get("/materials", async (req, res) => {
     const catMap = Object.fromEntries(catsSnap.docs.map((c) => [c.id, c.data().name]));
     const materials = pageItems.map((m) => formatMaterial(m, m.categoryId ? catMap[m.categoryId] : void 0));
     res.json({ materials, total, page, limit, totalPages });
-  } catch {
+  } catch (err) {
+    console.error("Firestore materials fetch failed:", err);
     res.json(
       jsonStoreGetMaterials({
         search,
@@ -35713,6 +35736,7 @@ router4.post("/materials", requireAuth, async (req, res) => {
       description: body.description ?? null,
       date: body.date ?? null,
       categoryId: body.categoryId ?? cat?.id ?? null,
+      hierarchyPath: body.hierarchyPath || `HCDC > ${cat?.name || "Uncategorized"} > General Series`,
       access: body.access || "public",
       format: body.format ?? null,
       fileSize: body.fileSize ?? null,
@@ -35843,6 +35867,7 @@ router4.put("/materials/:id", requireAuth, async (req, res) => {
       description: body.description ?? m.description ?? null,
       date: body.date ?? m.date ?? null,
       categoryId: body.categoryId !== void 0 ? body.categoryId : m.categoryId,
+      hierarchyPath: body.hierarchyPath !== void 0 ? body.hierarchyPath : m.hierarchyPath,
       access: body.access ?? m.access,
       format: body.format ?? m.format ?? null,
       fileSize: body.fileSize ?? m.fileSize ?? null,
@@ -36423,17 +36448,75 @@ router8.delete("/announcements/:id", requireAuth, requireRole("admin"), async (r
 });
 var announcements_default = router8;
 
-// src/routes/index.ts
+// src/routes/feedback.ts
+var import_express9 = __toESM(require_express2(), 1);
 var router9 = (0, import_express9.Router)();
-router9.use(health_default);
-router9.use(auth_default);
-router9.use(materials_default);
-router9.use(categories_default);
-router9.use(requests_default);
-router9.use(users_default);
-router9.use(announcements_default);
-router9.use(audit_default);
-var routes_default = router9;
+router9.get("/", async (req, res) => {
+  try {
+    const db = getFirestoreDb();
+    const snapshot = await db.collection("feedback").get();
+    const feedback = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    feedback.sort((a, b) => {
+      const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const db2 = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return db2 - da;
+    });
+    res.json(feedback);
+  } catch (error) {
+    console.error("Error fetching feedback:", error);
+    res.json([]);
+  }
+});
+router9.post("/", async (req, res) => {
+  const { type, message, name, email } = req.body;
+  if (!type || !message) {
+    return res.status(400).json({ error: "Type and message are required" });
+  }
+  try {
+    const db = getFirestoreDb();
+    const id = generateId();
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    const newFeedback = {
+      id,
+      type,
+      message,
+      name: name || "Anonymous",
+      email: email || "",
+      date: now.split("T")[0],
+      createdAt: now,
+      status: "unread"
+    };
+    await db.collection("feedback").doc(id).set(newFeedback);
+    res.status(201).json(newFeedback);
+  } catch (error) {
+    console.error("Error saving feedback:", error);
+    res.status(500).json({ error: "Failed to save feedback" });
+  }
+});
+router9.patch("/:id/read", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const db = getFirestoreDb();
+    await db.collection("feedback").doc(id).update({ status: "read" });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to mark feedback as read" });
+  }
+});
+var feedback_default = router9;
+
+// src/routes/index.ts
+var router10 = (0, import_express10.Router)();
+router10.use(health_default);
+router10.use(auth_default);
+router10.use(materials_default);
+router10.use(categories_default);
+router10.use(requests_default);
+router10.use(users_default);
+router10.use(announcements_default);
+router10.use(audit_default);
+router10.use("/feedback", feedback_default);
+var routes_default = router10;
 
 // src/lib/logger.ts
 var import_pino = __toESM(require_pino(), 1);
@@ -36457,7 +36540,7 @@ var logger = isProduction ? {
 });
 
 // src/app.ts
-var app = (0, import_express10.default)();
+var app = (0, import_express11.default)();
 console.log("iArchive Backend Initializing...");
 console.log("NODE_ENV:", process.env.NODE_ENV);
 console.log("VERCEL:", process.env.VERCEL);
@@ -36489,8 +36572,8 @@ if (process.env.NODE_ENV !== "production") {
   });
 }
 app.use((0, import_cors.default)());
-app.use(import_express10.default.json());
-app.use(import_express10.default.urlencoded({ extended: true }));
+app.use(import_express11.default.json());
+app.use(import_express11.default.urlencoded({ extended: true }));
 app.use((req, res, next) => {
   if (req.method === "POST") {
     const { email, password } = req.body || {};

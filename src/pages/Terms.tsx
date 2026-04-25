@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Link } from "wouter";
 import { ArrowLeft, ShieldCheck, FileText, Scale, Lock, Eye, CheckCircle2, Database } from "lucide-react";
+import { PublicNavbar } from "@/components/PublicNavbar";
 import { motion } from "framer-motion";
 
 const fadeInUp = {
@@ -29,28 +30,14 @@ export default function Terms() {
   return (
     <div className="min-h-screen bg-[#f7f8fc] font-sans selection:bg-[#4169E1]/20">
       {/* ─── NAVBAR ─── */}
-      <header className="bg-white border-b border-border/70 sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#0a1628] flex items-center justify-center text-white">
-               <Database className="w-5 h-5" />
-            </div>
-            <span className="font-bold text-xl tracking-tight text-[#0a1628]">iArchive</span>
-          </Link>
-          <Link href="/collections">
-             <button className="flex items-center gap-2 text-sm font-bold text-muted-foreground hover:text-[#4169E1] transition-colors cursor-pointer">
-               <ArrowLeft className="w-4 h-4" /> Back to Research
-             </button>
-          </Link>
-        </div>
-      </header>
+      <PublicNavbar isTransparentOnTop={false} />
 
       {/* ─── HERO HEADER ─── */}
       <motion.div 
         initial="initial"
         animate="animate"
         variants={staggerContainer}
-        className="bg-[#0a1628] py-20 relative overflow-hidden"
+        className="bg-[#0a1628] pt-32 pb-20 relative overflow-hidden"
       >
         <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" />
         <div className="absolute -top-24 -right-24 w-96 h-96 bg-[#4169E1]/20 rounded-full blur-[100px]" />

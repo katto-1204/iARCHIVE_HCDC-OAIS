@@ -39,8 +39,8 @@ export default function AdminCategories() {
   
   const [editingId, setEditingId] = React.useState<string | null>(null);
 
-  // Tree Expansion State
-  const [expandedNodes, setExpandedNodes] = React.useState<Set<string>>(new Set());
+  // Tree Expansion State - Default to expanding the main departmental node
+  const [expandedNodes, setExpandedNodes] = React.useState<Set<string>>(new Set(["dept_fonds_id"]));
 
   // Deletion State
   const [deleteDialog, setDeleteDialog] = React.useState<{id: string, name: string} | null>(null);

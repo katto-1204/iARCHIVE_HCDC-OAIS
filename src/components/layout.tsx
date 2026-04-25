@@ -1,9 +1,10 @@
 import * as React from "react";
 import { Link, useLocation } from "wouter";
-import { Library, LayoutDashboard, Database, Users, GitPullRequest, Search, FileText, Settings, LogOut, Menu, X, Bell, Loader2, User, UserCog, LogIn } from "lucide-react";
-import { useGetMe, useLogout, useGetAccessRequests, useGetAuditLogs, useGetUsers } from "@workspace/api-client-react";
+import { Library, LayoutDashboard, Database, Users, GitPullRequest, Search, FileText, Settings, LogOut, Menu, X, Bell, Loader2, User, UserCog, LogIn, MessageSquare } from "lucide-react";
+import { useGetMe, useLogout, useGetAccessRequests, useGetAuditLogs, useGetUsers, useGetFeedbacks } from "@workspace/api-client-react";
 import { Button } from "./ui-components";
 import { cn } from "@/lib/utils";
+import { PublicNavbar } from "./PublicNavbar";
 
 export function PublicLayout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
@@ -19,107 +20,9 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col bg-background selection:bg-accent/20">
-      <header className={cn(
-        "fixed top-0 inset-x-0 z-50 transition-all duration-300 border-b",
-        isScrolled || location !== "/" ? "bg-white/90 backdrop-blur-lg border-border/50 shadow-sm py-3" : "bg-transparent border-transparent py-5"
-      )}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-4 group">
-            <img src={`${import.meta.env.BASE_URL}logos/iarchive%20icon.png`} alt="iArchive icon" className="w-12 h-12 object-contain drop-shadow-sm group-hover:scale-105 transition-transform" />
-            <div>
-              <h1 className="font-display font-black text-2xl leading-none text-primary uppercase tracking-tight">iArchive</h1>
-              <p className={cn("text-[9px] font-bold tracking-[0.2em] uppercase mt-1", isScrolled || location !== "/" ? "text-muted-foreground" : "text-primary/70")}>HCDC Digital Collections</p>
-            </div>
-          </Link>
+      <PublicNavbar isTransparentOnTop={false} />
 
-          <nav className="hidden md:flex items-center gap-8 text-sm font-bold uppercase tracking-wider">
-            <Link href="/collections" className="text-foreground/80 hover:text-accent transition-colors">Collections</Link>
-            <button onClick={() => {
-              if (location !== '/') {
-                setLocation('/#features');
-              } else {
-                document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
-              }
-            }} className="text-foreground/80 hover:text-accent transition-colors cursor-pointer">Features</button>
-            <Link href="/about" className="text-foreground/80 hover:text-accent transition-colors">About iARCHIVE</Link>
-            <Link href="/terms" className="text-foreground/80 hover:text-accent transition-colors">Terms</Link>
-            {user ? (
-              <div className="flex items-center gap-4">
-                <Link href={user.role === 'admin' ? '/admin' : user.role === 'archivist' ? '/archivist' : '/student'} className="text-sm font-semibold text-primary">
-                  Welcome, {user.name}
-                </Link>
-                <Button variant="outline" size="sm" onClick={() => setLocation(user.role === 'admin' ? '/admin' : user.role === 'archivist' ? '/archivist' : '/student')}>Dashboard</Button>
-              </div>
-            ) : (
-              <Button variant="accent" size="sm" onClick={() => setLocation('/login')}>Sign In / Register</Button>
-            )}
-          </nav>
-
-          <button 
-            className="md:hidden p-2 text-foreground/80 hover:text-accent"
-            onClick={() => setMobileMenuOpen(true)}
-          >
-            <Menu className="w-6 h-6" />
-          </button>
-        </div>
-
-        {/* Mobile menu overlay */}
-        {mobileMenuOpen && (
-          <div className="md:hidden fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm shadow-xl">
-            <div className="absolute right-0 top-0 bottom-0 w-64 bg-white shadow-2xl p-6 flex flex-col items-stretch space-y-4">
-              <div className="flex justify-between items-center mb-4">
-                <span className="font-display font-bold text-xl text-primary">Menu</span>
-                <button 
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="p-2 text-muted-foreground hover:text-primary rounded-full hover:bg-muted"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <Link href="/collections">
-                <span className="py-2 border-b border-border font-bold text-foreground hover:text-accent cursor-pointer block" onClick={() => setMobileMenuOpen(false)}>Collections</span>
-              </Link>
-              <button 
-                className="py-2 border-b border-border font-bold text-foreground hover:text-accent text-left" 
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  if (location !== '/') setLocation('/#features');
-                  else {
-                    setTimeout(() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' }), 100);
-                  }
-                }}
-              >
-                Features
-              </button>
-              <Link href="/about">
-                <span className="py-2 border-b border-border font-bold text-foreground hover:text-accent cursor-pointer block" onClick={() => setMobileMenuOpen(false)}>About iARCHIVE</span>
-              </Link>
-              <Link href="/terms">
-                <span className="py-2 border-b border-border font-bold text-foreground hover:text-accent cursor-pointer block" onClick={() => setMobileMenuOpen(false)}>Terms</span>
-              </Link>
-              
-              <div className="mt-auto pt-8">
-                {user ? (
-                   <div className="flex flex-col gap-3">
-                     <span className="text-xs text-muted-foreground uppercase font-bold text-center">Hello, {user.name}</span>
-                     <Button className="w-full" onClick={() => { setMobileMenuOpen(false); setLocation(user.role === 'admin' ? '/admin' : user.role === 'archivist' ? '/archivist' : '/student'); }}>
-                       <LayoutDashboard className="w-4 h-4 mr-2" />
-                       Dashboard
-                     </Button>
-                   </div>
-                ) : (
-                  <Button className="w-full bg-accent hover:bg-accent/90" onClick={() => { setMobileMenuOpen(false); setLocation('/login'); }}>
-                    <LogIn className="w-4 h-4 mr-2" />
-                    Sign In / Register
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-      </header>
-
-      <main className="flex-1">
+      <main className="flex-1 pt-20">
         {children}
       </main>
 
@@ -131,7 +34,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
               <h2 className="font-display font-bold text-2xl text-white">iArchive</h2>
             </div>
             <p className="text-primary-foreground/70 max-w-sm">
-              Preserving HCDC's institutional memory, digitally forever. Compliant with OAIS, ISAD(G), and Dublin Core standards.
+              Preserving HCDC's institutional memory, digitally forever. Aligned with OAIS, ISAD(G), and Dublin Core standards.
             </p>
           </div>
           <div>
@@ -166,6 +69,9 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const auditBadge = auditData?.logs?.length ? "New" : undefined;
   const { mutate: logoutMutate } = useLogout();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  
+  const { data: feedbackData } = useGetFeedbacks();
+  const unreadFeedbackCount = feedbackData?.filter((f: any) => f.status === 'unread').length || 0;
 
   // Auto-open sidebar on desktop, closed on mobile
   React.useEffect(() => {
@@ -192,16 +98,16 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
 
   const links = user.role === "admin"
     ? [
-        { icon: LayoutDashboard, label: "Metadata Dashboard", href: "/admin" },
-        { icon: Database, label: "Archival Materials", href: "/admin/collections" },
-        { icon: FileText, label: "Categories", href: "/admin/categories" },
-        { icon: GitPullRequest, label: "Requests", href: "/admin/requests", badge: pendingReqCount },
-        { icon: UserCog, label: "Admin Accounts", href: "/admin/users", badge: pendingUsersCount },
-        { icon: Users, label: "User Accounts", href: "/admin/user-accounts" },
-        { icon: Bell, label: "Announcements", href: "/admin/announcements" },
-        { icon: Search, label: "Audit Logs", href: "/admin/audit", badge: auditBadge },
-        { icon: User, label: "My Profile", href: "/admin/profile" },
-      ]
+      { icon: LayoutDashboard, label: "Metadata Dashboard", href: "/admin", badge: unreadFeedbackCount || undefined },
+      { icon: Database, label: "Archival Materials", href: "/admin/collections" },
+      { icon: FileText, label: "Categories", href: "/admin/categories" },
+      { icon: GitPullRequest, label: "Requests", href: "/admin/requests", badge: pendingReqCount },
+      { icon: UserCog, label: "Admin Accounts", href: "/admin/users", badge: pendingUsersCount },
+      { icon: Users, label: "User Accounts", href: "/admin/user-accounts" },
+      { icon: Bell, label: "Announcements", href: "/admin/announcements" },
+      { icon: Search, label: "Audit Logs", href: "/admin/audit", badge: auditBadge },
+      { icon: User, label: "My Profile", href: "/admin/profile" },
+    ]
     : user.role === "archivist"
       ? [
         { icon: LayoutDashboard, label: "Dashboard", href: "/archivist" },
@@ -230,7 +136,11 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       )}>
         <div className="h-16 flex items-center justify-between px-6 border-b border-white/10 bg-black/10">
           <div className="flex items-center">
-            <img src={`${import.meta.env.BASE_URL}logos/iarchive%20icon.png`} className="w-8 h-8 object-contain mr-3" alt="Logo" />
+            <div className="mr-3">
+              <span className="font-display font-bold text-base tracking-tight leading-none">iArchive</span>
+              <p className="text-[7px] font-bold tracking-[0.15em] uppercase text-white/50 mt-0.5">HCDC</p>
+            </div>
+            <span className="text-white/30 mr-3">|</span>
             <h2 className="font-display font-bold text-xl tracking-tight uppercase">
               {user.role === "admin" ? "Admin" : user.role === "archivist" ? "Archivist" : "User"}
             </h2>

@@ -33,7 +33,7 @@ export default function ArchivistDashboard() {
         <div className="mt-4 md:mt-0 text-sm font-medium text-muted-foreground bg-muted/50 px-4 py-2 rounded-xl border border-border/50 flex flex-col items-end">
           <span className="text-[#0a1628]">Shift Active</span>
           <span className="text-xs font-normal flex items-center gap-1">
-            <ShieldCheck className="w-3 h-3 text-emerald-500" /> OAIS Compliant Mode
+            <ShieldCheck className="w-3 h-3 text-emerald-500" /> OAIS Aligned Mode
           </span>
         </div>
       </div>

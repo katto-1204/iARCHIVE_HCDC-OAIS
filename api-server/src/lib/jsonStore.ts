@@ -383,7 +383,7 @@ export function jsonStoreGetMaterials(params: {
   const categoryId = params.category?.trim();
 
   const filtered = materials
-    .filter((m) => m.status === "published")
+    .filter((m) => !m.status || m.status === "published")
     .filter((m) => {
       if (!search) return true;
       return (
@@ -640,6 +640,22 @@ export function jsonStoreGetUserById(id: string) {
     createdAt: new Date().toISOString(),
     passwordHash: "",
   };
+}
+
+export function jsonStoreUpdateUserProfile(id: string, updates: { name?: string; institution?: string; purpose?: string }) {
+  const usersPath = USERS_PATH;
+  if (!fs.existsSync(usersPath)) return null;
+  const users = JSON.parse(fs.readFileSync(usersPath, "utf-8"));
+  const index = users.findIndex((u: any) => u.id === id);
+  if (index === -1) return null;
+
+  if (updates.name) users[index].name = updates.name;
+  if (updates.institution !== undefined) users[index].institution = updates.institution;
+  if (updates.purpose !== undefined) users[index].purpose = updates.purpose;
+  users[index].updatedAt = new Date().toISOString();
+
+  fs.writeFileSync(usersPath, JSON.stringify(users, null, 2));
+  return users[index];
 }
 
 export function jsonStoreRegisterUser(input: {

@@ -161,6 +161,7 @@ export function getAllFieldValues(material: ArchivalMaterial): Array<{
 
 /** Generate a simple barcode SVG string for a unique ID */
 export function generateBarcodeBars(uniqueId: string): number[] {
+  if (!uniqueId) return [];
   // Simple Code128-style visual — convert each character to a bar pattern
   const bars: number[] = [];
   for (let i = 0; i < uniqueId.length; i++) {

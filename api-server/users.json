@@ -1,0 +1,15 @@
+[
+  {
+    "id": "90f08366-a537-4f5d-a04c-0db1784be6c5",
+    "name": "Catherine Arnado",
+    "email": "catherine.arnado@hcdc.edu.ph",
+    "passwordHash": "$2b$12$712hOOoE5lHQEbPPU6dyqOOSXRwbE0uvDSwR9ZF34RemkIdPvPzB2",
+    "role": "student",
+    "userCategory": "student",
+    "institution": "HCDC",
+    "purpose": "sfsfafs",
+    "status": "pending",
+    "createdAt": "2026-04-25T18:30:55.271Z",
+    "updatedAt": "2026-04-25T18:30:55.271Z"
+  }
+]

@@ -10,8 +10,8 @@ interface BarcodeProps {
 
 export function Barcode({ value, width = 120, height = 32, className = "" }: BarcodeProps) {
   const bars = React.useMemo(() => generateBarcodeBars(value), [value]);
-  const totalWidth = bars.reduce((a, b) => a + b, 0);
-  const scale = width / totalWidth;
+  const totalWidth = bars.length > 0 ? bars.reduce((a, b) => a + b, 0) : 0;
+  const scale = totalWidth > 0 ? width / totalWidth : 0;
 
   return (
     <div className={`inline-flex flex-col items-center gap-0.5 ${className}`}>

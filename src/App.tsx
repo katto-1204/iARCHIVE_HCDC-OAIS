@@ -23,10 +23,12 @@ import AdminUsers from "./pages/admin/Users";
 import AdminCategories from "./pages/admin/Categories";
 import AdminAnnouncements from "./pages/admin/Announcements";
 import AdminUserAccounts from "./pages/admin/UserAccounts";
+import AdminFeedback from "./pages/admin/Feedback";
 import ArchivistDashboard from "./pages/archivist/Dashboard";
 import StudentDashboard from "./pages/student/Dashboard";
 import Profile from "./pages/Profile";
 import RequestAccess from "./pages/RequestAccess";
+import Feedback from "./pages/Feedback";
 import NotFound from "@/pages/not-found";
 
 // Intercept global fetch to attach JWT from localStorage for @workspace/api-client-react hooks
@@ -73,6 +75,7 @@ function Router() {
       <Route path="/materials/:id" component={MaterialDetail} />
       <Route path="/about" component={About} />
       <Route path="/terms" component={Terms} />
+      <Route path="/feedback" component={Feedback} />
       
       {/* Admin Routes */}
       <Route path="/admin" component={AdminDashboard} />
@@ -84,6 +87,7 @@ function Router() {
       <Route path="/admin/users" component={AdminUsers} />
       <Route path="/admin/user-accounts" component={AdminUserAccounts} />
       <Route path="/admin/announcements" component={AdminAnnouncements} />
+      <Route path="/admin/feedback" component={AdminFeedback} />
       <Route path="/admin/profile" component={Profile} />
       
       <Route path="/archivist" component={ArchivistDashboard} />

@@ -1,19 +1,20 @@
 import * as React from "react";
 import { useRoute, Link } from "wouter";
 import { format } from "date-fns";
-import {
-  FileText, Lock, ArrowLeft, CheckCircle,
+import { PublicNavbar } from "@/components/PublicNavbar";
+import { 
+  FileText, Lock, ArrowLeft, CheckCircle, 
   ZoomIn, ZoomOut, RotateCcw, Maximize2, ExternalLink,
   Database, HardDrive, Calendar, User, Tag, BookOpen, AlertTriangle, Edit,
-  ChevronLeft, ChevronRight, X
+  ChevronLeft, ChevronRight, X, Eye, Maximize, Hand, Move
 } from "lucide-react";
-import { useGetMe, useGetAccessRequests } from "@workspace/api-client-react";
-import { getMaterialById, loadMaterial } from "@/data/storage";
+import { useGetMe, useGetAccessRequests, useGetMaterial } from "../lib/api-client-react";
+import { getMaterialById } from "@/data/storage";
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   if (!value) return null;
   return (
-    <div className="grid grid-cols-[180px_1fr] gap-4 py-3 border-b border-border/50 last:border-0">
+    <div className="grid grid-cols-[auto_1fr] gap-3 py-3 border-b border-border/50 last:border-0">
       <dt className="text-sm text-muted-foreground font-medium">{label}</dt>
       <dd className="text-sm text-foreground font-normal">{value}</dd>
     </div>
@@ -34,8 +35,8 @@ function IsadSection({ num, title, children }: { num: number; title: string; chi
   );
 }
 
-/* ═══ Multi-Page Document Viewer ═══ */
-function PageViewer({ 
+/* ═══ Multi-Page Media Viewer ═══ */
+function MediaViewer({ 
   materialId,
   pages, 
   pageImages, 
@@ -52,130 +53,310 @@ function PageViewer({
 }) {
   const [currentPage, setCurrentPage] = React.useState(0);
   const [showFullscreen, setShowFullscreen] = React.useState(false);
-  const images = pageImages || [];
-  const totalDisplayPages = images.length;
   
-  // Restricted: preview 3 pages, then on the 4th blur and show request access
-  const maxVisiblePages = (!canAccess && isRestricted) ? Math.min(4, totalDisplayPages) : totalDisplayPages;
+  // Zoom & Pan State
+  const [zoom, setZoom] = React.useState(1);
+  const [offset, setOffset] = React.useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = React.useState(false);
+  const [startPoint, setStartPoint] = React.useState({ x: 0, y: 0 });
+  
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const images = pageImages || [];
+  const totalPages = pages || images.length;
+  const loadedPagesCount = images.length;
+  
+  // Rule A & B: Restriction Logic
+  let maxVisiblePages = loadedPagesCount;
+  if (!canAccess && isRestricted) {
+    if (totalPages > 10) {
+      maxVisiblePages = 3;
+    } else if (totalPages <= 5) {
+      maxVisiblePages = 2;
+    } else {
+      // For 6-10 pages, let's assume 3 as well or follow a pattern. 
+      // User only specified >10 and <=5. I'll stick to those strictly.
+      maxVisiblePages = 3; 
+    }
+  }
+  
   const visibleImages = images.slice(0, maxVisiblePages);
   
-  const goTo = (idx: number) => {
-    if (idx >= 0 && idx < maxVisiblePages) setCurrentPage(idx);
+  const handleZoom = (delta: number) => {
+    setZoom(prev => Math.min(Math.max(0.5, prev + delta), 3));
   };
 
-  if (totalDisplayPages === 0) return null;
+  const handleReset = () => {
+    setZoom(1);
+    setOffset({ x: 0, y: 0 });
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.1 : 0.1;
+      handleZoom(delta);
+    }
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (zoom <= 1) return;
+    setIsPanning(true);
+    setStartPoint({ x: e.clientX - offset.x, y: e.clientY - offset.y });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isPanning) return;
+    setOffset({
+      x: e.clientX - startPoint.x,
+      y: e.clientY - startPoint.y
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsPanning(false);
+  };
+
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === '=' || e.key === '+') {
+          e.preventDefault();
+          handleZoom(0.25);
+        } else if (e.key === '-') {
+          e.preventDefault();
+          handleZoom(-0.25);
+        } else if (e.key === '0') {
+          e.preventDefault();
+          handleReset();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const goTo = (idx: number) => {
+    if (idx >= 0 && idx < maxVisiblePages) {
+      setCurrentPage(idx);
+      handleReset();
+    }
+  };
+
+  if (loadedPagesCount === 0) return null;
 
   return (
     <>
-      <div className="rounded-3xl border border-white/10 overflow-hidden shadow-2xl bg-[#0c0f16]">
-        {/* Viewer Header */}
-        <div className="flex flex-wrap items-center justify-between px-5 py-3 gap-3 border-b border-white/10 bg-gradient-to-r from-[#0f172a] to-[#111827]">
-          <div className="flex items-center gap-3">
-            <span className="bg-white/10 text-white text-[10px] font-bold px-3 py-1 rounded-full tracking-widest">MEDIA VIEWER</span>
-            <span className="text-xs text-white/60">
-              Page {currentPage + 1} of {maxVisiblePages}{pages ? ` (${pages} total)` : ""}
+      <div 
+        className="rounded-[24px] border border-white/10 overflow-hidden shadow-2xl bg-[#0a1628] flex flex-col h-[720px] select-none"
+        onWheel={handleWheel}
+      >
+        {/* A. REFINED TOP BAR */}
+        <div className="flex flex-wrap items-center justify-between px-6 py-4 gap-4 border-b border-white/5 bg-[#0a1628]">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-full border border-white/10">
+              <Eye className="w-3.5 h-3.5 text-white/70" />
+              <span className="text-[10px] font-bold text-white tracking-[0.1em] uppercase">Media Viewer</span>
+            </div>
+            <div className="h-4 w-[1px] bg-white/10 mx-1" />
+            <span className="text-xs font-semibold text-white/90">
+              Page {currentPage + 1} <span className="text-white/40 font-normal mx-1">of</span> {maxVisiblePages}
+              {!canAccess && isRestricted && (
+                <span className="text-white/40 font-normal ml-2">
+                  (previewing {maxVisiblePages} of {totalPages} pages)
+                </span>
+              )}
+              {totalPages > loadedPagesCount && !isRestricted && (
+                <span className="text-white/40 font-normal ml-2">({totalPages} total)</span>
+              )}
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${isRestricted ? "bg-[#960000]/20 text-[#ffb4b4]" : "bg-emerald-500/20 text-emerald-200"}`}>
-              {isRestricted ? "RESTRICTED" : "PUBLIC"}
-            </span>
-            <button onClick={() => setShowFullscreen(true)} className="w-8 h-8 rounded-lg border border-white/10 hover:bg-white/10 flex items-center justify-center text-white/70 hover:text-white transition-colors">
+
+          <div className="flex items-center gap-3">
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border ${
+              isRestricted 
+                ? "bg-[#960000]/10 border-[#960000]/30 text-[#ffb4b4]" 
+                : "bg-emerald-500/10 border-emerald-500/30 text-emerald-200"
+            }`}>
+              <Lock className="w-3 h-3" />
+              <span className="text-[10px] font-bold tracking-wider uppercase">
+                {isRestricted ? "RESTRICTED" : "PUBLIC"}
+              </span>
+            </div>
+            
+            <button 
+              onClick={() => setShowFullscreen(true)} 
+              className="w-9 h-9 rounded-xl border border-white/10 hover:bg-white/10 flex items-center justify-center text-white/70 hover:text-white transition-all hover:scale-105 active:scale-95"
+            >
               <Maximize2 className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        <div className="flex flex-col md:flex-row">
-          {/* Filmstrip */}
-          <div className="md:w-28 w-full md:border-r border-white/10 bg-[#0b0f16] md:max-h-[640px]">
-            <div className="md:h-full md:overflow-y-auto flex md:flex-col gap-2 p-3 overflow-x-auto custom-scrollbar">
-              {visibleImages.map((img, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => goTo(idx)}
-                  className={`relative shrink-0 w-16 h-20 rounded-lg overflow-hidden border-2 transition-all ${
-                    currentPage === idx
-                      ? "border-emerald-400 ring-2 ring-emerald-400/20"
-                      : "border-white/10 opacity-70 hover:opacity-100"
-                  }`}
-                >
-                  <img src={img} alt={`Thumbnail ${idx + 1}`} className="w-full h-full object-cover" />
-                  <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[8px] font-bold text-center py-0.5">
-                    {idx === 0 ? "Cover" : idx + 1}
+        <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
+          {/* B. REFINED THUMBNAIL SIDEBAR */}
+          <div className="md:w-[100px] w-full md:border-r border-white/5 bg-[#08101d] flex flex-col">
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-3 flex md:flex-col items-center">
+              {images.map((img, idx) => {
+                const isLocked = !canAccess && isRestricted && idx >= maxVisiblePages;
+                
+                return (
+                  <button
+                    key={idx}
+                    disabled={isLocked}
+                    onClick={() => goTo(idx)}
+                    className={`relative shrink-0 w-16 h-20 rounded-xl overflow-hidden border-2 transition-all duration-300 group ${
+                      currentPage === idx
+                        ? "border-[#4169E1] ring-4 ring-[#4169E1]/20 scale-105 shadow-lg z-10"
+                        : isLocked 
+                          ? "border-white/5 grayscale opacity-40 cursor-not-allowed"
+                          : "border-white/10 opacity-70 hover:opacity-100 hover:border-white/30 hover:scale-[1.02]"
+                    }`}
+                  >
+                    <img src={img} alt={`Thumbnail ${idx + 1}`} className="w-full h-full object-cover" />
+                    
+                    {/* Locked Overlay */}
+                    {isLocked && (
+                      <div className="absolute inset-0 bg-[#0a1628]/80 backdrop-blur-[2px] flex flex-col items-center justify-center gap-1">
+                        <Lock className="w-4 h-4 text-[#ffb4b4]" />
+                        <span className="text-[8px] font-bold text-[#ffb4b4]/60 uppercase tracking-tighter">Locked</span>
+                      </div>
+                    )}
+
+                    <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[8px] font-bold text-center py-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {idx === 0 ? "Cover" : idx + 1}
+                    </div>
+                  </button>
+                );
+              })}
+              
+              {/* Extra Locked Tiles if totalPages > loadedPagesCount */}
+              {!canAccess && isRestricted && totalPages > loadedPagesCount && (
+                Array.from({ length: Math.min(3, totalPages - loadedPagesCount) }).map((_, i) => (
+                  <div
+                    key={`extra-locked-${i}`}
+                    className="shrink-0 w-16 h-20 rounded-xl border-2 border-dashed border-white/5 bg-white/5 flex flex-col items-center justify-center gap-1 opacity-30"
+                  >
+                    <Lock className="w-4 h-4 text-white/40" />
                   </div>
-                  {!canAccess && isRestricted && idx === maxVisiblePages - 1 && idx < totalDisplayPages - 1 && (
-                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                      <Lock className="w-3 h-3 text-[#ffb4b4]" />
-                    </div>
-                  )}
-                </button>
-              ))}
-              {!canAccess && isRestricted && totalDisplayPages > maxVisiblePages && (
-                <>
-                  {Array.from({ length: Math.min(2, totalDisplayPages - maxVisiblePages) }).map((_, idx) => (
-                    <div
-                      key={`locked-${idx}`}
-                      className="shrink-0 w-16 h-20 rounded-lg border-2 border-dashed border-[#960000]/40 bg-[#960000]/10 flex flex-col items-center justify-center gap-1"
-                    >
-                      <Lock className="w-3 h-3 text-[#ffb4b4]/70" />
-                      <span className="text-[7px] font-bold text-[#ffb4b4]/70 uppercase">Locked</span>
-                    </div>
-                  ))}
-                </>
+                ))
               )}
             </div>
           </div>
 
-          {/* Main Stage */}
-          <div className="relative flex-1 bg-gradient-to-b from-[#101420] to-[#0c0f16] min-h-[520px]">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.08),_transparent_55%)]" />
-            <div className="relative flex items-center justify-center min-h-[520px] max-h-[640px] overflow-hidden px-8 py-6">
-              <img
-                src={visibleImages[currentPage]}
-                alt={`${title} - Page ${currentPage + 1}`}
-                className={`max-h-[620px] w-full object-contain transition-all duration-500 ${!canAccess && isRestricted && currentPage === 3 ? "blur-md opacity-70" : ""}`}
-              />
-
-              <div className="absolute top-4 left-4 bg-black/60 text-white text-[10px] px-3 py-1 rounded-full font-bold backdrop-blur-sm">
-                {currentPage === 0 ? "Cover Page" : `Page ${currentPage + 1}`}
+          {/* C. MAIN STAGE WITH ZOOM/PAN */}
+          <div className="relative flex-1 bg-[#0a1628] flex flex-col overflow-hidden">
+            <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,_rgba(65,105,225,0.05),_transparent_70%)]" />
+            
+            <div 
+              ref={containerRef}
+              className={`relative flex-1 flex items-center justify-center overflow-hidden p-10 cursor-default ${zoom > 1 ? (isPanning ? 'cursor-grabbing' : 'cursor-grab') : ''}`}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+            >
+              <div 
+                className="relative transition-transform duration-200 ease-out flex items-center justify-center"
+                style={{ 
+                  transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
+                  transformOrigin: 'center'
+                }}
+              >
+                <div className="relative shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)] rounded-lg overflow-hidden transition-all duration-500">
+                  <img
+                    src={visibleImages[currentPage]}
+                    alt={`${title} - Page ${currentPage + 1}`}
+                    onDragStart={(e) => e.preventDefault()}
+                    className={`max-h-[580px] w-auto object-contain transition-all duration-700 ${!canAccess && isRestricted && currentPage >= maxVisiblePages - 1 && loadedPagesCount > maxVisiblePages ? "blur-md opacity-70" : ""}`}
+                  />
+                  
+                  {/* Floating Page Label */}
+                  <div className="absolute top-4 left-4 bg-[#0a1628]/80 backdrop-blur-md text-white text-[10px] px-3 py-1.5 rounded-lg font-bold border border-white/10">
+                    {currentPage === 0 ? "Cover Page" : `Page ${currentPage + 1}`}
+                  </div>
+                </div>
               </div>
 
-              {!canAccess && isRestricted && currentPage === 3 && (
-                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/40 to-black/60 flex flex-col items-center justify-end pb-10 z-10">
-                  <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-border/60 p-8 max-w-md text-center mx-4 animate-fade-in-up">
-                    <div className="w-14 h-14 rounded-full bg-[#960000]/10 flex items-center justify-center mx-auto mb-4">
-                      <Lock className="w-7 h-7 text-[#960000]" />
+              {/* Navigation Arrows */}
+              {currentPage > 0 && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); goTo(currentPage - 1); }}
+                  className="absolute left-6 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-[#0a1628]/40 hover:bg-[#0a1628]/80 hover:bg-emerald-500/10 border border-white/10 hover:border-emerald-500/40 flex items-center justify-center transition-all group scale-100 hover:scale-110 active:scale-95 z-20"
+                >
+                  <ChevronLeft className="w-6 h-6 text-white group-hover:text-emerald-400" />
+                </button>
+              )}
+              {currentPage < maxVisiblePages - 1 && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); goTo(currentPage + 1); }}
+                  className="absolute right-6 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-[#0a1628]/40 hover:bg-[#0a1628]/80 hover:bg-emerald-500/10 border border-white/10 hover:border-emerald-500/40 flex items-center justify-center transition-all group scale-100 hover:scale-110 active:scale-95 z-20"
+                >
+                  <ChevronRight className="w-6 h-6 text-white group-hover:text-emerald-400" />
+                </button>
+              )}
+
+              {/* D. ZOOM CONTROLS PILL */}
+              <div className="absolute bottom-10 left-1/2 -translate-x-1/2 bg-[#0a1628]/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl px-2 py-2 flex items-center gap-1 z-30">
+                <button 
+                  onClick={(e) => { e.stopPropagation(); handleZoom(-0.25); }}
+                  className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center text-white/70 hover:text-white transition-colors"
+                  title="Zoom Out (Ctrl -)"
+                >
+                  <ZoomOut className="w-4 h-4" />
+                </button>
+                <div className="min-w-[56px] text-center px-2">
+                  <span className="text-[11px] font-bold text-white/90">{Math.round(zoom * 100)}%</span>
+                </div>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); handleZoom(0.25); }}
+                  className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center text-white/70 hover:text-white transition-colors"
+                  title="Zoom In (Ctrl +)"
+                >
+                  <ZoomIn className="w-4 h-4" />
+                </button>
+                <div className="w-[1px] h-4 bg-white/10 mx-1" />
+                <button 
+                  onClick={(e) => { e.stopPropagation(); handleReset(); }}
+                  className="px-3 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center text-[10px] font-bold text-white/70 hover:text-white transition-colors gap-2"
+                  title="Reset (Ctrl 0)"
+                >
+                  <Maximize className="w-3.5 h-3.5" />
+                  Fit
+                </button>
+              </div>
+
+              {/* RESTRICTED OVERLAY */}
+              {!canAccess && isRestricted && currentPage >= maxVisiblePages - 1 && loadedPagesCount > maxVisiblePages && (
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0a1628] via-[#0a1628]/60 to-transparent flex flex-col items-center justify-end pb-24 z-40 px-6">
+                  <div className="bg-white rounded-3xl shadow-2xl border border-border/40 p-8 max-w-sm text-center animate-in fade-in slide-in-from-bottom-8 duration-500">
+                    <div className="w-16 h-16 rounded-full bg-[#960000]/10 flex items-center justify-center mx-auto mb-4 border border-[#960000]/20">
+                      <Lock className="w-8 h-8 text-[#960000]" />
                     </div>
-                    <h3 className="text-lg font-bold text-[#0a1628] mb-2">Restricted Content</h3>
-                    <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
-                      You've reached the preview limit. This material requires authorized access to view all {pages || totalDisplayPages} pages.
+                    <h3 className="text-xl font-bold text-[#0a1628] mb-3">Restricted Access</h3>
+                    <p className="text-sm text-muted-foreground mb-8 leading-relaxed px-2">
+                      🔒 This page is restricted. Request access to view the full {totalPages}-page document.
                     </p>
                     <Link href={`/request-access?materialId=${encodeURIComponent(materialId)}&title=${encodeURIComponent(title)}`}>
-                      <button className="w-full bg-[#960000] hover:bg-[#7a0000] text-white font-bold py-3 px-6 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg">
-                        <Lock className="w-4 h-4" /> Request Access to Continue
+                      <button className="w-full bg-[#960000] hover:bg-[#7a0000] text-white font-bold py-4 rounded-2xl transition-all flex items-center justify-center gap-3 shadow-lg hover:translate-y-[-2px] active:translate-y-0">
+                        <Lock className="w-5 h-5" /> Request Access
                       </button>
                     </Link>
                   </div>
                 </div>
               )}
+            </div>
 
-              {currentPage > 0 && (
-                <button
-                  onClick={() => goTo(currentPage - 1)}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 flex items-center justify-center transition-all"
-                >
-                  <ChevronLeft className="w-5 h-5 text-white" />
-                </button>
-              )}
-              {currentPage < maxVisiblePages - 1 && (!isRestricted || canAccess || currentPage < 3) && (
-                <button
-                  onClick={() => goTo(currentPage + 1)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 flex items-center justify-center transition-all"
-                >
-                  <ChevronRight className="w-5 h-5 text-white" />
-                </button>
-              )}
+            {/* E. PRESERVATION BOTTOM BAR */}
+            <div className="px-6 py-3 border-t border-white/5 bg-[#08101d] flex items-center justify-between">
+              <div className="flex items-center gap-3 opacity-60 hover:opacity-100 transition-opacity">
+                <Database className="w-3.5 h-3.5 text-[#4169E1]" />
+                <span className="text-[10px] font-bold text-white/50 tracking-wider uppercase">OAIS ALIGNED</span>
+                <div className="w-1 h-1 rounded-full bg-white/20" />
+                <span className="text-[10px] font-medium text-white/40 tracking-wide">ISO 14721:2012 PRESERVATION INFO</span>
+              </div>
+              <div className="text-[10px] font-mono text-white/30 truncate max-w-[200px]">
+                {materialId} // AIP.V1.LATEST
+              </div>
             </div>
           </div>
         </div>
@@ -294,23 +475,25 @@ function RestrictedAccessModal({
 
 export default function MaterialDetail() {
   const [, params] = useRoute("/materials/:id");
+  const { data: apiMaterial, isLoading: isApiLoading } = useGetMaterial(params?.id);
   const [material, setMaterial] = React.useState<any>(null);
   const [isLoading, setIsLoading] = React.useState(true);
 
   React.useEffect(() => {
-    if (params?.id) {
-      loadMaterial(params.id).then((hydratedMat) => {
-        setMaterial(hydratedMat);
-        setIsLoading(false);
-      }).catch(e => {
-        console.error("Failed to load material", e);
-        setMaterial(getMaterialById(params!.id));
-        setIsLoading(false);
-      });
+    if (isApiLoading) return;
+    
+    if (apiMaterial) {
+      setMaterial(apiMaterial);
+      setIsLoading(false);
+    } else if (params?.id) {
+      // Fallback to local if API fails or returns nothing (for items only in materials.json)
+      const local = getMaterialById(params.id);
+      setMaterial(local);
+      setIsLoading(false);
     } else {
       setIsLoading(false);
     }
-  }, [params?.id]);
+  }, [apiMaterial, isApiLoading, params?.id]);
 
   const { data: user } = useGetMe();
   const { data: requests } = useGetAccessRequests({ status: "approved" });
@@ -392,24 +575,10 @@ export default function MaterialDetail() {
   return (
     <div className="min-h-screen bg-[#f7f8fc] font-sans">
       {/* ─── TOP NAV ─── */}
-      <header className="bg-white border-b border-border/70 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-md bg-[#4169E1] flex items-center justify-center">
-              <Database className="w-3.5 h-3.5 text-white" />
-            </div>
-            <span className="font-bold text-[#0a1628]">iArchive</span>
-          </div>
-          <Link href="/collections">
-            <button className="flex items-center gap-2 text-sm font-semibold text-foreground border border-border px-4 py-2 rounded-lg hover:bg-muted/50 transition-colors">
-              <ArrowLeft className="w-4 h-4" /> Back
-            </button>
-          </Link>
-        </div>
-      </header>
+      <PublicNavbar isTransparentOnTop={false} />
 
       {/* ─── BREADCRUMB ─── */}
-      <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-6 pt-20 pb-3 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Link href="/" className="hover:text-foreground transition-colors">Home</Link>
           <span>›</span>
@@ -453,14 +622,16 @@ export default function MaterialDetail() {
           <div className="space-y-5">
             {/* Multi-Page Document Viewer */}
             {true ? (
-              <PageViewer
+              <MediaViewer
                 materialId={material.id}
-                pages={material.pages || 4}
+                pages={material.pages || 60}
                 pageImages={material.pageImages && material.pageImages.length > 0 ? material.pageImages : [
                   "https://images.unsplash.com/photo-1586281380349-632531db7ed4?w=800&auto=format&fit=crop",
                   "https://images.unsplash.com/photo-1616628188550-808682f392ce?w=800&auto=format&fit=crop",
                   "https://images.unsplash.com/photo-1544816155-12df9643f363?w=800&auto=format&fit=crop",
-                  "https://images.unsplash.com/photo-1586281380117-5a60ae2050cc?w=800&auto=format&fit=crop"
+                  "https://images.unsplash.com/photo-1586281380117-5a60ae2050cc?w=800&auto=format&fit=crop",
+                  "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=800&auto=format&fit=crop",
+                  "https://images.unsplash.com/photo-1532012197267-da84d127e765?w=800&auto=format&fit=crop"
                 ]}
                 title={material.title}
                 isRestricted={isRestricted}

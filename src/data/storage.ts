@@ -5,8 +5,19 @@ const STORAGE_KEYS = {
   MATERIALS: "iarchive_materials",
   ACTIVITY: "iarchive_activity",
   INGEST_REQUESTS: "iarchive_ingest_requests",
+  FEEDBACK: "iarchive_feedback",
   VERSION: "iarchive_version",
 };
+
+export interface FeedbackEntry {
+  id: string;
+  type: "Suggestion" | "Bug Report" | "Compliment";
+  message: string;
+  name: string;
+  email: string;
+  date: string;
+  status: "read" | "unread";
+}
 
 const STORAGE_VERSION = "4"; // Bump version
 async function migrateBase64Media(materials: ArchivalMaterial[]) {
@@ -299,5 +310,37 @@ export function updateIngestRequest(id: string, status: "approved" | "rejected")
   const list = getIngestRequests();
   const updated = list.map((req) => req.id === id ? { ...req, status } : req);
   localStorage.setItem(STORAGE_KEYS.INGEST_REQUESTS, JSON.stringify(updated));
+  return updated;
+}
+
+export function getFeedbacks(): FeedbackEntry[] {
+  if (typeof window === "undefined") return [];
+  const stored = localStorage.getItem(STORAGE_KEYS.FEEDBACK);
+  if (!stored) return [
+    { id: "1", type: "Suggestion", message: "Make the search bar bigger.", name: "Jane Doe", email: "jane@test.com", date: "2026-04-20", status: "unread" },
+    { id: "2", type: "Bug Report", message: "The login page flashes sometimes on mobile.", name: "Anonymous", email: "", date: "2026-04-22", status: "read" },
+    { id: "3", type: "Compliment", message: "The new collection cards look amazing!", name: "Alice Brown", email: "alice@example.com", date: "2026-04-25", status: "unread" },
+  ];
+  try { return JSON.parse(stored); } catch { return []; }
+}
+
+export function saveFeedback(feedback: FeedbackEntry) {
+  const list = getFeedbacks();
+  const index = list.findIndex(f => f.id === feedback.id);
+  let updated;
+  if (index >= 0) {
+    updated = [...list];
+    updated[index] = feedback;
+  } else {
+    updated = [feedback, ...list];
+  }
+  localStorage.setItem(STORAGE_KEYS.FEEDBACK, JSON.stringify(updated));
+  return updated;
+}
+
+export function markFeedbackAsRead(id: string) {
+  const list = getFeedbacks();
+  const updated = list.map(f => f.id === id ? { ...f, status: "read" as const } : f);
+  localStorage.setItem(STORAGE_KEYS.FEEDBACK, JSON.stringify(updated));
   return updated;
 }

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, Badge, Button, Input } from "
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
+import { cn, compressFile, fileToBase64 } from "@/lib/utils";
 import {
   Search, Plus, Edit, ExternalLink, Layers, Settings2, Download,
   Upload, FolderTree, ShieldCheck, CheckCircle2, FileText,
@@ -222,8 +222,8 @@ export default function AdminMaterials() {
       if (generatedRefCode && generatedRefCode !== prev.referenceCode) next.referenceCode = generatedRefCode;
       
       // Sync hierarchy-derived fields (Optional: could map to source/context if desired)
-      if (uploadForm.fonds !== undefined) {
-        const hierarchyPath = `HCDC > ${uploadForm.fonds}${uploadForm.subfonds ? ' > ' + uploadForm.subfonds : ''}${uploadForm.series ? ' > ' + uploadForm.series : ''}`;
+      if (uploadForm.subfonds !== undefined) {
+        const hierarchyPath = `HCDC > Departmental Sub-fonds > ${uploadForm.subfonds}${uploadForm.series ? ' > ' + uploadForm.series : ''}`;
         next.hierarchyPath = hierarchyPath;
       }
       return next;
@@ -568,18 +568,24 @@ export default function AdminMaterials() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (file.type.startsWith("image/")) {
-       const blob = await compressImageToBlob(file, 1200, 0.5);
-       setUploadForm(prev => ({ ...prev, fileData: blob, fileType: blob.type || file.type }));
-    } else {
-       setUploadForm(prev => ({ ...prev, fileData: file, fileType: file.type }));
+    const ogSize = file.size;
+    let fileToProcess = file as File | Blob;
+    
+    if (ogSize > 1024 * 1024) {
+      setProcessingState("compressing");
+      fileToProcess = await compressFile(file, 1);
     }
 
-    const ogSize = file.size;
-    const newSize = Math.floor(ogSize * 0.1);
+    if (fileToProcess.type.startsWith("image/")) {
+       setUploadForm(prev => ({ ...prev, fileData: fileToProcess as Blob, fileType: fileToProcess.type }));
+    } else {
+       setUploadForm(prev => ({ ...prev, fileData: fileToProcess as Blob, fileType: fileToProcess.type }));
+    }
+
+    const newSize = fileToProcess.size;
     setFileDetails({ name: file.name, ogSize, newSize });
     
-    await extractMainFile(file);
+    await extractMainFile(fileToProcess as File);
   };
 
   const handleMetadataScanUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -626,10 +632,11 @@ export default function AdminMaterials() {
 
        // Process first document file as the MAIN material
        if (documentFiles.length > 0) {
-         const mainDoc = documentFiles[0];
-         setUploadForm(prev => ({ ...prev, fileData: mainDoc, fileType: mainDoc.type }));
-         setFileDetails({ name: mainDoc.name, ogSize: mainDoc.size, newSize: Math.floor(mainDoc.size * 0.1) });
-         await extractMainFile(mainDoc);
+         const rawMainDoc = documentFiles[0];
+         const mainDoc = await compressFile(rawMainDoc, 0.6); // Compress for Firestore Base64 limit
+         setUploadForm(prev => ({ ...prev, fileData: mainDoc, fileType: (mainDoc as any).type || rawMainDoc.type }));
+         setFileDetails({ name: rawMainDoc.name, ogSize: rawMainDoc.size, newSize: mainDoc.size });
+         await extractMainFile(mainDoc as File);
 
          // Any additional document files → extract as supplementary metadata
          for (let i = 1; i < documentFiles.length; i++) {
@@ -856,6 +863,10 @@ export default function AdminMaterials() {
 
   const handleEditMaterial = (mat: ArchivalMaterial, e: React.MouseEvent) => {
     e.stopPropagation();
+    const parts = (mat.hierarchyPath || "").split(" > ").map(p => p.trim());
+    let depth = 1;
+    if (parts[depth] === "Departmental Sub-fonds") depth++;
+    
     setUploadForm({
       title: mat.title || "",
       creator: mat.creator || "",
@@ -874,10 +885,10 @@ export default function AdminMaterials() {
       year: mat.uniqueId?.substring(0, 2) || "26",
       catNo: mat.uniqueId?.substring(4, 6) || "01",
       matNo: mat.uniqueId?.substring(6) || "0000001",
-      fonds: "HCDC — Holy Cross of Davao College",
-      subfonds: mat.hierarchyPath?.split(" > ")[1]?.trim() || "",
-      program: mat.hierarchyPath?.split(" > ")[2]?.trim() || "",
-      series: mat.hierarchyPath?.split(" > ")[3]?.trim() || ""
+      fonds: parts[0] || "HCDC — Holy Cross of Davao College",
+      subfonds: parts[depth] || "",
+      program: parts.length > depth + 1 ? parts[depth+1] : "",
+      series: parts.length > depth + 2 ? parts[parts.length - 1] : ""
     });
     setChecklistValues(mat as any);
     setUploadOpen(true);
@@ -1201,7 +1212,7 @@ export default function AdminMaterials() {
                               <span className="text-[10px] text-muted-foreground truncate max-w-[150px]">{mat.creator}</span>
                               {isOAIS && (
                                 <span className="text-[8px] font-bold text-emerald-600 bg-emerald-50 px-1 py-0.5 rounded-full inline-flex items-center gap-0.5 shrink-0">
-                                  <ShieldCheck className="w-2 h-2" /> OAIS Compliant
+                                  <ShieldCheck className="w-2 h-2" /> OAIS Aligned
                                 </span>
                               )}
                             </div>
@@ -1894,7 +1905,8 @@ export default function AdminMaterials() {
                </Button>
             ) : (
                <Button onClick={async () => {
-              const hierarchyPath = `HCDC > ${uploadForm.subfonds}${uploadForm.program ? ' > ' + uploadForm.program : ''}${uploadForm.series ? ' > ' + uploadForm.series : ''}`;
+              // Corrected hierarchy path to use "Departmental Sub-fonds" as requested
+              const hierarchyPath = `HCDC > Departmental Sub-fonds > ${uploadForm.subfonds}${uploadForm.program ? ' > ' + uploadForm.program : ''}${uploadForm.series ? ' > ' + uploadForm.series : ''}`;
               const existingApproval = (selectedMaterial as any)?.approvalStatus;
               const approvalStatus = editingMaterialId
                 ? (existingApproval || "approved")
@@ -1973,6 +1985,17 @@ export default function AdminMaterials() {
                 // --- API INTEGRATION ---
                 try {
                   const apiData = { ...newMaterial };
+                  
+                  // Convert File/Blob to Base64 for Firestore storage
+                  if (uploadForm.fileData instanceof Blob) {
+                    try {
+                      const compressed = await compressFile(uploadForm.fileData, 0.9);
+                      const base64 = await fileToBase64(compressed);
+                      (apiData as any).fileUrl = base64;
+                    } catch (err) {
+                      console.error("Base64 conversion failed:", err);
+                    }
+                  }
                   // Ensure category mapping for API
                   if (uploadForm.series) {
                     const cat = categories.find(c => c.name === uploadForm.series);
@@ -2235,7 +2258,7 @@ function MaterialDetailView({ material, onBack }: { material: ArchivalMaterial, 
       <div className="flex items-center gap-2 mb-8 flex-wrap">
         <span className="font-mono text-xs font-bold text-muted-foreground">{material.uniqueId}</span>
         <Badge variant="outline" className="text-[9px] bg-emerald-50 text-emerald-700 border-emerald-200 uppercase font-bold px-1.5 py-0.5">Item</Badge>
-        {isOAIS && <Badge variant="outline" className="text-[9px] bg-emerald-50 text-emerald-700 border-emerald-200 uppercase font-bold px-1.5 py-0.5 inline-flex items-center gap-1"><ShieldCheck className="w-2.5 h-2.5" /> OAIS Compliant</Badge>}
+        {isOAIS && <Badge variant="outline" className="text-[9px] bg-emerald-50 text-emerald-700 border-emerald-200 uppercase font-bold px-1.5 py-0.5 inline-flex items-center gap-1"><ShieldCheck className="w-2.5 h-2.5" /> OAIS Aligned</Badge>}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">

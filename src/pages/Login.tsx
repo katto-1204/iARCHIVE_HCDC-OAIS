@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { ShieldCheck, Search, LogIn, Sparkles, Lock, Clock, AlertTriangle, XCircle, ShieldAlert, X, Ban } from "lucide-react";
+import { ShieldCheck, Search, LogIn, Sparkles, Lock, Clock, AlertTriangle, XCircle, ShieldAlert, X, Ban, CheckCircle2, Scale, Eye, EyeOff, Database, FileText } from "lucide-react";
 import { useLogin } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -19,11 +19,29 @@ type ErrorModalData = {
   suggestion?: string;
 };
 
+const termsContent = [
+  { title: "Acceptance of Terms", icon: CheckCircle2, content: "By accessing or using the iArchive platform (the \"System\") of Holy Cross of Davao College (HCDC), you acknowledge that you have read, understood, and agree to be bound by these Terms of Use and all applicable laws and regulations in the Philippines, including the Data Privacy Act of 2012." },
+  { title: "Authorized Access", icon: Lock, content: "Access to specific archival materials is granted based on user roles and institutional affiliation. Restricted and confidential materials require explicit approval from the HCDC Archiving Department. Users are prohibited from sharing their credentials or attempting to bypass security measures to access unauthorized content." },
+  { title: "Intellectual Property & Usage", icon: Scale, content: "Materials in the iArchive are protected by copyright and other intellectual property rights. Unless otherwise specified (e.g., Public Domain or Creative Commons), digital objects are provided for personal research, teaching, and private study only. Commercial use or redistribution without written consent from HCDC or the original rights holder is strictly prohibited." },
+  { title: "Data Privacy & Ethical Use", icon: Eye, content: "iArchive collects and processes personal information in accordance with the HCDC Privacy Policy. Users must handle all data obtained through the System ethically and legally, particularly when archival records contain sensitive personal information or represent cultural heritage." },
+  { title: "Preservation & Integrity", icon: Database, content: "The archival integrity of digital objects is maintained through industry-standard fixity checks (SHA-256). Users shall not alter, deface, or misrepresent the material or metadata found within the System. Any identified discrepancies should be reported to the System Administrator." },
+];
+
+const privacyContent = [
+  { title: "Information We Collect", content: "iArchive collects personal data necessary for account creation and system access, including your name, email address, institutional affiliation, and role. Usage data such as login activity, access requests, and browsing history within the archive may also be recorded for audit and security purposes." },
+  { title: "How We Use Your Data", content: "Your personal information is used to authenticate access, manage user roles, process access requests for restricted materials, and maintain audit trails as required by archival standards (OAIS ISO 14721). We do not sell or share your personal data with third parties." },
+  { title: "Data Protection", content: "All personal data is stored securely using industry-standard encryption. Access to user data is restricted to authorized administrators. We comply with the Philippine Data Privacy Act of 2012 (Republic Act No. 10173) and implement appropriate technical and organizational security measures." },
+  { title: "Your Rights", content: "You have the right to access, correct, or request deletion of your personal data. To exercise these rights, please contact the HCDC Archival Administration team. You may also file a complaint with the National Privacy Commission if you believe your data privacy rights have been violated." },
+];
+
 export default function Login() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { mutate, isPending } = useLogin();
   const [errorModal, setErrorModal] = React.useState<ErrorModalData | null>(null);
+  const [termsAccepted, setTermsAccepted] = React.useState(false);
+  const [termsModalOpen, setTermsModalOpen] = React.useState<"terms" | "privacy" | null>(null);
+  const [showPassword, setShowPassword] = React.useState(false);
 
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
@@ -47,8 +65,8 @@ export default function Login() {
           setErrorModal({ type: "pending", title: "Account Pending Approval", message, suggestion: "Your registration was received. An administrator will review and activate your account shortly." });
         } else if (/not found|no account|register first/i.test(message)) {
           setErrorModal({ type: "not_found", title: "Account Not Found", message, suggestion: "Would you like to create a new account?" });
-        } else if (/incorrect|invalid|wrong|credentials/i.test(message)) {
-          setErrorModal({ type: "invalid", title: "Invalid Credentials", message, suggestion: "Please double-check your email and password." });
+        } else if (/incorrect|invalid|wrong|credentials|password/i.test(message)) {
+          setErrorModal({ type: "invalid", title: "Invalid Credentials", message: "Invalid credentials!", suggestion: "Please double-check your email and password." });
         } else {
           setErrorModal({ type: "error", title: "Login Failed", message });
         }
@@ -93,7 +111,7 @@ export default function Login() {
             {[
               { icon: Lock, title: "Role-Based Access", desc: "Separate dashboards for Admin, Archivist, and User accounts" },
               { icon: Search, title: "Full Archive Search", desc: "Search across ISAD(G) metadata, Dublin Core elements, and more" },
-              { icon: ShieldCheck, title: "OAIS Compliant", desc: "ISO 14721:2012 certified preservation standards" },
+              { icon: ShieldCheck, title: "OAIS Aligned", desc: "Built on the ISO 14721:2012 preservation framework" },
             ].map((f, i) => (
               <div key={i} className="flex gap-4 p-4 rounded-xl bg-white/5 border border-white/8 backdrop-blur-sm">
                 <f.icon className="w-6 h-6 text-[#ff4444] shrink-0 mt-0.5" />
@@ -130,14 +148,47 @@ export default function Login() {
                   className="w-full h-11 bg-white/5 border border-white/10 rounded-xl px-4 text-white text-sm placeholder:text-white/25 focus:outline-none focus:border-[#4169E1]/50 focus:ring-1 focus:ring-[#4169E1]/30 transition-all" />
                 {form.formState.errors.email && <p className="text-sm text-red-400">{form.formState.errors.email.message}</p>}
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 relative">
                 <label className="text-white/70 text-sm font-medium">Password</label>
-                <input type="password" {...form.register("password")} placeholder="••••••••"
-                  className="w-full h-11 bg-white/5 border border-white/10 rounded-xl px-4 text-white text-sm placeholder:text-white/25 focus:outline-none focus:border-[#4169E1]/50 focus:ring-1 focus:ring-[#4169E1]/30 transition-all" />
+                <div className="relative">
+                  <input type={showPassword ? "text" : "password"} {...form.register("password")} placeholder="••••••••"
+                    className="w-full h-11 bg-white/5 border border-white/10 rounded-xl pl-4 pr-10 text-white text-sm placeholder:text-white/25 focus:outline-none focus:border-[#4169E1]/50 focus:ring-1 focus:ring-[#4169E1]/30 transition-all" />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70 transition-colors">
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
                 {form.formState.errors.password && <p className="text-sm text-red-400">{form.formState.errors.password.message}</p>}
               </div>
-              <button type="submit" disabled={isPending}
-                className="w-full h-12 bg-[#960000] hover:bg-[#7a0000] text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2 mt-2 disabled:opacity-50 hover:shadow-lg hover:shadow-[#960000]/30">
+              {/* Terms of Use & Privacy Policy Checkbox */}
+              <div className="flex items-start gap-3 pt-1">
+                <input
+                  type="checkbox"
+                  id="terms-checkbox"
+                  checked={termsAccepted}
+                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                  className="mt-1 w-4 h-4 rounded border-white/20 bg-white/5 accent-[#4169E1] cursor-pointer shrink-0"
+                />
+                <label htmlFor="terms-checkbox" className="text-white/60 text-sm leading-relaxed cursor-pointer select-none">
+                  I agree to the{" "}
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); setTermsModalOpen("terms"); }}
+                    className="text-[#4169E1] font-semibold underline underline-offset-2 hover:text-[#7c94e8] transition-colors"
+                  >
+                    Terms of Use
+                  </button>{" "}
+                  and{" "}
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); setTermsModalOpen("privacy"); }}
+                    className="text-[#4169E1] font-semibold underline underline-offset-2 hover:text-[#7c94e8] transition-colors"
+                  >
+                    Privacy Policy
+                  </button>
+                </label>
+              </div>
+              <button type="submit" disabled={isPending || !termsAccepted}
+                className="w-full h-12 bg-[#960000] hover:bg-[#7a0000] text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2 mt-2 disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-[#960000]/30">
                 {isPending ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><LogIn className="w-4 h-4" /> Sign In</>}
               </button>
             </form>
@@ -148,6 +199,102 @@ export default function Login() {
           </div>
         </div>
       </div>
+
+      {/* ─── Terms / Privacy Policy Modal ─── */}
+      {termsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setTermsModalOpen(null)}>
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+          <div
+            className="relative w-full max-w-2xl max-h-[85vh] bg-[#0f1a2e] border border-white/10 rounded-2xl shadow-2xl shadow-black/50 overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="px-6 py-5 border-b border-white/10 bg-gradient-to-r from-[#0f1a2e] to-[#131f35] flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#4169E1]/10 border border-[#4169E1]/20 flex items-center justify-center">
+                  {termsModalOpen === "terms" ? <ShieldCheck className="w-5 h-5 text-[#4169E1]" /> : <Eye className="w-5 h-5 text-[#4169E1]" />}
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">{termsModalOpen === "terms" ? "Terms of Use" : "Privacy Policy"}</h3>
+                  <p className="text-xs text-white/40">Holy Cross of Davao College — iArchive</p>
+                </div>
+              </div>
+              <button onClick={() => setTermsModalOpen(null)} className="text-white/30 hover:text-white/70 transition-colors p-1">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6 custom-scrollbar">
+              {termsModalOpen === "terms" ? (
+                <>
+                  <p className="text-white/50 text-sm leading-relaxed">
+                    By using the iArchive platform, you agree to the following terms and conditions governing your access to and use of the digital archival system of Holy Cross of Davao College.
+                  </p>
+                  {termsContent.map((section, idx) => (
+                    <div key={idx} className="bg-white/5 border border-white/8 rounded-xl p-5">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-8 h-8 rounded-lg bg-[#4169E1]/10 flex items-center justify-center shrink-0">
+                          <section.icon className="w-4 h-4 text-[#4169E1]" />
+                        </div>
+                        <div>
+                          <span className="text-[9px] font-bold text-[#4169E1] uppercase tracking-widest">Article {idx + 1}</span>
+                          <h4 className="text-sm font-bold text-white">{section.title}</h4>
+                        </div>
+                      </div>
+                      <p className="text-white/55 text-sm leading-relaxed pl-11">{section.content}</p>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <p className="text-white/50 text-sm leading-relaxed">
+                    This Privacy Policy describes how the iArchive platform collects, uses, and protects your personal information in compliance with the Data Privacy Act of 2012.
+                  </p>
+                  {privacyContent.map((section, idx) => (
+                    <div key={idx} className="bg-white/5 border border-white/8 rounded-xl p-5">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-8 h-8 rounded-lg bg-[#4169E1]/10 flex items-center justify-center shrink-0">
+                          <FileText className="w-4 h-4 text-[#4169E1]" />
+                        </div>
+                        <div>
+                          <span className="text-[9px] font-bold text-[#4169E1] uppercase tracking-widest">Section {idx + 1}</span>
+                          <h4 className="text-sm font-bold text-white">{section.title}</h4>
+                        </div>
+                      </div>
+                      <p className="text-white/55 text-sm leading-relaxed pl-11">{section.content}</p>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+
+            {/* Modal Footer — Tabs + Accept */}
+            <div className="px-6 py-4 border-t border-white/10 bg-[#0c1525] flex items-center justify-between gap-3 shrink-0">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setTermsModalOpen("terms")}
+                  className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${termsModalOpen === "terms" ? "bg-[#4169E1]/20 text-[#4169E1] border border-[#4169E1]/30" : "text-white/40 hover:text-white/60 border border-white/10"}`}
+                >
+                  Terms of Use
+                </button>
+                <button
+                  onClick={() => setTermsModalOpen("privacy")}
+                  className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${termsModalOpen === "privacy" ? "bg-[#4169E1]/20 text-[#4169E1] border border-[#4169E1]/30" : "text-white/40 hover:text-white/60 border border-white/10"}`}
+                >
+                  Privacy Policy
+                </button>
+              </div>
+              <button
+                onClick={() => { setTermsAccepted(true); setTermsModalOpen(null); }}
+                className="bg-[#4169E1] hover:bg-[#3558c0] text-white text-sm font-bold px-6 py-2.5 rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-[#4169E1]/20"
+              >
+                <CheckCircle2 className="w-4 h-4" /> I Have Agreed
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── Premium Error Modal ─── */}
       {errorModal && (() => {

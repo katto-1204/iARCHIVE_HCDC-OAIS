@@ -2,7 +2,7 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { signToken } from "../lib/auth.js";
 import { requireAuth } from "../middlewares/auth.js";
-import { jsonStoreGetUserByEmail, jsonStoreGetUserById, jsonStoreRegisterUser } from "../lib/jsonStore.js";
+import { jsonStoreGetUserByEmail, jsonStoreGetUserById, jsonStoreRegisterUser, jsonStoreUpdateUserProfile } from "../lib/jsonStore.js";
 import { getFirebaseAuth, getFirestoreDb } from "../lib/firebase.js";
 
 const router = Router();
@@ -380,6 +380,18 @@ router.patch("/auth/profile", requireAuth, async (req, res) => {
     const updated = await db.collection("users").doc(userId).get();
     res.json({ id: updated.id, ...updated.data() });
   } catch (error: any) {
+    const jsonUser = jsonStoreUpdateUserProfile(userId, { name, institution, purpose });
+    if (jsonUser) {
+      res.json(jsonUser);
+      return;
+    }
+
+    const demoUserIndex = DEMO_USERS.findIndex((u) => u.id === userId);
+    if (demoUserIndex !== -1) {
+      res.json({ ...DEMO_USERS[demoUserIndex], name: name || DEMO_USERS[demoUserIndex].name });
+      return;
+    }
+
     console.error("Profile Update Error:", error.message);
     res.status(500).json({ error: "Failed to update profile" });
   }
