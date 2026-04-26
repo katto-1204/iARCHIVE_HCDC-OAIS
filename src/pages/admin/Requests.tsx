@@ -143,17 +143,7 @@ export default function AdminRequests() {
     });
   };
 
-  React.useEffect(() => {
-    const sync = () => setIngestRequests(getIngestRequests());
-    window.addEventListener("storage", sync);
-    window.addEventListener("focus", sync);
-    return () => {
-      window.removeEventListener("storage", sync);
-      window.removeEventListener("focus", sync);
-    };
-  }, []);
-
-  const filteredIngest = ingestRequests.filter((req) => req.status === tab);
+  const filteredIngest = (ingestData ?? []).filter((req: any) => req.status === tab);
   const accessRequests = data?.requests ?? [];
   const requestRows = mode === "access" ? accessRequests : filteredIngest;
 
