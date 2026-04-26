@@ -3,69 +3,84 @@ import { Link } from "wouter";
 import { format } from "date-fns";
 import { AdminLayout } from "@/components/layout";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Badge, Button } from "@/components/ui-components";
-import { useGetAccessRequests, useApproveRequest, useRejectRequest, useGetMe } from "@workspace/api-client-react";
-import { getIngestRequests, updateIngestRequest, getMaterialById, saveMaterial, addActivity } from "@/data/storage";
+import { useGetAccessRequests, useApproveRequest, useRejectRequest, useGetMe, useGetIngestRequests, useApproveIngestRequest, useRejectIngestRequest, useUpdateMaterial } from "@workspace/api-client-react";
+import { getMaterialById, saveMaterial, addActivity } from "@/data/storage";
 import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 export default function AdminRequests() {
   const { data: me } = useGetMe();
   const [mode, setMode] = React.useState<"access" | "ingest">("access");
   const [tab, setTab] = React.useState<"pending" | "approved" | "rejected">("pending");
-  const { data, isLoading, refetch } = useGetAccessRequests({ status: tab });
-  const [ingestRequests, setIngestRequests] = React.useState(() => getIngestRequests());
+  const { data, isLoading, refetch: refetchAccess } = useGetAccessRequests({ status: tab });
+  const { data: ingestData, isLoading: ingestLoading, refetch: refetchIngest } = useGetIngestRequests({ status: tab });
   
   const { mutate: approve, isPending: isApproving } = useApproveRequest();
   const { mutate: reject, isPending: isRejecting } = useRejectRequest();
-  const [actionId, setActionId] = React.useState<string | null>(null);
+  const { mutate: approveIngest, isPending: isApprovingIngest } = useApproveIngestRequest();
+  const { mutate: rejectIngest, isPending: isRejectingIngest } = useRejectIngestRequest();
   const { toast } = useToast();
 
-  const handleApprove = (id: string) => {
-    setActionId(id);
-    approve({ id }, {
+  // Dialog states
+  const [approveAccessDialog, setApproveAccessDialog] = React.useState<{id: string, title: string} | null>(null);
+  const [rejectAccessDialog, setRejectAccessDialog] = React.useState<{id: string, title: string} | null>(null);
+  const [rejectReason, setRejectReason] = React.useState("");
+
+  const [approveIngestDialog, setApproveIngestDialog] = React.useState<{id: string, title: string} | null>(null);
+  const [rejectIngestDialog, setRejectIngestDialog] = React.useState<{id: string, title: string} | null>(null);
+
+  const confirmApproveAccess = () => {
+    if (!approveAccessDialog) return;
+    approve({ id: approveAccessDialog.id }, {
       onSuccess: () => {
         toast({ title: "Approved", description: "Request granted." });
-        refetch();
-        setActionId(null);
+        refetchAccess();
+        setApproveAccessDialog(null);
       },
       onError: () => {
         toast({ title: "Approval Failed", description: "Could not approve this request.", variant: "destructive" });
-        setActionId(null);
       }
     });
   };
 
-  const handleReject = (id: string) => {
-    setActionId(id);
-    // Use setTimeout to avoid blocking the main thread (prompt is synchronous)
-    setTimeout(() => {
-      const reason = prompt("Enter rejection reason:");
-      if (reason !== null) {
-        reject({ id, data: { reason } }, {
-          onSuccess: () => {
-            toast({ title: "Rejected", description: "Request denied." });
-            refetch();
-            setActionId(null);
-          },
-          onError: () => {
-            toast({ title: "Rejection Failed", description: "Could not reject this request.", variant: "destructive" });
-            setActionId(null);
-          }
-        });
-      } else {
-        setActionId(null);
+  const confirmRejectAccess = () => {
+    if (!rejectAccessDialog) return;
+    reject({ id: rejectAccessDialog.id, data: { reason: rejectReason } }, {
+      onSuccess: () => {
+        toast({ title: "Rejected", description: "Request denied." });
+        refetchAccess();
+        setRejectAccessDialog(null);
+        setRejectReason("");
+      },
+      onError: () => {
+        toast({ title: "Rejection Failed", description: "Could not reject this request.", variant: "destructive" });
       }
-    }, 50);
+    });
   };
 
-  const handleApproveIngest = async (id: string) => {
+  const { mutateAsync: updateMaterialAsync } = useUpdateMaterial();
+
+  const confirmApproveIngest = async () => {
+    if (!approveIngestDialog) return;
+    const { id } = approveIngestDialog;
+    
+    // Attempt local approval
     const material = getMaterialById(id);
     if (material) {
-      await saveMaterial({
+      const updatedOpts = {
         ...material,
         approvalStatus: "approved",
         approvedAt: new Date().toISOString(),
         approvedBy: me?.name || "Admin",
-      } as any);
+      };
+      await saveMaterial(updatedOpts as any);
+      
+      try {
+        await updateMaterialAsync({ id, data: { approvalStatus: "approved", approvedAt: updatedOpts.approvedAt, approvedBy: updatedOpts.approvedBy } });
+      } catch (e) {
+        // fail silently for offline/fallback mode
+      }
+
       addActivity({
         user: me?.name || "Admin",
         actionType: "approve",
@@ -73,12 +88,24 @@ export default function AdminRequests() {
         materialId: material.uniqueId,
       });
     }
-    const updated = updateIngestRequest(id, "approved");
-    setIngestRequests(updated);
-    toast({ title: "Approved", description: "Ingest request approved." });
+
+    approveIngest({ id }, {
+      onSuccess: () => {
+        toast({ title: "Approved", description: "Ingest request approved." });
+        refetchIngest();
+        setApproveIngestDialog(null);
+      },
+      onError: () => {
+        toast({ title: "Operation partial", description: "Updated locally but backend sync failed." });
+        refetchIngest();
+        setApproveIngestDialog(null);
+      }
+    });
   };
 
-  const handleRejectIngest = async (id: string) => {
+  const confirmRejectIngest = async () => {
+    if (!rejectIngestDialog) return;
+    const { id } = rejectIngestDialog;
     const material = getMaterialById(id);
     if (material) {
       await saveMaterial({
@@ -87,6 +114,13 @@ export default function AdminRequests() {
         approvedAt: undefined,
         approvedBy: undefined,
       } as any);
+
+      try {
+        await updateMaterialAsync({ id, data: { approvalStatus: "rejected", approvedAt: null, approvedBy: null } });
+      } catch (e) {
+        // fail silently for offline/fallback mode
+      }
+
       addActivity({
         user: me?.name || "Admin",
         actionType: "reject",
@@ -94,9 +128,19 @@ export default function AdminRequests() {
         materialId: material.uniqueId,
       });
     }
-    const updated = updateIngestRequest(id, "rejected");
-    setIngestRequests(updated);
-    toast({ title: "Rejected", description: "Ingest request rejected." });
+
+    rejectIngest({ id }, {
+      onSuccess: () => {
+        toast({ title: "Rejected", description: "Ingest request rejected." });
+        refetchIngest();
+        setRejectIngestDialog(null);
+      },
+      onError: () => {
+        toast({ title: "Operation partial", description: "Updated locally but backend sync failed." });
+        refetchIngest();
+        setRejectIngestDialog(null);
+      }
+    });
   };
 
   React.useEffect(() => {
@@ -196,25 +240,25 @@ export default function AdminRequests() {
                             size="sm"
                             variant="outline"
                             className="text-emerald-600 border-emerald-200 hover:bg-emerald-50"
-                            onClick={() => handleApprove(req.id)}
-                            disabled={isApproving || isRejecting || actionId === req.id}
+                            onClick={() => setApproveAccessDialog({ id: req.id, title: req.materialTitle })}
+                            disabled={isApproving || isRejecting}
                           >
-                            {actionId === req.id && isApproving ? "Approving..." : "Approve"}
+                            Approve
                           </Button>
                           <Button
                             size="sm"
                             variant="outline"
                             className="text-destructive border-destructive/20 hover:bg-destructive/10"
-                            onClick={() => handleReject(req.id)}
-                            disabled={isApproving || isRejecting || actionId === req.id}
+                            onClick={() => setRejectAccessDialog({ id: req.id, title: req.materialTitle })}
+                            disabled={isApproving || isRejecting}
                           >
-                            {actionId === req.id && isRejecting ? "Rejecting..." : "Reject"}
+                            Reject
                           </Button>
                         </>
                       ) : (
                         <>
-                          <Button size="sm" variant="outline" className="text-emerald-600 border-emerald-200 hover:bg-emerald-50" onClick={() => handleApproveIngest(req.id)}>Approve</Button>
-                          <Button size="sm" variant="outline" className="text-destructive border-destructive/20 hover:bg-destructive/10" onClick={() => handleRejectIngest(req.id)}>Reject</Button>
+                          <Button size="sm" variant="outline" className="text-emerald-600 border-emerald-200 hover:bg-emerald-50" onClick={() => setApproveIngestDialog({ id: req.id, title: req.materialTitle })}>Approve</Button>
+                          <Button size="sm" variant="outline" className="text-destructive border-destructive/20 hover:bg-destructive/10" onClick={() => setRejectIngestDialog({ id: req.id, title: req.materialTitle })}>Reject</Button>
                         </>
                       )}
                     </TableCell>
@@ -225,6 +269,90 @@ export default function AdminRequests() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Approve Access Dialog */}
+      <Dialog open={!!approveAccessDialog} onOpenChange={(open) => !open && setApproveAccessDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Approve Access Request</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to approve access to "{approveAccessDialog?.title}"?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setApproveAccessDialog(null)} disabled={isApproving}>Cancel</Button>
+            <Button onClick={confirmApproveAccess} disabled={isApproving} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+              {isApproving ? "Approving..." : "Approve Access"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject Access Dialog */}
+      <Dialog open={!!rejectAccessDialog} onOpenChange={(open) => !open && setRejectAccessDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject Access Request</DialogTitle>
+            <DialogDescription>
+              Provide a reason for rejecting access to "{rejectAccessDialog?.title}".
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-4">
+            <textarea
+              className="w-full min-h-[100px] rounded-xl border border-border bg-muted/30 p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-destructive/20"
+              placeholder="e.g., You do not meet the criteria for this highly confidential material..."
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRejectAccessDialog(null)} disabled={isRejecting}>Cancel</Button>
+            <Button onClick={confirmRejectAccess} disabled={isRejecting} className="bg-destructive hover:bg-destructive/90 text-white">
+              {isRejecting ? "Rejecting..." : "Confirm Rejection"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Approve Ingest Dialog */}
+      <Dialog open={!!approveIngestDialog} onOpenChange={(open) => !open && setApproveIngestDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Approve Ingest Request</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to approve the ingestion of "{approveIngestDialog?.title}" into the archive?
+              Once approved, the material will be permanently published and accessible based on its access level.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setApproveIngestDialog(null)}>Cancel</Button>
+            <Button onClick={confirmApproveIngest} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+              Approve Ingestion
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject Ingest Dialog */}
+      <Dialog open={!!rejectIngestDialog} onOpenChange={(open) => !open && setRejectIngestDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject Ingest Request</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to reject the ingestion of "{rejectIngestDialog?.title}"? 
+              This will mark the material request as rejected.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRejectIngestDialog(null)}>Cancel</Button>
+            <Button onClick={confirmRejectIngest} className="bg-destructive hover:bg-destructive/90 text-white">
+              Confirm Rejection
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </AdminLayout>
   );
 }
+

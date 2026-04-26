@@ -212,7 +212,15 @@ function MediaViewer({
                           : "border-white/10 opacity-70 hover:opacity-100 hover:border-white/30 hover:scale-[1.02]"
                     }`}
                   >
-                    <img src={img} alt={`Thumbnail ${idx + 1}`} className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 z-10 bg-transparent pointer-events-none" />
+                    <img 
+                      src={img} 
+                      alt={`Thumbnail ${idx + 1}`} 
+                      className="w-full h-full object-cover" 
+                      draggable="false"
+                      onDragStart={(e) => e.preventDefault()}
+                      onContextMenu={(e) => e.preventDefault()}
+                    />
                     
                     {/* Locked Overlay */}
                     {isLocked && (
@@ -262,16 +270,23 @@ function MediaViewer({
                   transformOrigin: 'center'
                 }}
               >
-                <div className="relative shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)] rounded-lg overflow-hidden transition-all duration-500">
+                <div 
+                  className="relative shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)] rounded-lg overflow-hidden transition-all duration-500"
+                  onContextMenu={(e) => e.preventDefault()}
+                >
                   <img
                     src={visibleImages[currentPage]}
                     alt={`${title} - Page ${currentPage + 1}`}
+                    draggable="false"
                     onDragStart={(e) => e.preventDefault()}
+                    onContextMenu={(e) => e.preventDefault()}
                     className={`max-h-[580px] w-auto object-contain transition-all duration-700 ${!canAccess && isRestricted && currentPage >= maxVisiblePages - 1 && loadedPagesCount > maxVisiblePages ? "blur-md opacity-70" : ""}`}
                   />
+                  {/* Transparent overlay for protection */}
+                  <div className="absolute inset-0 z-10 bg-transparent" />
                   
                   {/* Floating Page Label */}
-                  <div className="absolute top-4 left-4 bg-[#0a1628]/80 backdrop-blur-md text-white text-[10px] px-3 py-1.5 rounded-lg font-bold border border-white/10">
+                  <div className="absolute top-4 left-4 z-20 bg-[#0a1628]/80 backdrop-blur-md text-white text-[10px] px-3 py-1.5 rounded-lg font-bold border border-white/10">
                     {currentPage === 0 ? "Cover Page" : `Page ${currentPage + 1}`}
                   </div>
                 </div>
@@ -374,26 +389,43 @@ function MediaViewer({
             </button>
           </div>
           <div className="flex-1 flex items-center justify-center relative px-16">
-            <img 
-              src={visibleImages[currentPage]} 
-              alt={`${title} - Page ${currentPage + 1}`} 
-              className="max-h-[85vh] max-w-full object-contain"
-            />
+            <div 
+              className="relative flex items-center justify-center max-h-[85vh] max-w-full"
+              onContextMenu={(e) => e.preventDefault()}
+            >
+              <img 
+                src={visibleImages[currentPage]} 
+                alt={`${title} - Page ${currentPage + 1}`} 
+                className="max-h-[85vh] max-w-full object-contain"
+                draggable="false"
+                onDragStart={(e) => e.preventDefault()}
+                onContextMenu={(e) => e.preventDefault()}
+              />
+              <div className="absolute inset-0 z-10 bg-transparent" />
+            </div>
             {currentPage > 0 && (
-              <button onClick={() => goTo(currentPage - 1)} className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
+              <button onClick={() => goTo(currentPage - 1)} className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-20">
                 <ChevronLeft className="w-6 h-6 text-white" />
               </button>
             )}
             {currentPage < maxVisiblePages - 1 && (!isRestricted || canAccess || currentPage < 3) && (
-              <button onClick={() => goTo(currentPage + 1)} className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
+              <button onClick={() => goTo(currentPage + 1)} className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-20">
                 <ChevronRight className="w-6 h-6 text-white" />
               </button>
             )}
           </div>
           <div className="flex justify-center gap-2 px-6 py-4 overflow-x-auto">
             {visibleImages.map((img, idx) => (
-              <button key={idx} onClick={() => goTo(idx)} className={`shrink-0 w-14 h-18 rounded-md overflow-hidden border-2 transition-all ${currentPage === idx ? 'border-white shadow-lg' : 'border-white/20 opacity-50 hover:opacity-80'}`}>
-                <img src={img} alt="" className="w-full h-full object-cover" />
+              <button key={idx} onClick={() => goTo(idx)} className={`shrink-0 w-14 h-18 rounded-md overflow-hidden border-2 transition-all relative ${currentPage === idx ? 'border-white shadow-lg' : 'border-white/20 opacity-50 hover:opacity-80'}`}>
+                <div className="absolute inset-0 z-10 bg-transparent pointer-events-none" />
+                <img 
+                  src={img} 
+                  alt="" 
+                  className="w-full h-full object-cover" 
+                  draggable="false"
+                  onDragStart={(e) => e.preventDefault()}
+                  onContextMenu={(e) => e.preventDefault()}
+                />
               </button>
             ))}
           </div>
@@ -652,9 +684,19 @@ export default function MaterialDetail() {
                     </div>
                   )}
                 </div>
-                <div className="h-72 bg-[#f7f8fc] flex flex-col items-center justify-center relative">
+                <div className="h-72 bg-[#f7f8fc] flex flex-col items-center justify-center relative shadow-inner overflow-hidden">
                   {material.thumbnailUrl ? (
-                    <img src={material.thumbnailUrl} alt={material.title} className="max-h-full max-w-full object-contain" />
+                    <div className="relative h-full flex items-center justify-center" onContextMenu={(e) => e.preventDefault()}>
+                      <img 
+                        src={material.thumbnailUrl} 
+                        alt={material.title} 
+                        className="max-h-full max-w-full object-contain" 
+                        draggable="false"
+                        onDragStart={(e) => e.preventDefault()}
+                        onContextMenu={(e) => e.preventDefault()}
+                      />
+                      <div className="absolute inset-0 z-10 bg-transparent" />
+                    </div>
                   ) : (
                     <div className="text-center">
                       <div className="w-24 h-28 bg-white border-2 border-border rounded-lg shadow-md flex items-center justify-center mx-auto mb-4 relative">

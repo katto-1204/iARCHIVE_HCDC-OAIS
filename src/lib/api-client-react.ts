@@ -385,6 +385,63 @@ export function useRejectRequest() {
   });
 }
 
+// =====================
+// Ingest Requests Hooks
+// =====================
+
+export function useGetIngestRequests(params?: { status?: string }) {
+  return useQuery({
+    queryKey: ["/api/ingest-requests", params || {}],
+    queryFn: async () => {
+      const searchParams = new URLSearchParams();
+      if (params?.status) searchParams.set("status", params.status);
+      const query = searchParams.toString();
+      const data = await apiRequest<{ requests: any[] }>(`/api/ingest-requests${query ? `?${query}` : ""}`);
+      return data.requests;
+    },
+  });
+}
+
+export function useSubmitIngestRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (args: MutationArgs<any>) =>
+      apiRequest("/api/ingest-requests", {
+        method: "POST",
+        body: JSON.stringify(args.data || {}),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ingest-requests"] });
+    },
+  });
+}
+
+export function useApproveIngestRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (args: MutationArgs) =>
+      apiRequest(`/api/ingest-requests/${args.id}/approve`, {
+        method: "POST",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ingest-requests"] });
+    },
+  });
+}
+
+export function useRejectIngestRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (args: MutationArgs) =>
+      apiRequest(`/api/ingest-requests/${args.id}/reject`, {
+        method: "POST",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ingest-requests"] });
+    },
+  });
+}
+
 export function useGetUsers(params?: { status?: string }) {
   return useQuery({
     queryKey: ["/api/users", params || {}],

@@ -14,6 +14,7 @@ import Register from "./pages/Register";
 import Collections from "./pages/Collections";
 import MaterialDetail from "./pages/MaterialDetail";
 import About from "./pages/About";
+import Features from "./pages/Features";
 import Terms from "./pages/Terms";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminMaterials from "./pages/admin/Materials";
@@ -74,6 +75,7 @@ function Router() {
       <Route path="/collections" component={Collections} />
       <Route path="/materials/:id" component={MaterialDetail} />
       <Route path="/about" component={About} />
+      <Route path="/features" component={Features} />
       <Route path="/terms" component={Terms} />
       <Route path="/feedback" component={Feedback} />
       

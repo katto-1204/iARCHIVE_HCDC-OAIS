@@ -9,6 +9,10 @@ import {
   jsonStoreGetAccessRequests,
   jsonStoreRejectAccessRequest,
   jsonStoreSubmitAccessRequest,
+  jsonStoreGetIngestRequests,
+  jsonStoreSubmitIngestRequest,
+  jsonStoreApproveIngestRequest,
+  jsonStoreRejectIngestRequest,
 } from "../lib/jsonStore.js";
 
 const router = Router();
@@ -141,6 +145,98 @@ router.post("/requests/:id/reject", requireAuth, requireRole("admin", "archivist
     const ok = jsonStoreRejectAccessRequest({ id, reason });
     if (!ok) { res.status(404).json({ error: "Request not found" }); return; }
     res.json({ message: "Request rejected" });
+  }
+});
+
+// ============================
+// Ingest Requests Endpoints
+// ============================
+
+router.get("/ingest-requests", requireAuth, requireRole("admin", "archivist"), async (req, res) => {
+  const status = req.query.status as string;
+  try {
+    const db = getFirestoreDb();
+    let query: Query = db.collection("ingestRequests");
+    if (status && ["pending", "approved", "rejected"].includes(status)) {
+      query = query.where("status", "==", status);
+    }
+    query = query.orderBy("requestedAt", "desc");
+    const snapshot = await query.get();
+    const rows = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    res.json({ requests: rows });
+  } catch {
+    res.json(jsonStoreGetIngestRequests({ status }));
+  }
+});
+
+router.post("/ingest-requests", requireAuth, requireRole("admin", "archivist"), async (req, res) => {
+  const user = req.user!;
+  const { materialId, materialTitle, hierarchyPath } = req.body;
+  if (!materialId || !materialTitle) { res.status(400).json({ error: "Material ID and Title required" }); return; }
+  try {
+    const id = generateId();
+    const db = getFirestoreDb();
+    const now = new Date().toISOString();
+    const payload = {
+      id,
+      materialId,
+      materialTitle,
+      hierarchyPath: hierarchyPath || "",
+      requestedBy: user.name || "Unknown",
+      requestedAt: now,
+      status: "pending",
+    };
+    await db.collection("ingestRequests").doc(id).set(payload);
+    await logAudit({ action: "SUBMIT_INGEST", entityType: "request", entityId: id, userId: user.userId, userName: user.name, details: `Submitted ingest request for material: ${materialId}` });
+    res.status(201).json(payload);
+  } catch {
+    const created = jsonStoreSubmitIngestRequest({
+      id: generateId(),
+      materialId,
+      materialTitle,
+      hierarchyPath,
+      requestedBy: user.name || "Unknown",
+      requestedAt: new Date().toISOString(),
+    });
+    if (!created) {
+      res.status(500).json({ error: "Failed to submit ingest request" });
+      return;
+    }
+    res.status(201).json(created);
+  }
+});
+
+router.post("/ingest-requests/:id/approve", requireAuth, requireRole("admin", "archivist"), async (req, res) => {
+  const user = req.user!;
+  const id = String(req.params.id);
+  try {
+    const db = getFirestoreDb();
+    const snap = await db.collection("ingestRequests").doc(id).get();
+    if (!snap.exists) { res.status(404).json({ error: "Request not found" }); return; }
+    await db.collection("ingestRequests").doc(id).update({ status: "approved" });
+    await logAudit({ action: "APPROVE_INGEST", entityType: "request", entityId: id, userId: user.userId, userName: user.name, details: `Approved ingest request` });
+    res.json({ message: "Ingest request approved" });
+  } catch {
+    const ok = jsonStoreApproveIngestRequest(id);
+    if (!ok) { res.status(404).json({ error: "Request not found" }); return; }
+    res.json({ message: "Ingest request approved" });
+  }
+});
+
+router.post("/ingest-requests/:id/reject", requireAuth, requireRole("admin", "archivist"), async (req, res) => {
+  const user = req.user!;
+  const id = String(req.params.id);
+  try {
+    const db = getFirestoreDb();
+    const snap = await db.collection("ingestRequests").doc(id).get();
+    if (!snap.exists) { res.status(404).json({ error: "Request not found" }); return; }
+    await db.collection("ingestRequests").doc(id).update({ status: "rejected" });
+    await logAudit({ action: "REJECT_INGEST", entityType: "request", entityId: id, userId: user.userId, userName: user.name, details: `Rejected ingest request` });
+    res.json({ message: "Ingest request rejected" });
+  } catch {
+    const ok = jsonStoreRejectIngestRequest(id);
+    if (!ok) { res.status(404).json({ error: "Request not found" }); return; }
+    res.json({ message: "Ingest request rejected" });
   }
 });
 

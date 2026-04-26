@@ -928,4 +928,55 @@ export function jsonStoreRejectAccessRequest(input: { id: string; reason: string
   return true;
 }
 
+// ========================
+// Ingest Requests Tracking
+// ========================
+
+type JsonIngestRequest = {
+  id: string;
+  materialId: string;
+  materialTitle: string;
+  hierarchyPath?: string;
+  requestedBy: string;
+  requestedAt: string;
+  status: "pending" | "approved" | "rejected";
+};
+
+const INGEST_REQUESTS_PATH = path.join(DATA_BASE, "ingest_requests.json");
+
+export function jsonStoreGetIngestRequests(params: { status?: string }) {
+  const requests = safeReadJson<JsonIngestRequest[]>(INGEST_REQUESTS_PATH, []);
+  let filtered = requests.slice();
+  if (params.status && ["pending", "approved", "rejected"].includes(params.status)) {
+    filtered = filtered.filter((r) => r.status === params.status);
+  }
+  return { requests: filtered.sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime()) };
+}
+
+export function jsonStoreSubmitIngestRequest(input: Omit<JsonIngestRequest, "status">) {
+  const requests = safeReadJson<JsonIngestRequest[]>(INGEST_REQUESTS_PATH, []);
+  const newReq: JsonIngestRequest = { ...input, status: "pending" };
+  requests.push(newReq);
+  safeWriteJson(INGEST_REQUESTS_PATH, requests);
+  return newReq;
+}
+
+export function jsonStoreApproveIngestRequest(id: string) {
+  const requests = safeReadJson<JsonIngestRequest[]>(INGEST_REQUESTS_PATH, []);
+  const idx = requests.findIndex((r) => r.id === id);
+  if (idx === -1) return false;
+  requests[idx].status = "approved";
+  safeWriteJson(INGEST_REQUESTS_PATH, requests);
+  return true;
+}
+
+export function jsonStoreRejectIngestRequest(id: string) {
+  const requests = safeReadJson<JsonIngestRequest[]>(INGEST_REQUESTS_PATH, []);
+  const idx = requests.findIndex((r) => r.id === id);
+  if (idx === -1) return false;
+  requests[idx].status = "rejected";
+  safeWriteJson(INGEST_REQUESTS_PATH, requests);
+  return true;
+}
+
 

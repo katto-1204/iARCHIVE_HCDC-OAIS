@@ -426,7 +426,7 @@ export default function Home() {
             <div className="md:col-span-2 md:ml-auto">
               <h4 className="text-white font-bold text-xs mb-6 uppercase tracking-[0.2em] text-white/80">Platform</h4>
               <ul className="space-y-4">
-                {[{ l: "Browse Archive", h: "/collections" }, { l: "About iArchive", h: "/about" }, { l: "System Login", h: "/login" }, { l: "Register", h: "/register" }].map((lnk, i) => (
+                {[{ l: "Browse Archive", h: "/collections" }, { l: "About iArchive", h: "/about" }, { l: "Features", h: "/features" }, { l: "System Login", h: "/login" }, { l: "Register", h: "/register" }].map((lnk, i) => (
                   <li key={i}><Link href={lnk.h} className="text-white/40 hover:text-[#4169E1] text-sm transition-colors font-medium">{lnk.l}</Link></li>
                 ))}
               </ul>

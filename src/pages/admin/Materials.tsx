@@ -37,7 +37,7 @@ import {
   getAllFieldValues, downloadMetadataExcel,
 } from "@/data/metadataUtils";
 import { useToast } from "@/hooks/use-toast";
-import { useGetMe, useGetCategories, useCreateMaterial, useUpdateMaterial, useDeleteMaterial, useGetMaterials as useGetMaterialsApi } from "@workspace/api-client-react";
+import { useGetMe, useGetCategories, useCreateMaterial, useUpdateMaterial, useDeleteMaterial, useGetMaterials as useGetMaterialsApi, useSubmitIngestRequest } from "@workspace/api-client-react";
 
 type ViewMode = "table" | "detail";
 
@@ -177,6 +177,7 @@ export default function AdminMaterials() {
 
   const { mutateAsync: createMaterial, isPending: isCreating } = useCreateMaterial();
   const { mutateAsync: updateMaterial, isPending: isUpdating } = useUpdateMaterial();
+  const { mutateAsync: submitIngestRequest } = useSubmitIngestRequest();
 
   // Dynamic Upload Form
   const [mediaCategory, setMediaCategory] = React.useState<"document" | "image" | "video">("document");
@@ -1964,6 +1965,16 @@ export default function AdminMaterials() {
                 });
 
                 if (approvalStatus === "pending") {
+                  submitIngestRequest({
+                    data: {
+                      materialId: newMaterial.uniqueId,
+                      materialTitle: newMaterial.title || newMaterial.uniqueId,
+                      hierarchyPath,
+                      requestedBy: me?.name || "Archivist",
+                      requestedAt: new Date().toISOString(),
+                    }
+                  });
+                  // Still do local fallback update
                   addIngestRequest({
                     id: newMaterial.id,
                     materialId: newMaterial.uniqueId,

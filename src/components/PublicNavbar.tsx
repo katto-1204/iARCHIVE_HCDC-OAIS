@@ -97,7 +97,7 @@ export function PublicNavbar({ isTransparentOnTop = false }: { isTransparentOnTo
           {/* Nav Links (Centered) */}
           <nav className="hidden md:flex items-center gap-1 text-sm font-medium">
             <NavButton href="/collections">Collections</NavButton>
-            <NavButton href="/about#features">Features</NavButton>
+            <NavButton href="/features">Features</NavButton>
             <NavButton href="/terms">Terms</NavButton>
           </nav>
 
@@ -163,7 +163,7 @@ export function PublicNavbar({ isTransparentOnTop = false }: { isTransparentOnTo
               <Link href="/about">
                 <span className="py-2 border-b border-white/10 block cursor-pointer" onClick={() => setMobileMenuOpen(false)}>About iArchive</span>
               </Link>
-              <Link href="/about#features">
+              <Link href="/features">
                 <span className="py-2 border-b border-white/10 block cursor-pointer" onClick={() => setMobileMenuOpen(false)}>Features</span>
               </Link>
               <Link href="/terms">
