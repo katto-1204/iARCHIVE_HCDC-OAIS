@@ -259,7 +259,7 @@ export default function Collections() {
                 >
                   <option value="">All Sub-fonds</option>
                    {Array.from(new Set(materials.map((m: any) => {
-                     const parts = (m.hierarchyPath || "").split(" > ").filter(p => !!p.trim());
+                     const parts = (m.hierarchyPath || "").split(" > ").filter((p: string) => !!p.trim());
                      return parts[1];
                    }).filter(Boolean))).sort().map((sf: any) => (
                     <option key={sf} value={sf}>{sf}</option>

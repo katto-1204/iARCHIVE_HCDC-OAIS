@@ -567,3 +567,16 @@ export function useMarkFeedbackRead() {
     },
   });
 }
+
+export function useDeleteFeedback() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (args: MutationArgs) =>
+      apiRequest(`/api/feedback/${args.id}`, {
+        method: "DELETE",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/feedback"] });
+    },
+  });
+}

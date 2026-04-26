@@ -813,7 +813,7 @@ export default function AdminMaterials() {
       try {
         const target = materials.find((m) => m.id === materialToDelete);
         
-        await deleteMatApi({ id: materialToDelete });
+        await deleteMatApi(materialToDelete);
         
         // Local storage sync fallback for production resilience
         const updated = await deleteMaterial(materialToDelete);

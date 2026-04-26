@@ -1,9 +1,11 @@
 
+import type { ArchivalMaterial } from "./sampleData";
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Departmental Sample Materials
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const materialCCJE: ArchivalMaterial = {
+const materialCCJE: Partial<ArchivalMaterial> = {
   id: "ccje-1",
   uniqueId: "26iA060000008",
   title: "CCJE Internship Program Records 2023",
@@ -18,7 +20,7 @@ const materialCCJE: ArchivalMaterial = {
   createdBy: "M. Santos"
 };
 
-const materialCHATME: ArchivalMaterial = {
+const materialCHATME: Partial<ArchivalMaterial> = {
   id: "chatme-1",
   uniqueId: "26iA070000009",
   title: "CHATME Culinary Arts Expo 2024",
@@ -33,7 +35,7 @@ const materialCHATME: ArchivalMaterial = {
   createdBy: "M. Santos"
 };
 
-const materialHUSOCOM: ArchivalMaterial = {
+const materialHUSOCOM: Partial<ArchivalMaterial> = {
   id: "husocom-1",
   uniqueId: "26iA080000010",
   title: "HUSOCOM Humanities Symposium 2023",
@@ -48,7 +50,7 @@ const materialHUSOCOM: ArchivalMaterial = {
   createdBy: "M. Santos"
 };
 
-const materialCOME: ArchivalMaterial = {
+const materialCOME: Partial<ArchivalMaterial> = {
   id: "come-1",
   uniqueId: "26iA090000011",
   title: "COME Maritime Safety Training Manual",
@@ -63,7 +65,7 @@ const materialCOME: ArchivalMaterial = {
   createdBy: "M. Santos"
 };
 
-const materialSBME: ArchivalMaterial = {
+const materialSBME: Partial<ArchivalMaterial> = {
   id: "sbme-1",
   uniqueId: "26iA100000012",
   title: "SBME Business Excellence Awards 2023",
@@ -78,7 +80,7 @@ const materialSBME: ArchivalMaterial = {
   createdBy: "M. Santos"
 };
 
-const materialSTE: ArchivalMaterial = {
+const materialSTE: Partial<ArchivalMaterial> = {
   id: "ste-1",
   uniqueId: "26iA110000013",
   title: "STE Practice Teaching Journals 2024",

@@ -61,4 +61,15 @@ router.patch("/:id/read", async (req, res) => {
   }
 });
 
+router.delete("/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const db = getFirestoreDb();
+    await db.collection("feedback").doc(id).delete();
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete feedback" });
+  }
+});
+
 export default router;

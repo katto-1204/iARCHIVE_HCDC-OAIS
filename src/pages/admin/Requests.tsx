@@ -21,6 +21,9 @@ export default function AdminRequests() {
   const { mutate: rejectIngest, isPending: isRejectingIngest } = useRejectIngestRequest();
   const { toast } = useToast();
 
+  // Optimistic UI state to hide processed items immediately
+  const [hiddenItems, setHiddenItems] = React.useState<Set<string>>(new Set());
+
   // Dialog states
   const [approveAccessDialog, setApproveAccessDialog] = React.useState<{id: string, title: string} | null>(null);
   const [rejectAccessDialog, setRejectAccessDialog] = React.useState<{id: string, title: string} | null>(null);
@@ -31,9 +34,11 @@ export default function AdminRequests() {
 
   const confirmApproveAccess = () => {
     if (!approveAccessDialog) return;
-    approve({ id: approveAccessDialog.id }, {
+    const reqId = approveAccessDialog.id;
+    approve({ id: reqId }, {
       onSuccess: () => {
         toast({ title: "Approved", description: "Request granted." });
+        setHiddenItems(prev => new Set(prev).add(reqId));
         refetchAccess();
         setApproveAccessDialog(null);
       },
@@ -45,9 +50,11 @@ export default function AdminRequests() {
 
   const confirmRejectAccess = () => {
     if (!rejectAccessDialog) return;
-    reject({ id: rejectAccessDialog.id, data: { reason: rejectReason } }, {
+    const reqId = rejectAccessDialog.id;
+    reject({ id: reqId, data: { reason: rejectReason } }, {
       onSuccess: () => {
         toast({ title: "Rejected", description: "Request denied." });
+        setHiddenItems(prev => new Set(prev).add(reqId));
         refetchAccess();
         setRejectAccessDialog(null);
         setRejectReason("");
@@ -62,10 +69,10 @@ export default function AdminRequests() {
 
   const confirmApproveIngest = async () => {
     if (!approveIngestDialog) return;
-    const { id } = approveIngestDialog;
+    const reqId = approveIngestDialog.id;
     
     // Attempt local approval
-    const material = getMaterialById(id);
+    const material = getMaterialById(reqId);
     if (material) {
       const updatedOpts = {
         ...material,
@@ -76,7 +83,7 @@ export default function AdminRequests() {
       await saveMaterial(updatedOpts as any);
       
       try {
-        await updateMaterialAsync({ id, data: { approvalStatus: "approved", approvedAt: updatedOpts.approvedAt, approvedBy: updatedOpts.approvedBy } });
+        await updateMaterialAsync({ id: reqId, data: { approvalStatus: "approved", approvedAt: updatedOpts.approvedAt, approvedBy: updatedOpts.approvedBy } });
       } catch (e) {
         // fail silently for offline/fallback mode
       }
@@ -89,9 +96,10 @@ export default function AdminRequests() {
       });
     }
 
-    approveIngest({ id }, {
+    approveIngest({ id: reqId }, {
       onSuccess: () => {
         toast({ title: "Approved", description: "Ingest request approved." });
+        setHiddenItems(prev => new Set(prev).add(reqId));
         refetchIngest();
         setApproveIngestDialog(null);
       },
@@ -105,8 +113,8 @@ export default function AdminRequests() {
 
   const confirmRejectIngest = async () => {
     if (!rejectIngestDialog) return;
-    const { id } = rejectIngestDialog;
-    const material = getMaterialById(id);
+    const reqId = rejectIngestDialog.id;
+    const material = getMaterialById(reqId);
     if (material) {
       await saveMaterial({
         ...material,
@@ -116,7 +124,7 @@ export default function AdminRequests() {
       } as any);
 
       try {
-        await updateMaterialAsync({ id, data: { approvalStatus: "rejected", approvedAt: null, approvedBy: null } });
+        await updateMaterialAsync({ id: reqId, data: { approvalStatus: "rejected", approvedAt: null, approvedBy: null } });
       } catch (e) {
         // fail silently for offline/fallback mode
       }
@@ -129,9 +137,10 @@ export default function AdminRequests() {
       });
     }
 
-    rejectIngest({ id }, {
+    rejectIngest({ id: reqId }, {
       onSuccess: () => {
         toast({ title: "Rejected", description: "Ingest request rejected." });
+        setHiddenItems(prev => new Set(prev).add(reqId));
         refetchIngest();
         setRejectIngestDialog(null);
       },
@@ -145,7 +154,7 @@ export default function AdminRequests() {
 
   const filteredIngest = (ingestData ?? []).filter((req: any) => req.status === tab);
   const accessRequests = data?.requests ?? [];
-  const requestRows = mode === "access" ? accessRequests : filteredIngest;
+  const requestRows = (mode === "access" ? accessRequests : filteredIngest).filter((r: any) => !hiddenItems.has(r.id));
 
   return (
     <AdminLayout>
