@@ -61,9 +61,10 @@ router.get("/requests", requireAuth, async (req, res) => {
     if (user.role === "student" || user.role === "researcher" || user.role === "alumni" || user.role === "public") {
       query = query.where("userId", "==", user.userId);
     }
-    query = query.orderBy("createdAt", "desc");
+    // query = query.orderBy("createdAt", "desc");
     const snapshot = await query.get();
     const rows = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    rows.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
     const total = rows.length;
     const totalPages = Math.ceil(total / limit);
     const offset = (page - 1) * limit;
@@ -160,9 +161,10 @@ router.get("/ingest-requests", requireAuth, requireRole("admin", "archivist"), a
     if (status && ["pending", "approved", "rejected"].includes(status)) {
       query = query.where("status", "==", status);
     }
-    query = query.orderBy("requestedAt", "desc");
+    // query = query.orderBy("requestedAt", "desc");
     const snapshot = await query.get();
     const rows = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    rows.sort((a: any, b: any) => new Date(b.requestedAt || 0).getTime() - new Date(a.requestedAt || 0).getTime());
     res.json({ requests: rows });
   } catch {
     res.json(jsonStoreGetIngestRequests({ status }));

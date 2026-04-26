@@ -183,6 +183,26 @@ router.post("/materials", requireAuth, async (req, res) => {
       createdAt: now,
       updatedAt: now,
     };
+    
+    // Chunking logic for large Base64 files
+    if (newMat.fileUrl && newMat.fileUrl.length > 800000) {
+      console.log(`File is large (${newMat.fileUrl.length} chars). Chunking into materialChunks...`);
+      const fullStr = newMat.fileUrl;
+      const chunkSize = 800000;
+      let chunksCount = 0;
+      for (let i = 0; i < fullStr.length; i += chunkSize) {
+        await db.collection("materialChunks").doc(`${id}_chunk_${chunksCount}`).set({
+          materialId: id,
+          chunkIndex: chunksCount,
+          data: fullStr.substring(i, i + chunkSize)
+        });
+        chunksCount++;
+      }
+      (newMat as any).isFileChunked = true;
+      (newMat as any).chunksCount = chunksCount;
+      newMat.fileUrl = "CHUNKED";
+    }
+
     await db.collection("materials").doc(id).set(newMat);
     await logAudit({ action: "CREATE_MATERIAL", entityType: "material", entityId: id, userId: user.userId, userName: user.name, details: `Created material: ${body.title}` });
     const catName = body.categoryId ? (cats.find((c: any) => c.id === body.categoryId) as any)?.name : undefined;
@@ -212,6 +232,17 @@ router.get("/materials/:id", async (req, res) => {
       return; 
     }
     const m = { id: docSnap.id, ...docSnap.data() } as any;
+    
+    // Reconstruct chunked Base64 fileUrl if necessary
+    if (m.isFileChunked) {
+      let reconstructed = "";
+      for (let i = 0; i < (m.chunksCount || 0); i++) {
+        const cSnap = await db.collection("materialChunks").doc(`${m.id}_chunk_${i}`).get();
+        if (cSnap.exists) reconstructed += cSnap.data()?.data || "";
+      }
+      m.fileUrl = reconstructed;
+    }
+
     const catsSnap = await db.collection("categories").get();
     const catMap = Object.fromEntries(catsSnap.docs.map((c) => [c.id, (c.data() as any).name]));
     let related: any[] = [];
@@ -252,7 +283,7 @@ router.put("/materials/:id", requireAuth, async (req, res) => {
     const snap = await db.collection("materials").doc(id).get();
     if (!snap.exists) { res.status(404).json({ error: "Material not found" }); return; }
     const m = snap.data() as any;
-    await db.collection("materials").doc(id).update({
+    const updateData: any = {
       title: body.title ?? m.title,
       altTitle: body.altTitle ?? m.altTitle ?? null,
       creator: body.creator ?? m.creator ?? null,
@@ -270,7 +301,25 @@ router.put("/materials/:id", requireAuth, async (req, res) => {
       thumbnailUrl: body.thumbnailUrl !== undefined ? body.thumbnailUrl : m.thumbnailUrl ?? null,
       status: body.status ?? m.status,
       updatedAt: new Date().toISOString(),
-    });
+    };
+
+    if (updateData.fileUrl && updateData.fileUrl.length > 800000 && updateData.fileUrl !== "CHUNKED") {
+      console.log(`Update File is large (${updateData.fileUrl.length} chars). Chunking...`);
+      const fullStr = updateData.fileUrl;
+      const chunkSize = 800000;
+      let chunksCount = 0;
+      for (let i = 0; i < fullStr.length; i += chunkSize) {
+        await db.collection("materialChunks").doc(`${id}_chunk_${chunksCount}`).set({
+          materialId: id, chunkIndex: chunksCount, data: fullStr.substring(i, i + chunkSize)
+        });
+        chunksCount++;
+      }
+      updateData.isFileChunked = true;
+      updateData.chunksCount = chunksCount;
+      updateData.fileUrl = "CHUNKED";
+    }
+
+    await db.collection("materials").doc(id).update(updateData);
     await logAudit({ action: "UPDATE_MATERIAL", entityType: "material", entityId: id, userId: user.userId, userName: user.name, details: `Updated material: ${m.title}` });
     const updated = await db.collection("materials").doc(id).get();
     res.json(formatMaterial({ id, ...updated.data() }));
@@ -291,7 +340,7 @@ router.patch("/materials/:id", requireAuth, async (req, res) => {
     const snap = await db.collection("materials").doc(id).get();
     if (!snap.exists) { res.status(404).json({ error: "Material not found" }); return; }
     const m = snap.data() as any;
-    await db.collection("materials").doc(id).update({
+    const updateData: any = {
       title: body.title ?? m.title,
       altTitle: body.altTitle ?? m.altTitle ?? null,
       creator: body.creator ?? m.creator ?? null,
@@ -308,7 +357,24 @@ router.patch("/materials/:id", requireAuth, async (req, res) => {
       thumbnailUrl: body.thumbnailUrl !== undefined ? body.thumbnailUrl : m.thumbnailUrl ?? null,
       status: body.status ?? m.status,
       updatedAt: new Date().toISOString(),
-    });
+    };
+
+    if (updateData.fileUrl && updateData.fileUrl.length > 800000 && updateData.fileUrl !== "CHUNKED") {
+      const fullStr = updateData.fileUrl;
+      const chunkSize = 800000;
+      let chunksCount = 0;
+      for (let i = 0; i < fullStr.length; i += chunkSize) {
+        await db.collection("materialChunks").doc(`${id}_chunk_${chunksCount}`).set({
+          materialId: id, chunkIndex: chunksCount, data: fullStr.substring(i, i + chunkSize)
+        });
+        chunksCount++;
+      }
+      updateData.isFileChunked = true;
+      updateData.chunksCount = chunksCount;
+      updateData.fileUrl = "CHUNKED";
+    }
+
+    await db.collection("materials").doc(id).update(updateData);
     await logAudit({ action: "UPDATE_MATERIAL", entityType: "material", entityId: id, userId: user.userId, userName: user.name, details: `Updated material: ${m.title}` });
     const updated = await db.collection("materials").doc(id).get();
     res.json(formatMaterial({ id, ...updated.data() }));

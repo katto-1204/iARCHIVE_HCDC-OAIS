@@ -40,8 +40,8 @@ if (process.env.NODE_ENV !== "production") {
   });
 }
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // TOTAL WAR DEMO BYPASS: Intercepts ANY POST containing demo credentials
 // This is immune to pathing issues (e.g. /api/auth/login vs /auth/login)
