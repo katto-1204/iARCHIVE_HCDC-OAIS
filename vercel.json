@@ -8,7 +8,16 @@
     },
     {
       "src": "api/index.ts",
-      "use": "@vercel/node"
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": [
+          "materials.json",
+          "categories.json",
+          "users.json",
+          "users copy.json",
+          "access_requests.json"
+        ]
+      }
     }
   ],
   "rewrites": [

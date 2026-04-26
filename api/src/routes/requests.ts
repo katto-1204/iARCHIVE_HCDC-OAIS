@@ -16,24 +16,38 @@ const router = Router();
 async function formatRequest(r: any) {
   const db = getFirestoreDb();
   let materialTitle = "Unknown";
-  const matSnap = await db.collection("materials").doc(r.materialId).get();
-  if (matSnap.exists) {
-    materialTitle = (matSnap.data() as any).title || "Unknown";
-  } else {
-    const byMaterialId = await db.collection("materials").where("materialId", "==", r.materialId).limit(1).get();
-    if (!byMaterialId.empty) {
-      materialTitle = (byMaterialId.docs[0].data() as any).title || "Unknown";
+  let userName = "Unknown";
+  let userEmail = "Unknown";
+  
+  if (db) {
+    try {
+      const matSnap = await db.collection("materials").doc(r.materialId).get();
+      if (matSnap.exists) {
+        materialTitle = (matSnap.data() as any).title || "Unknown";
+      } else {
+        const byMaterialId = await db.collection("materials").where("materialId", "==", r.materialId).limit(1).get();
+        if (!byMaterialId.empty) {
+          materialTitle = (byMaterialId.docs[0].data() as any).title || "Unknown";
+        }
+      }
+      const userSnap = await db.collection("users").doc(r.userId).get();
+      if (userSnap.exists) {
+        const user = userSnap.data() as any;
+        userName = user?.name || "Unknown";
+        userEmail = user?.email || "Unknown";
+      }
+    } catch {
+      // Continue with default values
     }
   }
-  const userSnap = await db.collection("users").doc(r.userId).get();
-  const user = userSnap.exists ? (userSnap.data() as any) : null;
+
   return {
     id: r.id,
     materialId: r.materialId,
     materialTitle,
     userId: r.userId,
-    userName: user?.name || "Unknown",
-    userEmail: user?.email || "Unknown",
+    userName,
+    userEmail,
     purpose: r.purpose,
     status: r.status,
     rejectionReason: r.rejectionReason,
@@ -50,6 +64,7 @@ router.get("/requests", requireAuth, async (req, res) => {
 
   try {
     const db = getFirestoreDb();
+    if (!db) throw new Error("Firebase unavailable");
     let query: Query = db.collection("accessRequests");
     if (status && ["pending", "approved", "rejected"].includes(status)) {
       query = query.where("status", "==", status);

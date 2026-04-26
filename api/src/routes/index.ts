@@ -7,6 +7,7 @@ import requestsRouter from "./requests.js";
 import usersRouter from "./users.js";
 import announcementsRouter from "./announcements.js";
 import auditRouter from "./audit.js";
+import feedbackRouter from "./feedback.js";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use(requestsRouter);
 router.use(usersRouter);
 router.use(announcementsRouter);
 router.use(auditRouter);
+router.use(feedbackRouter);
 
 export default router;

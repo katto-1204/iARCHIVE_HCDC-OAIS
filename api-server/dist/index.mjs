@@ -35627,8 +35627,12 @@ var audit_default = router3;
 var router4 = (0, import_express4.Router)();
 function formatMaterial(m, categoryName) {
   const catName = categoryName || m.categoryName || "Uncategorized";
+  const idValue = m.id || m.materialId || m.material_id;
   return {
     ...m,
+    id: idValue,
+    uniqueId: m.materialId || m.material_id || m.id,
+    materialId: m.materialId || m.material_id || m.id,
     categoryName: catName,
     hierarchyPath: m.hierarchyPath || `HCDC > ${catName} > General Series`
   };
@@ -35796,6 +35800,11 @@ router4.get("/materials/:id", async (req, res) => {
       docSnap = byMaterialId.docs[0];
     }
     if (!docSnap || !docSnap.exists) {
+      const mat = jsonStoreGetMaterial(id);
+      if (mat) {
+        res.json(mat);
+        return;
+      }
       res.status(404).json({ error: "Material not found" });
       return;
     }
@@ -35839,7 +35848,8 @@ router4.get("/materials/:id", async (req, res) => {
       fileUrl: m.fileUrl,
       relatedItems: related.map((r) => formatMaterial(r, r.categoryId ? catMap[r.categoryId] : void 0))
     });
-  } catch {
+  } catch (err) {
+    console.error("Material retrieval failed:", err);
     const mat = jsonStoreGetMaterial(id);
     if (!mat) {
       res.status(404).json({ error: "Material not found" });

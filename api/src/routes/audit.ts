@@ -15,6 +15,7 @@ export async function logAudit(data: {
 }) {
   try {
     const db = getFirestoreDb();
+    if (!db) { console.warn("Audit log skipped (Firebase unavailable):", data.action); return; }
     const id = generateId();
     await db.collection("auditLogs").doc(id).set({
       id,
@@ -36,6 +37,7 @@ router.get("/audit", requireAuth, requireRole("admin", "archivist"), async (req,
   const limit = Math.min(100, parseInt(req.query.limit as string) || 20);
   try {
     const db = getFirestoreDb();
+    if (!db) throw new Error("Firebase unavailable");
     const snapshot = await db.collection("auditLogs").orderBy("createdAt", "desc").get();
     const logs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     const total = logs.length;

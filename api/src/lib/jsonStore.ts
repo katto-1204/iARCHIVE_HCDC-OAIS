@@ -123,6 +123,53 @@ function getDemoUserById(id?: string) {
 
 const isVercel = process.env.VERCEL === "1" || !!process.env.VERCEL_ENV;
 const DATA_BASE = isVercel ? "/tmp" : process.cwd();
+
+// ─── Seed from project root on Vercel cold start ───────────────────────────
+// On Vercel, /tmp is empty on cold starts. We need to seed it from the project
+// root JSON files that are bundled alongside the serverless function.
+function seedVercelTmp() {
+  if (!isVercel) return;
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+
+  // Try multiple possible locations for the source JSON files
+  const possibleRoots = [
+    process.cwd(),                                      // Vercel function CWD
+    path.resolve(__dirname, "..", "..", ".."),            // api/src/lib -> api root -> project root
+    path.resolve(__dirname, "..", "..", "..", ".."),      // one more level up
+  ];
+
+  const filesToSeed = [
+    "categories.json",
+    "materials.json",
+    "users.json",
+    "users copy.json",
+    "access_requests.json",
+  ];
+
+  for (const fileName of filesToSeed) {
+    const destPath = path.join("/tmp", fileName);
+    if (fs.existsSync(destPath)) continue; // Already seeded
+
+    for (const root of possibleRoots) {
+      const srcPath = path.join(root, fileName);
+      try {
+        if (fs.existsSync(srcPath)) {
+          const data = fs.readFileSync(srcPath, "utf8");
+          fs.writeFileSync(destPath, data, "utf8");
+          console.log(`Seeded /tmp/${fileName} from ${srcPath}`);
+          break;
+        }
+      } catch {
+        // Continue to next possible root
+      }
+    }
+  }
+}
+
+// Run seed on module load
+seedVercelTmp();
+
 const CATEGORIES_PATH = path.join(DATA_BASE, "categories.json");
 const MATERIALS_PATH = path.join(DATA_BASE, "materials.json");
 const USERS_PATH = path.join(DATA_BASE, "users.json");
@@ -385,7 +432,7 @@ export function jsonStoreGetMaterials(params: {
   const categoryId = params.category?.trim();
 
   const filtered = materials
-    .filter((m) => m.status === "published")
+    .filter((m) => !m.status || m.status === "published")
     .filter((m) => {
       if (!search) return true;
       return (
@@ -407,7 +454,7 @@ export function jsonStoreGetMaterials(params: {
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   const page = Math.max(1, params.page ?? 1);
-  const limit = Math.min(50, params.limit ?? 12);
+  const limit = Math.min(1000, params.limit ?? 50);
   const total = filtered.length;
   const totalPages = Math.ceil(total / limit);
   const offset = (page - 1) * limit;
@@ -583,10 +630,11 @@ export function jsonStoreDeleteMaterial(id: string) {
 export function jsonStoreGetStats() {
   const categories = safeReadJson<JsonCategory[]>(CATEGORIES_PATH, []);
   const materials = safeReadJson<JsonMaterial[]>(MATERIALS_PATH, []);
+  const users = safeReadJson<JsonUser[]>(USERS_PATH, []);
   return {
-    totalMaterials: materials.filter((m) => m.status === "published").length,
+    totalMaterials: materials.filter((m) => !m.status || m.status === "published").length,
     totalCategories: categories.length,
-    totalUsers: 3,
+    totalUsers: Math.max(3, users.length),
     pendingRequests: 0,
     pendingUsers: 0,
     recentActivity: [],
@@ -642,6 +690,20 @@ export function jsonStoreGetUserById(id: string) {
     createdAt: new Date().toISOString(),
     passwordHash: "",
   };
+}
+
+export function jsonStoreUpdateUserProfile(id: string, updates: { name?: string; institution?: string; purpose?: string }) {
+  const users = safeReadJson<JsonUser[]>(USERS_PATH, []);
+  const index = users.findIndex((u: any) => u.id === id);
+  if (index === -1) return null;
+
+  if (updates.name) users[index].name = updates.name;
+  if (updates.institution !== undefined) users[index].institution = updates.institution;
+  if (updates.purpose !== undefined) users[index].purpose = updates.purpose;
+  users[index].updatedAt = new Date().toISOString();
+
+  safeWriteJson(USERS_PATH, users);
+  return users[index];
 }
 
 export function jsonStoreRegisterUser(input: {
@@ -798,51 +860,26 @@ export function jsonStoreGetAccessRequests(params: {
   filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   const total = filtered.length;
   const totalPages = Math.ceil(total / limit);
-
   const pageItems = filtered.slice(offset, offset + limit);
-  const materialTitleById: Record<string, string> = {};
-  for (const m of materials) {
-    materialTitleById[m.id] = m.title;
-    materialTitleById[m.material_id] = m.title;
-  }
-  const demoUserById: Record<string, JsonUser> = Object.fromEntries(
-    DEMO_USERS.map((u) => [
-      u.id,
-      {
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        role: u.role,
-        userCategory: u.userCategory,
-        institution: u.institution,
-        purpose: null,
-        status: u.status,
-        passwordHash: "",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      } as JsonUser,
-    ]),
-  );
-  const userById: Record<string, JsonUser> = {
-    ...demoUserById,
-    ...Object.fromEntries([...users, ...usersCopy].map((u) => [u.id, u])),
-  };
+
+  const allUsers = Array.from(new Map([...users, ...usersCopy].map((u) => [u.id, u])).values());
 
   return {
-    requests: pageItems.map((r) => {
-      const user = userById[r.userId];
+    requests: pageItems.map((req) => {
+      const u = allUsers.find((x) => x.id === req.userId) || getDemoUserById(req.userId);
+      const mat = materials.find((m) => m.id === req.materialId || m.material_id === req.materialId);
       return {
-        id: r.id,
-        materialId: r.materialId,
-        materialTitle: materialTitleById[r.materialId] || "Unknown",
-        userId: r.userId,
-        userName: user?.name || "Unknown",
-        userEmail: user?.email || "Unknown",
-        purpose: r.purpose,
-        status: r.status,
-        rejectionReason: r.rejectionReason ?? null,
-        createdAt: r.createdAt,
-        updatedAt: r.updatedAt ?? r.createdAt,
+        id: req.id,
+        materialId: req.materialId,
+        materialTitle: mat?.title || "Unknown Material",
+        userId: req.userId,
+        userName: u?.name || "Unknown",
+        userEmail: u?.email || "Unknown",
+        purpose: req.purpose,
+        status: req.status,
+        rejectionReason: req.rejectionReason,
+        createdAt: req.createdAt,
+        updatedAt: req.updatedAt,
       };
     }),
     total,
@@ -855,13 +892,12 @@ export function jsonStoreSubmitAccessRequest(input: {
   materialId: string;
   purpose: string;
   userId: string;
-  userName?: string;
-  userEmail?: string;
+  userName: string;
 }) {
   const accessRequests = safeReadJson<JsonAccessRequest[]>(ACCESS_REQUESTS_PATH, []);
   const now = new Date().toISOString();
   const id = generateId();
-  const req: JsonAccessRequest = {
+  const newReq: JsonAccessRequest = {
     id,
     materialId: input.materialId,
     userId: input.userId,
@@ -870,26 +906,23 @@ export function jsonStoreSubmitAccessRequest(input: {
     createdAt: now,
     updatedAt: now,
   };
-  accessRequests.push(req);
+  accessRequests.push(newReq);
   safeWriteJson(ACCESS_REQUESTS_PATH, accessRequests);
 
   const materials = safeReadJson<JsonMaterial[]>(MATERIALS_PATH, []);
-  const material = materials.find((m) => m.id === input.materialId || m.material_id === input.materialId);
-
-  const user = jsonStoreGetUserById(input.userId);
+  const mat = materials.find((m) => m.id === input.materialId || m.material_id === input.materialId);
 
   return {
-    id: req.id,
-    materialId: req.materialId,
-    materialTitle: material?.title ?? "Unknown",
-    userId: req.userId,
-    userName: user?.name ?? input.userName ?? "Unknown",
-    userEmail: user?.email ?? input.userEmail ?? "Unknown",
-    purpose: req.purpose,
-    status: req.status,
-    rejectionReason: req.rejectionReason ?? null,
-    createdAt: req.createdAt,
-    updatedAt: req.updatedAt ?? req.createdAt,
+    id,
+    materialId: input.materialId,
+    materialTitle: mat?.title || "Unknown Material",
+    userId: input.userId,
+    userName: input.userName,
+    userEmail: "",
+    purpose: input.purpose,
+    status: "pending" as const,
+    createdAt: now,
+    updatedAt: now,
   };
 }
 
@@ -903,15 +936,13 @@ export function jsonStoreApproveAccessRequest(id: string) {
   return true;
 }
 
-export function jsonStoreRejectAccessRequest(input: { id: string; reason: string }) {
+export function jsonStoreRejectAccessRequest(input: { id: string; reason?: string }) {
   const accessRequests = safeReadJson<JsonAccessRequest[]>(ACCESS_REQUESTS_PATH, []);
   const idx = accessRequests.findIndex((r) => r.id === input.id);
   if (idx === -1) return false;
   accessRequests[idx].status = "rejected";
-  accessRequests[idx].rejectionReason = input.reason;
+  accessRequests[idx].rejectionReason = input.reason || null;
   accessRequests[idx].updatedAt = new Date().toISOString();
   safeWriteJson(ACCESS_REQUESTS_PATH, accessRequests);
   return true;
 }
-
-

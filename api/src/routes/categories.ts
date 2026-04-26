@@ -15,13 +15,11 @@ const router = Router();
 router.get("/categories", async (_req, res) => {
   try {
     const db = getFirestoreDb();
-    if (!db) throw new Error("Firebase Unavailable");
+    if (!db) throw new Error("Firebase unavailable");
     
     const catsSnap = await db.collection("categories").orderBy("categoryNo", "asc").get();
     const cats = catsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     
-    // Efficiently get counts for all categories at once if needed, or just return cats
-    // Since we want to be safe, we'll try a simpler approach if many categories exist
     const materialsSnap = await db.collection("materials").select("categoryId").get();
     const matCounts: Record<string, number> = {};
     materialsSnap.docs.forEach(doc => {
@@ -31,8 +29,8 @@ router.get("/categories", async (_req, res) => {
 
     res.json(cats.map((c: any) => ({ ...c, materialCount: matCounts[c.id] || 0 })));
   } catch (err: any) {
-    console.error("Error fetching categories from Firestore:", err);
-    res.status(500).json({ error: "Failed to fetch categories", details: err.message });
+    console.error("Firestore categories fetch failed, using JSON store fallback:", err.message);
+    res.json(jsonStoreGetCategories());
   }
 });
 
@@ -42,6 +40,7 @@ router.post("/categories", requireAuth, requireRole("admin", "archivist"), async
   if (!name || !level) { res.status(400).json({ error: "Name and level required" }); return; }
   try {
     const db = getFirestoreDb();
+    if (!db) throw new Error("Firebase unavailable");
     const countSnap = await db.collection("categories").count().get();
     const categoryNo = Number(countSnap.data().count) + 1;
     const id = generateId();
@@ -59,8 +58,9 @@ router.post("/categories", requireAuth, requireRole("admin", "archivist"), async
     await logAudit({ action: "CREATE_CATEGORY", entityType: "category", entityId: id, userId: user.userId, userName: user.name, details: `Created category: ${name}` });
     res.status(201).json({ id, name, description: description ?? null, level, parentId: parentId ?? null, categoryNo, createdAt: now, updatedAt: now, materialCount: 0 });
   } catch (err: any) {
-    console.error("Error creating category in Firestore:", err);
-    res.status(500).json({ error: "Failed to create category", details: err.message });
+    console.error("Firestore category create failed, using JSON store fallback:", err.message);
+    const created = jsonStoreCreateCategory({ name, description, level, parentId });
+    res.status(201).json(created);
   }
 });
 
@@ -70,6 +70,7 @@ router.put("/categories/:id", requireAuth, requireRole("admin", "archivist"), as
   const { name, description, level, parentId } = req.body;
   try {
     const db = getFirestoreDb();
+    if (!db) throw new Error("Firebase unavailable");
     const snap = await db.collection("categories").doc(id).get();
     if (!snap.exists) { res.status(404).json({ error: "Category not found" }); return; }
     const cat = snap.data() as any;
@@ -85,8 +86,10 @@ router.put("/categories/:id", requireAuth, requireRole("admin", "archivist"), as
     const updated = await db.collection("categories").doc(id).get();
     res.json({ id, ...updated.data(), materialCount: Number(countSnap.data().count) });
   } catch (err: any) {
-    console.error("Error updating category in Firestore:", err);
-    res.status(500).json({ error: "Failed to update category", details: err.message });
+    console.error("Firestore category update failed, using JSON store fallback:", err.message);
+    const updated = jsonStoreUpdateCategory({ id, name, description, level, parentId });
+    if (!updated) { res.status(404).json({ error: "Category not found" }); return; }
+    res.json(updated);
   }
 });
 
@@ -97,6 +100,7 @@ router.patch("/categories/:id", requireAuth, requireRole("admin", "archivist"), 
   const { name, description, level, parentId } = req.body;
   try {
     const db = getFirestoreDb();
+    if (!db) throw new Error("Firebase unavailable");
     const snap = await db.collection("categories").doc(id).get();
     if (!snap.exists) { res.status(404).json({ error: "Category not found" }); return; }
     const cat = snap.data() as any;
@@ -112,8 +116,10 @@ router.patch("/categories/:id", requireAuth, requireRole("admin", "archivist"), 
     const updated = await db.collection("categories").doc(id).get();
     res.json({ id, ...updated.data(), materialCount: Number(countSnap.data().count) });
   } catch (err: any) {
-    console.error("Error patching category in Firestore:", err);
-    res.status(500).json({ error: "Failed to update category", details: err.message });
+    console.error("Firestore category patch failed, using JSON store fallback:", err.message);
+    const updated = jsonStoreUpdateCategory({ id, name, description, level, parentId });
+    if (!updated) { res.status(404).json({ error: "Category not found" }); return; }
+    res.json(updated);
   }
 });
 
@@ -122,6 +128,7 @@ router.delete("/categories/:id", requireAuth, requireRole("admin"), async (req, 
   const id = String(req.params.id);
   try {
     const db = getFirestoreDb();
+    if (!db) throw new Error("Firebase unavailable");
     const snap = await db.collection("categories").doc(id).get();
     if (!snap.exists) { res.status(404).json({ error: "Category not found" }); return; }
     const cat = snap.data() as any;
@@ -135,8 +142,10 @@ router.delete("/categories/:id", requireAuth, requireRole("admin"), async (req, 
     await logAudit({ action: "DELETE_CATEGORY", entityType: "category", entityId: id, userId: user.userId, userName: user.name, details: `Deleted category: ${cat.name}` });
     res.json({ message: "Category deleted" });
   } catch (err: any) {
-    console.error("Error deleting category from Firestore:", err);
-    res.status(500).json({ error: "Failed to delete category", details: err.message });
+    console.error("Firestore category delete failed, using JSON store fallback:", err.message);
+    const ok = jsonStoreDeleteCategory(id);
+    if (!ok) { res.status(404).json({ error: "Category not found" }); return; }
+    res.json({ message: "Category deleted" });
   }
 });
 

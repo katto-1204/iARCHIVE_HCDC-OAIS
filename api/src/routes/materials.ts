@@ -15,26 +15,16 @@ import { getFirestoreDb } from "../lib/firebase.js";
 const router = Router();
 
 function formatMaterial(m: any, categoryName?: string) {
+  const catName = categoryName || m.categoryName || "Uncategorized";
+  const idValue = m.id || m.materialId || m.material_id;
+  // Pass through ALL fields from Firestore — the frontend depends on many of them
   return {
-    id: m.id,
-    materialId: m.materialId,
-    title: m.title,
-    altTitle: m.altTitle,
-    creator: m.creator,
-    description: m.description,
-    date: m.date,
-    categoryId: m.categoryId,
-    categoryName: categoryName || null,
-    access: m.access,
-    format: m.format,
-    fileSize: m.fileSize,
-    pages: m.pages,
-    language: m.language,
-    publisher: m.publisher,
-    status: m.status,
-    thumbnailUrl: m.thumbnailUrl,
-    createdAt: m.createdAt,
-    createdBy: m.createdBy,
+    ...m,
+    id: idValue,
+    uniqueId: m.materialId || m.material_id || m.id,
+    materialId: m.materialId || m.material_id || m.id,
+    categoryName: catName,
+    hierarchyPath: m.hierarchyPath || `HCDC > ${catName} > General Series`,
   };
 }
 
@@ -56,22 +46,41 @@ function matchesSearch(m: any, search: string) {
 
 router.get("/materials", async (req, res) => {
   const page = Math.max(1, parseInt(req.query.page as string) || 1);
-  const limit = Math.min(50, parseInt(req.query.limit as string) || 12);
+  const limit = Math.min(1000, parseInt(req.query.limit as string) || 50);
   const search = req.query.search as string;
   const access = req.query.access as string;
   const categoryId = req.query.category as string;
   try {
     const db = getFirestoreDb();
-    let query = db.collection("materials").where("status", "==", "published");
+    if (!db) throw new Error("Firebase unavailable");
+    let query: FirebaseFirestore.Query = db.collection("materials");
     if (access && ["public", "restricted", "confidential"].includes(access)) {
       query = query.where("access", "==", access);
     }
     if (categoryId) {
       query = query.where("categoryId", "==", categoryId);
     }
-    query = query.orderBy("createdAt", "desc");
     const snapshot = await query.get();
-    const rows = snapshot.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) })) as any[];
+    let rows = snapshot.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) })) as any[];
+    
+    // Merge mock data from JSON store
+    try {
+      const mockData = jsonStoreGetMaterials({ limit: 10000, access, category: categoryId });
+      if (mockData && mockData.materials) {
+        const firestoreIds = new Set(rows.map(r => r.id));
+        const mockRows = mockData.materials.filter((m: any) => !firestoreIds.has(m.id));
+        rows = [...rows, ...mockRows];
+      }
+    } catch (e) {
+        console.warn("Failed to merge mock materials", e);
+    }
+
+    // Sort in memory to avoid requiring composite Firestore indexes
+    rows.sort((a, b) => {
+      const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const db2 = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return db2 - da;
+    });
     const filtered = search ? rows.filter((m) => matchesSearch(m, search)) : rows;
     const total = filtered.length;
     const totalPages = Math.ceil(total / limit);
@@ -82,9 +91,17 @@ router.get("/materials", async (req, res) => {
     const catMap = Object.fromEntries(catsSnap.docs.map((c) => [c.id, (c.data() as any).name]));
     const materials = pageItems.map((m) => formatMaterial(m, m.categoryId ? catMap[m.categoryId] : undefined));
     res.json({ materials, total, page, limit, totalPages });
-  } catch (err: any) {
-    console.error("Error fetching materials from Firestore:", err);
-    res.status(500).json({ error: "Failed to fetch materials", details: err.message });
+  } catch (err) {
+    console.error("Firestore materials fetch failed, using JSON store fallback:", err);
+    res.json(
+      jsonStoreGetMaterials({
+        search,
+        access,
+        category: categoryId,
+        page,
+        limit,
+      }),
+    );
   }
 });
 
@@ -94,6 +111,7 @@ router.post("/materials", requireAuth, async (req, res) => {
   if (!body.title) { res.status(400).json({ error: "Title required" }); return; }
   try {
     const db = getFirestoreDb();
+    if (!db) throw new Error("Firebase unavailable");
     const catsSnap = await db.collection("categories").get();
     const cats = catsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     const cat = body.categoryId ? cats.find((c: any) => c.id === body.categoryId) : cats[0];
@@ -126,6 +144,7 @@ router.post("/materials", requireAuth, async (req, res) => {
       description: body.description ?? null,
       date: body.date ?? null,
       categoryId: body.categoryId ?? (cat as any)?.id ?? null,
+      hierarchyPath: body.hierarchyPath || `HCDC > ${(cat as any)?.name || "Uncategorized"} > General Series`,
       access: body.access || "public",
       format: body.format ?? null,
       fileSize: body.fileSize ?? null,
@@ -170,9 +189,9 @@ router.post("/materials", requireAuth, async (req, res) => {
     await logAudit({ action: "CREATE_MATERIAL", entityType: "material", entityId: id, userId: user.userId, userName: user.name, details: `Created material: ${body.title}` });
     const catName = body.categoryId ? (cats.find((c: any) => c.id === body.categoryId) as any)?.name : undefined;
     res.status(201).json(formatMaterial(newMat, catName));
-  } catch (err: any) {
-    console.error("Error creating material in Firestore:", err);
-    res.status(500).json({ error: "Failed to create material", details: err.message });
+  } catch {
+    const created = jsonStoreCreateMaterial({ data: body, user: { userId: user.userId, name: user.name } });
+    res.status(201).json(created);
   }
 });
 
@@ -180,12 +199,21 @@ router.get("/materials/:id", async (req, res) => {
   const id = String(req.params.id);
   try {
     const db = getFirestoreDb();
+    if (!db) throw new Error("Firebase unavailable");
     let docSnap = await db.collection("materials").doc(id).get();
     if (!docSnap.exists) {
       const byMaterialId = await db.collection("materials").where("materialId", "==", id).limit(1).get();
       docSnap = byMaterialId.docs[0];
     }
-    if (!docSnap || !docSnap.exists) { res.status(404).json({ error: "Material not found" }); return; }
+    if (!docSnap || !docSnap.exists) { 
+      const mat = jsonStoreGetMaterial(id);
+      if (mat) {
+        res.json(mat);
+        return;
+      }
+      res.status(404).json({ error: "Material not found" }); 
+      return; 
+    }
     const m = { id: docSnap.id, ...docSnap.data() } as any;
     const catsSnap = await db.collection("categories").get();
     const catMap = Object.fromEntries(catsSnap.docs.map((c) => [c.id, (c.data() as any).name]));
@@ -210,9 +238,11 @@ router.get("/materials/:id", async (req, res) => {
       fixityStatus: m.fixityStatus, preferredCitation: m.preferredCitation, fileUrl: m.fileUrl,
       relatedItems: related.map((r) => formatMaterial(r, r.categoryId ? catMap[r.categoryId] : undefined)),
     });
-  } catch (err: any) {
-    console.error("Error fetching material by ID from Firestore:", err);
-    res.status(500).json({ error: "Failed to fetch material", details: err.message });
+  } catch (err) {
+    console.error("Material retrieval failed:", err);
+    const mat = jsonStoreGetMaterial(id);
+    if (!mat) { res.status(404).json({ error: "Material not found" }); return; }
+    res.json(mat);
   }
 });
 
@@ -222,6 +252,7 @@ router.put("/materials/:id", requireAuth, async (req, res) => {
   const body = req.body;
   try {
     const db = getFirestoreDb();
+    if (!db) throw new Error("Firebase unavailable");
     const snap = await db.collection("materials").doc(id).get();
     if (!snap.exists) { res.status(404).json({ error: "Material not found" }); return; }
     const m = snap.data() as any;
@@ -232,6 +263,7 @@ router.put("/materials/:id", requireAuth, async (req, res) => {
       description: body.description ?? m.description ?? null,
       date: body.date ?? m.date ?? null,
       categoryId: body.categoryId !== undefined ? body.categoryId : m.categoryId,
+      hierarchyPath: body.hierarchyPath !== undefined ? body.hierarchyPath : m.hierarchyPath,
       access: body.access ?? m.access,
       format: body.format ?? m.format ?? null,
       fileSize: body.fileSize ?? m.fileSize ?? null,
@@ -246,9 +278,10 @@ router.put("/materials/:id", requireAuth, async (req, res) => {
     await logAudit({ action: "UPDATE_MATERIAL", entityType: "material", entityId: id, userId: user.userId, userName: user.name, details: `Updated material: ${m.title}` });
     const updated = await db.collection("materials").doc(id).get();
     res.json(formatMaterial({ id, ...updated.data() }));
-  } catch (err: any) {
-    console.error("Error updating material in Firestore:", err);
-    res.status(500).json({ error: "Failed to update material", details: err.message });
+  } catch {
+    const updated = jsonStoreUpdateMaterial(id, body, { userId: user.userId, name: user.name });
+    if (!updated) { res.status(404).json({ error: "Material not found" }); return; }
+    res.json(updated);
   }
 });
 
@@ -259,6 +292,7 @@ router.patch("/materials/:id", requireAuth, async (req, res) => {
   const body = req.body;
   try {
     const db = getFirestoreDb();
+    if (!db) throw new Error("Firebase unavailable");
     const snap = await db.collection("materials").doc(id).get();
     if (!snap.exists) { res.status(404).json({ error: "Material not found" }); return; }
     const m = snap.data() as any;
@@ -283,9 +317,10 @@ router.patch("/materials/:id", requireAuth, async (req, res) => {
     await logAudit({ action: "UPDATE_MATERIAL", entityType: "material", entityId: id, userId: user.userId, userName: user.name, details: `Updated material: ${m.title}` });
     const updated = await db.collection("materials").doc(id).get();
     res.json(formatMaterial({ id, ...updated.data() }));
-  } catch (err: any) {
-    console.error("Error updating material in Firestore:", err);
-    res.status(500).json({ error: "Failed to update material", details: err.message });
+  } catch {
+    const updated = jsonStoreUpdateMaterial(id, body, { userId: user.userId, name: user.name });
+    if (!updated) { res.status(404).json({ error: "Material not found" }); return; }
+    res.json(updated);
   }
 });
 
@@ -294,44 +329,40 @@ router.delete("/materials/:id", requireAuth, async (req, res) => {
   const id = String(req.params.id);
   try {
     const db = getFirestoreDb();
-    if (!db) throw new Error("Firebase Unavailable");
+    if (!db) throw new Error("Firebase unavailable");
     const snap = await db.collection("materials").doc(id).get();
     if (!snap.exists) { res.status(404).json({ error: "Material not found" }); return; }
     const m = snap.data() as any;
     await db.collection("materials").doc(id).delete();
     await logAudit({ action: "DELETE_MATERIAL", entityType: "material", entityId: id, userId: user.userId, userName: user.name, details: `Deleted material: ${m.title}` });
     res.json({ message: "Material deleted" });
-  } catch (err: any) {
-    console.error("Error deleting material from Firestore:", err);
-    res.status(500).json({ error: "Failed to delete material", details: err.message });
+  } catch {
+    const ok = jsonStoreDeleteMaterial(id);
+    if (!ok) { res.status(404).json({ error: "Material not found" }); return; }
+    res.json({ message: "Material deleted" });
   }
 });
 
 router.get("/stats", async (_req, res) => {
   try {
     const db = getFirestoreDb();
-    if (!db) throw new Error("Firebase Unavailable");
-    
-    // Safer counting
-    const matCount = await db.collection("materials").where("status", "==", "published").count().get().then(s => s.data()?.count || 0).catch(() => 0);
-    const catCount = await db.collection("categories").count().get().then(s => s.data()?.count || 0).catch(() => 0);
-    const userCount = await db.collection("users").where("status", "==", "active").count().get().then(s => s.data()?.count || 0).catch(() => 0);
-    const pendingReqs = await db.collection("accessRequests").where("status", "==", "pending").count().get().then(s => s.data()?.count || 0).catch(() => 0);
-    const pendingUsers = await db.collection("users").where("status", "==", "pending").count().get().then(s => s.data()?.count || 0).catch(() => 0);
-    
-    const recentActivitySnap = await db.collection("auditLogs").orderBy("createdAt", "desc").limit(10).get().catch(() => ({ docs: [] }));
-    const recentActivity = recentActivitySnap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
-
+    if (!db) throw new Error("Firebase unavailable");
+    const matCount = await db.collection("materials").where("status", "==", "published").count().get();
+    const catCount = await db.collection("categories").count().get();
+    const userCount = await db.collection("users").where("status", "==", "active").count().get();
+    const pendingReqs = await db.collection("accessRequests").where("status", "==", "pending").count().get();
+    const pendingUsers = await db.collection("users").where("status", "==", "pending").count().get();
+    const recentActivitySnap = await db.collection("auditLogs").orderBy("createdAt", "desc").limit(10).get();
+    const recentActivity = recentActivitySnap.docs.map((d) => ({ id: d.id, ...d.data() }));
     res.json({
-      totalMaterials: Number(matCount),
-      totalCategories: Number(catCount),
-      totalUsers: Number(userCount),
-      pendingRequests: Number(pendingReqs),
-      pendingUsers: Number(pendingUsers),
+      totalMaterials: Number(matCount.data().count),
+      totalCategories: Number(catCount.data().count),
+      totalUsers: Number(userCount.data().count),
+      pendingRequests: Number(pendingReqs.data().count),
+      pendingUsers: Number(pendingUsers.data().count),
       recentActivity,
     });
-  } catch (err: any) {
-    console.warn("Stats Firebase fallback:", err.message);
+  } catch {
     res.json(jsonStoreGetStats());
   }
 });
