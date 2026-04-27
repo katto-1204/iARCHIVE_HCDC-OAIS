@@ -332,8 +332,10 @@ export function useDeleteAnnouncement() {
 }
 
 export function useGetAccessRequests(params?: { status?: string }) {
+  const token = typeof window !== 'undefined' ? localStorage.getItem("iarchive_token") : null;
   return useQuery({
     queryKey: ["/api/requests", params || {}],
+    enabled: !!token,
     queryFn: async () => {
       const searchParams = new URLSearchParams();
       if (params?.status) searchParams.set("status", params.status);
@@ -587,6 +589,20 @@ export function useUploadMaterialPage() {
       apiRequest(`/api/materials/${args.materialId}/pages`, {
         method: "POST",
         body: JSON.stringify({ pageIndex: args.pageIndex, data: args.data }),
+      }),
+  });
+}
+
+export function useUploadMaterialFileChunk() {
+  return useMutation({
+    mutationFn: (args: { materialId: string; chunkIndex: number; totalChunks: number; data: string }) =>
+      apiRequest(`/api/materials/${args.materialId}/file/chunks`, {
+        method: "POST",
+        body: JSON.stringify({ 
+          chunkIndex: args.chunkIndex, 
+          totalChunks: args.totalChunks, 
+          data: args.data 
+        }),
       }),
   });
 }

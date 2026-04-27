@@ -37,7 +37,7 @@ import {
   getAllFieldValues, downloadMetadataExcel,
 } from "@/data/metadataUtils";
 import { useToast } from "@/hooks/use-toast";
-import { useGetMe, useGetCategories, useCreateMaterial, useUpdateMaterial, useDeleteMaterial, useGetMaterials as useGetMaterialsApi, useSubmitIngestRequest, useUploadMaterialPage } from "@workspace/api-client-react";
+import { useGetMe, useGetCategories, useCreateMaterial, useUpdateMaterial, useDeleteMaterial, useGetMaterials as useGetMaterialsApi, useSubmitIngestRequest, useUploadMaterialPage, useUploadMaterialFileChunk } from "@workspace/api-client-react";
 
 type ViewMode = "table" | "detail";
 
@@ -135,6 +135,7 @@ export default function AdminMaterials() {
   const updateMaterialMutation = useUpdateMaterial();
   const deleteMaterialMutation = useDeleteMaterial();
   const uploadPageMutation = useUploadMaterialPage();
+  const uploadFileChunkMutation = useUploadMaterialFileChunk();
   const submitIngestMutation = useSubmitIngestRequest();
 
   React.useEffect(() => {
@@ -384,7 +385,7 @@ export default function AdminMaterials() {
           const textContent = await page.getTextContent();
           fullText += textContent.items.map((item: any) => item.str).join(" ") + "\n\n";
           
-          if (i <= 10) {
+          if (i <= 50) { // Increased limit to 50 pages for better coverage
             try {
               const viewport = page.getViewport({ scale: 1.0 });
               const canvas = document.createElement('canvas');
@@ -2018,22 +2019,34 @@ export default function AdminMaterials() {
                 apiData.hasPageImages = pagesToUpload.length > 0;
                 apiData.pageCount = pagesToUpload.length;
                 
-                // Convert main file Blob to Base64 for Firestore storage
+                // Handle main file (with chunking for large files)
+                let mainFileBase64 = "";
                 if (uploadForm.fileData instanceof Blob) {
                   try {
                     const compressed = await compressFile(uploadForm.fileData, 0.9);
-                    const base64 = await fileToBase64(compressed);
-                    apiData.fileUrl = base64;
+                    mainFileBase64 = await fileToBase64(compressed);
                   } catch (err) {
                     console.error("Base64 conversion failed:", err);
-                    // Fall through — fileUrl might still be a URL string
                   }
+                } else if (typeof apiData.fileUrl === 'string' && apiData.fileUrl.length > 1000) {
+                  // If it's already a base64 string from a previous scan
+                  mainFileBase64 = apiData.fileUrl;
+                }
+                
+                // If main file is large (> 500KB base64), use chunked upload
+                if (mainFileBase64.length > 500000) {
+                  console.log(`File is large (${mainFileBase64.length} chars). Using chunked upload.`);
+                  apiData.fileUrl = "PENDING_UPLOAD";
+                } else if (mainFileBase64.length > 0) {
+                  apiData.fileUrl = mainFileBase64;
+                  mainFileBase64 = ""; // Clear so we don't double-upload
                 }
                 
                 // Convert first page thumbnail to base64 for Firestore (for collections display)
                 if (pdfPreviewBlobs.length > 0) {
                   try {
-                    const thumbBase64 = await fileToBase64(pdfPreviewBlobs[0]);
+                    const compressedThumb = await compressFile(pdfPreviewBlobs[0], 0.1);
+                    const thumbBase64 = await fileToBase64(compressedThumb);
                     apiData.thumbnailUrl = thumbBase64;
                   } catch (err) {
                     console.error("Thumbnail base64 failed:", err);
@@ -2094,6 +2107,33 @@ export default function AdminMaterials() {
                       id: pageToast.id,
                       title: "Upload Complete",
                       description: `All ${pagesToUpload.length} pages saved to Firestore.`,
+                    });
+                  }
+
+                  // C. Chunked Main File Upload (if it was too large for the initial payload)
+                  if (finalId && mainFileBase64.length > 0) {
+                    const chunkToast = toast({
+                      title: "Uploading Document",
+                      description: "Large document detected. Uploading in chunks...",
+                    });
+                    
+                    const chunkSize = 500000;
+                    const totalChunks = Math.ceil(mainFileBase64.length / chunkSize);
+                    
+                    for (let i = 0; i < totalChunks; i++) {
+                      const chunk = mainFileBase64.substring(i * chunkSize, (i + 1) * chunkSize);
+                      await uploadFileChunkMutation.mutateAsync({
+                        materialId: finalId,
+                        chunkIndex: i,
+                        totalChunks,
+                        data: chunk
+                      });
+                    }
+                    
+                    chunkToast.update({
+                      id: chunkToast.id,
+                      title: "Document Uploaded",
+                      description: "Large document successfully saved to Firestore.",
                     });
                   }
 

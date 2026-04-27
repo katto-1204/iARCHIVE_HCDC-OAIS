@@ -3,7 +3,7 @@ import { useRoute, Link } from "wouter";
 import { format } from "date-fns";
 import { PublicNavbar } from "@/components/PublicNavbar";
 import { 
-  FileText, Lock, ArrowLeft, CheckCircle, 
+  FileText, Lock, ArrowLeft, CheckCircle, Loader2,
   ZoomIn, ZoomOut, RotateCcw, Maximize2, ExternalLink,
   Database, HardDrive, Calendar, User, Tag, BookOpen, AlertTriangle, Edit,
   ChevronLeft, ChevronRight, X, Eye, Maximize, Hand, Move
@@ -142,7 +142,19 @@ function MediaViewer({
     }
   };
 
-  if (loadedPagesCount === 0) return null;
+  // If we have a thumbnail but no pages yet, use thumbnail as the cover for now
+  const displayImages = images.length > 0 ? images : (materialId && materialId.length > 0 ? [] : []);
+  
+  if (loadedPagesCount === 0) {
+    return (
+      <div className="rounded-[24px] border border-white/10 overflow-hidden shadow-2xl bg-[#0a1628] flex items-center justify-center h-[720px]">
+        <div className="text-center p-10">
+          <Loader2 className="w-10 h-10 text-white/20 animate-spin mx-auto mb-4" />
+          <p className="text-white/40 text-sm font-medium">Loading document pages...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -784,7 +796,7 @@ export default function MaterialDetail() {
                 </span>
               </div>
 
-              <h1 className="text-2xl font-bold text-[#0a1628] mb-5 leading-snug">{material.title}</h1>
+              <h1 className="text-2xl font-bold text-[#0a1628] mb-5 leading-snug break-words">{material.title}</h1>
 
               {/* NEW: TERMS OF USE STICKY VISIBLE */}
               {(material as any).termsOfUse && (

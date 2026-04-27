@@ -277,15 +277,21 @@ router.get("/materials/:id", async (req, res) => {
       m.fileUrl = reconstructed;
     }
 
-    // Fetch page images if they exist
-    if (m.hasPageImages) {
+    // Always try to fetch page images if it's a single material view
+    try {
       const pagesSnap = await db.collection("materialPages")
         .where("materialId", "==", m.id)
         .get();
-      m.pageImages = pagesSnap.docs
-        .map(d => d.data())
-        .sort((a: any, b: any) => (a.pageIndex || 0) - (b.pageIndex || 0))
-        .map(d => d.data);
+      
+      if (!pagesSnap.empty) {
+        m.pageImages = pagesSnap.docs
+          .map(d => d.data())
+          .sort((a: any, b: any) => (a.pageIndex || 0) - (b.pageIndex || 0))
+          .map(d => d.data);
+        m.hasPageImages = true;
+      }
+    } catch (e) {
+      console.error("Failed to fetch pages for material:", m.id, e);
     }
 
     const catsSnap = await db.collection("categories").get();
@@ -585,6 +591,42 @@ router.post("/materials/:id/pages", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("Failed to save page:", err);
     res.status(500).json({ error: "Failed to save page" });
+  }
+});
+
+router.post("/materials/:id/file/chunks", requireAuth, async (req, res) => {
+  const id = String(req.params.id);
+  const { chunkIndex, totalChunks, data } = req.body;
+  
+  if (chunkIndex === undefined || !data) {
+    return res.status(400).json({ error: "chunkIndex and data are required" });
+  }
+
+  try {
+    const db = getFirestoreDb();
+    if (!db) throw new Error("Firebase unavailable");
+
+    // Save chunk to materialChunks collection
+    await db.collection("materialChunks").doc(`${id}_chunk_${chunkIndex}`).set({
+      materialId: id,
+      chunkIndex,
+      data
+    });
+
+    // If this is the last chunk, update the material document
+    if (chunkIndex === totalChunks - 1) {
+      await db.collection("materials").doc(id).update({
+        isFileChunked: true,
+        chunksCount: totalChunks,
+        fileUrl: "CHUNKED", // Placeholder to indicate data is in chunks
+        updatedAt: new Date().toISOString()
+      });
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Failed to save file chunk:", err);
+    res.status(500).json({ error: "Failed to save file chunk" });
   }
 });
 
