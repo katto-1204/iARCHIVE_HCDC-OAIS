@@ -755,7 +755,7 @@ export default function AdminMaterials() {
     if (search) {
       const s = search.toLowerCase();
       result = result.filter(m =>
-        m.title?.toLowerCase().includes(s) || m.uniqueId.toLowerCase().includes(s) || m.creator?.toLowerCase().includes(s)
+        m.title?.toLowerCase().includes(s) || (m.uniqueId || "").toLowerCase().includes(s) || m.creator?.toLowerCase().includes(s)
       );
     }
     if (approvalFilter !== "all") {
@@ -1449,8 +1449,17 @@ export default function AdminMaterials() {
                                 onSelectAll={() => {}}
                                 onClearAll={() => {}}
                                 onValueChange={async (fieldKey, value) => {
-                                  // Inline edit propagation for CRUD saving
+                                  // Inline edit propagation for both Cloud and Local saving
                                   const updatedMat = { ...mat, [fieldKey]: value };
+                                  
+                                  try {
+                                    // Primary sync to cloud (Firestore)
+                                    await updateMaterial({ id: mat.id, data: { [fieldKey]: value } });
+                                  } catch (err) {
+                                    console.warn("Cloud sync failed during inline edit, falling back to local storage:", err);
+                                  }
+                                  
+                                  // Local storage sync for persistence resilience
                                   const updated = await saveMaterial(updatedMat as any);
                                   setMaterials(updated);
                                 }}
