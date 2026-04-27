@@ -657,14 +657,7 @@ export default function MaterialDetail() {
               <MediaViewer
                 materialId={material.id}
                 pages={material.pages || 60}
-                pageImages={material.pageImages && material.pageImages.length > 0 ? material.pageImages : [
-                  "https://images.unsplash.com/photo-1586281380349-632531db7ed4?w=800&auto=format&fit=crop",
-                  "https://images.unsplash.com/photo-1616628188550-808682f392ce?w=800&auto=format&fit=crop",
-                  "https://images.unsplash.com/photo-1544816155-12df9643f363?w=800&auto=format&fit=crop",
-                  "https://images.unsplash.com/photo-1586281380117-5a60ae2050cc?w=800&auto=format&fit=crop",
-                  "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=800&auto=format&fit=crop",
-                  "https://images.unsplash.com/photo-1532012197267-da84d127e765?w=800&auto=format&fit=crop"
-                ]}
+                pageImages={material.pageImages && material.pageImages.length > 0 ? material.pageImages : (material.fileUrl ? [material.fileUrl] : [])}
                 title={material.title}
                 isRestricted={isRestricted}
                 canAccess={canAccessFull}

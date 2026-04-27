@@ -1410,7 +1410,7 @@ export default function AdminMaterials() {
                                     <span className="text-emerald-400">Public Object</span>
                                   )}
                                </div>
-                               {(selectedMaterial?.fileUrl && selectedMaterial.fileUrl.startsWith("data:application/pdf")) || selectedMaterial?.fileType?.includes("pdf") || selectedMaterial?.format?.includes("pdf") ? (
+                               {(selectedMaterial?.fileUrl && typeof selectedMaterial.fileUrl === "string" && selectedMaterial.fileUrl.startsWith("data:application/pdf")) || selectedMaterial?.fileType?.includes("pdf") || selectedMaterial?.format?.includes("pdf") ? (
                                    <div className="relative w-full h-[700px] bg-[#333]">
                                       <object data={selectedMaterial.fileUrl} type="application/pdf" className="w-full h-full">
                                          <iframe src={selectedMaterial.fileUrl} className="w-full h-full border-0">
@@ -1418,7 +1418,7 @@ export default function AdminMaterials() {
                                          </iframe>
                                       </object>
                                    </div>
-                               ) : selectedMaterial?.fileType?.startsWith("video/") || (selectedMaterial?.fileUrl && selectedMaterial.fileUrl.startsWith("data:video/")) ? (
+                               ) : selectedMaterial?.fileType?.startsWith("video/") || (selectedMaterial?.fileUrl && typeof selectedMaterial.fileUrl === "string" && selectedMaterial.fileUrl.startsWith("data:video/")) ? (
                                    <video src={selectedMaterial.fileUrl} controls className="w-full h-[600px] object-contain bg-black" />
                                ) : selectedMaterial?.pageImages && selectedMaterial.pageImages.length > 0 ? (
                                    <div className="flex overflow-x-auto gap-4 p-8 snap-x bg-[#1a1a1a] custom-scrollbar scroll-smooth">
@@ -1429,7 +1429,7 @@ export default function AdminMaterials() {
                                           </div>
                                        ))}
                                    </div>
-                               ) : selectedMaterial?.fileType?.startsWith("image/") || (selectedMaterial?.fileUrl && selectedMaterial.fileUrl.startsWith("data:image/")) ? (
+                               ) : selectedMaterial?.fileType?.startsWith("image/") || (selectedMaterial?.fileUrl && typeof selectedMaterial.fileUrl === "string" && selectedMaterial.fileUrl.startsWith("data:image/")) ? (
                                    <div className="bg-[#1a1a1a] p-8 flex justify-center">
                                       <img src={selectedMaterial.fileUrl} className="max-h-[600px] max-w-full object-contain rounded shadow-2xl bg-white" />
                                    </div>
