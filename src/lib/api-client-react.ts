@@ -580,3 +580,13 @@ export function useDeleteFeedback() {
     },
   });
 }
+
+export function useUploadMaterialPage() {
+  return useMutation({
+    mutationFn: (args: { materialId: string; pageIndex: number; data: string }) =>
+      apiRequest(`/api/materials/${args.materialId}/pages`, {
+        method: "POST",
+        body: JSON.stringify({ pageIndex: args.pageIndex, data: args.data }),
+      }),
+  });
+}

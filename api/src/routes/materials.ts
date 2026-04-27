@@ -568,6 +568,31 @@ router.delete("/materials/:id", requireAuth, async (req, res) => {
   }
 });
 
+router.post("/materials/:id/pages", requireAuth, async (req, res) => {
+  const id = String(req.params.id);
+  const { pageIndex, data } = req.body;
+  if (pageIndex === undefined || !data) {
+    return res.status(400).json({ error: "pageIndex and data are required" });
+  }
+  try {
+    const db = getFirestoreDb();
+    await db.collection("materialPages").doc(`${id}_page_${pageIndex}`).set({
+      materialId: id,
+      pageIndex,
+      data
+    });
+    // Ensure the material document reflects that it has pages
+    await db.collection("materials").doc(id).update({
+      hasPageImages: true,
+      updatedAt: new Date().toISOString()
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Failed to save page:", err);
+    res.status(500).json({ error: "Failed to save page" });
+  }
+});
+
 router.get("/stats", async (_req, res) => {
   try {
     const db = getFirestoreDb();

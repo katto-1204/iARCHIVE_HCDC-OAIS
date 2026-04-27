@@ -20,7 +20,7 @@ import {
   type ArchivalMaterial, type HierarchyNode, type HierarchyLevel
 } from "@/data/sampleData";
 import { 
-  getMaterials, saveMaterial, deleteMaterial, addActivity, addIngestRequest, updateIngestRequest
+  deleteMaterial, addActivity, addIngestRequest, updateIngestRequest
 } from "@/data/storage";
 
 declare global {
@@ -37,7 +37,7 @@ import {
   getAllFieldValues, downloadMetadataExcel,
 } from "@/data/metadataUtils";
 import { useToast } from "@/hooks/use-toast";
-import { useGetMe, useGetCategories, useCreateMaterial, useUpdateMaterial, useDeleteMaterial, useGetMaterials as useGetMaterialsApi, useSubmitIngestRequest } from "@workspace/api-client-react";
+import { useGetMe, useGetCategories, useCreateMaterial, useUpdateMaterial, useDeleteMaterial, useGetMaterials as useGetMaterialsApi, useSubmitIngestRequest, useUploadMaterialPage } from "@workspace/api-client-react";
 
 type ViewMode = "table" | "detail";
 
@@ -131,6 +131,11 @@ export default function AdminMaterials() {
   }, [materials]);
 
   const { data: apiMaterialsData, isLoading: apiMaterialsLoading, refetch: refetchMaterials } = useGetMaterialsApi({ limit: 1000 });
+  const createMaterialMutation = useCreateMaterial();
+  const updateMaterialMutation = useUpdateMaterial();
+  const deleteMaterialMutation = useDeleteMaterial();
+  const uploadPageMutation = useUploadMaterialPage();
+  const submitIngestMutation = useSubmitIngestRequest();
 
   React.useEffect(() => {
     setCurrentPage(1);
@@ -138,42 +143,17 @@ export default function AdminMaterials() {
 
   React.useEffect(() => {
     if (apiMaterialsData?.materials) {
-      // Merge with local storage to avoid flickering and allow offline support
-      // Firestore (API) data always takes precedence
-      const localMats = getMaterials();
-      
-      // Create a set of IDs from API (both primary ID and uniqueId/materialId)
-      const apiIdMap = new Set<string>();
-      apiMaterialsData.materials.forEach((m: any) => {
-        if (m.id) apiIdMap.add(m.id);
-        if (m.uniqueId) apiIdMap.add(m.uniqueId);
-        if (m.materialId) apiIdMap.add(m.materialId);
-      });
-
-      // Filter local materials that aren't already represented in the API results
-      const localOnlyMats = localMats.filter(m => {
-        const hasId = m.id && apiIdMap.has(m.id);
-        const hasUniqueId = m.uniqueId && apiIdMap.has(m.uniqueId);
-        const hasMaterialId = m.materialId && apiIdMap.has(m.materialId);
-        return !hasId && !hasUniqueId && !hasMaterialId;
-      });
-
-      setMaterials([...apiMaterialsData.materials, ...localOnlyMats]);
+      setMaterials(apiMaterialsData.materials);
       setMaterialsLoading(false);
     } else {
-      // While loading or if API fails, show what we have in local storage
-      setMaterials(getMaterials());
+      setMaterials([]);
       setMaterialsLoading(apiMaterialsLoading);
     }
   }, [apiMaterialsData, apiMaterialsLoading]);
 
   React.useEffect(() => {
     const sync = () => {
-       if (!apiMaterialsData?.materials) {
-           setMaterials(getMaterials());
-       } else {
-           refetchMaterials();
-       }
+       refetchMaterials();
     };
     window.addEventListener("storage", sync);
     window.addEventListener("focus", sync);
@@ -836,8 +816,8 @@ export default function AdminMaterials() {
       console.error("Failed to update approval status in Firestore:", err);
     }
 
-    const updated = await saveMaterial(updatedMaterial as any);
-    setMaterials(updated);
+    // Update local state for immediate UI feedback
+    setMaterials(prev => prev.map(m => m.id === material.id ? updatedMaterial : m));
     refetchMaterials();
 
     if (material.approvalStatus === "pending") {
@@ -1459,9 +1439,8 @@ export default function AdminMaterials() {
                                     console.warn("Cloud sync failed during inline edit, falling back to local storage:", err);
                                   }
                                   
-                                  // Local storage sync for persistence resilience
-                                  const updated = await saveMaterial(updatedMat as any);
-                                  setMaterials(updated);
+                                  // Update local state for immediate UI feedback
+                                  setMaterials(prev => prev.map(m => m.id === mat.id ? updatedMat : m));
                                 }}
                                 className="shadow-none border border-border/60"
                                 allowedFieldIds={activeSchema}
@@ -2031,9 +2010,13 @@ export default function AdminMaterials() {
                 
                 // Strip non-serializable fields before sending to API
                 delete apiData.fileData;
-                // Keep pageImages so they can be saved to the cloud
-                // delete apiData.pageImages; // REMOVED: We now handle this on the backend
-                delete apiData.fileId; // IndexedDB ref, not relevant for Firestore
+                delete apiData.fileId;
+                
+                // Prepare pages for granular upload (bypassing Vercel's 4.5MB limit)
+                const pagesToUpload = apiData.pageImages || [];
+                delete apiData.pageImages;
+                apiData.hasPageImages = pagesToUpload.length > 0;
+                apiData.pageCount = pagesToUpload.length;
                 
                 // Convert main file Blob to Base64 for Firestore storage
                 if (uploadForm.fileData instanceof Blob) {
@@ -2059,20 +2042,7 @@ export default function AdminMaterials() {
                   apiData.thumbnailUrl = pdfPreviewImages[0];
                 }
                 
-                // Convert all page images to Base64 for Firestore storage
-                if (apiData.pageImages && apiData.pageImages.length > 0) {
-                  try {
-                    const base64Pages = await Promise.all(
-                      apiData.pageImages.map(async (img: any) => {
-                        if (img instanceof Blob) return await fileToBase64(img);
-                        return img; // already a string
-                      })
-                    );
-                    apiData.pageImages = base64Pages;
-                  } catch (err) {
-                    console.error("Page images conversion failed:", err);
-                  }
-                }
+
                 
                 // Ensure category mapping for API
                 if (uploadForm.series) {
@@ -2086,21 +2056,65 @@ export default function AdminMaterials() {
                 }
 
                 let firestoreSaved = false;
+
+                let finalId = editingMaterialId;
+
                 try {
+                  // A. Save main record (Metadata + PDF file)
                   if (editingMaterialId) {
                     await updateMaterial({ id: editingMaterialId, data: apiData });
                   } else {
                     const res = await createMaterial({ data: apiData });
-                    if (res && res.id) setLastIngestedId(res.id);
+                    if (res && res.id) {
+                      finalId = res.id;
+                      setLastIngestedId(res.id);
+                    }
                   }
+
+                  // B. Granular Page Uploads (one by one to bypass payload limits)
+                  if (finalId && pagesToUpload.length > 0) {
+                    const pageToast = toast({
+                      title: "Uploading Pages",
+                      description: `Saving ${pagesToUpload.length} pages to Firestore...`,
+                    });
+                    
+                    for (let i = 0; i < pagesToUpload.length; i++) {
+                      let pageData = pagesToUpload[i];
+                      if (pageData instanceof Blob) {
+                        pageData = await fileToBase64(pageData);
+                      }
+                      await uploadPageMutation.mutateAsync({
+                        materialId: finalId,
+                        pageIndex: i,
+                        data: pageData
+                      });
+                    }
+                    
+                    pageToast.update({
+                      id: pageToast.id,
+                      title: "Upload Complete",
+                      description: `All ${pagesToUpload.length} pages saved to Firestore.`,
+                    });
+                  }
+
                   firestoreSaved = true;
+                  toast({
+                    title: editingMaterialId ? "Material Updated" : "Ingestion Successful",
+                    description: editingMaterialId ? "Changes saved to Firestore." : "Material and all pages saved to Firestore.",
+                  });
                 } catch (apiErr: any) {
                   console.error("Firestore Save Failed:", apiErr);
+                  const errorMsg = apiErr?.message || "Cloud sync failed";
+                  toast({
+                    variant: "destructive",
+                    title: "Firestore Error",
+                    description: `Critical: ${errorMsg}. Material NOT saved.`,
+                  });
+                  return; // Stop here — do NOT save to local storage
                 }
 
-                // Local storage sync for offline resilience (always do this as backup)
-                const updated = await saveMaterial(newMaterial);
-                setMaterials(updated);
+                // ═══ NO LOCAL FALLBACK ═══
+                // Removed saveMaterial(newMaterial) to enforce Firestore-only ingestion
                 
                 // Clear filters after successful ingest to make it visible
                 if (!editingMaterialId) {

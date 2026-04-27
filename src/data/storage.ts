@@ -95,6 +95,8 @@ export function initializeStorage() {
   if (typeof window === "undefined") return;
   const currentVersion = localStorage.getItem(STORAGE_KEYS.VERSION);
   if (!localStorage.getItem(STORAGE_KEYS.MATERIALS) || currentVersion !== STORAGE_VERSION) {
+    // Archival materials are now strictly Firestore-only. 
+    // We only seed sample data if no API is available, but we don't persist ingestion changes here.
     localStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify(SAMPLE_MATERIALS));
     localStorage.setItem(STORAGE_KEYS.VERSION, STORAGE_VERSION);
   }
@@ -175,73 +177,13 @@ export async function loadMaterial(id: string): Promise<ArchivalMaterial | undef
    return mat;
 }
 
-/** Save/Update Material */
+/** Save/Update Material - DISALBED LOCAL STORAGE VERSION */
 export async function saveMaterial(material: ArchivalMaterial) {
-  const materials = getMaterials();
-  const index = materials.findIndex(m => m.id === material.id);
-  const now = new Date().toISOString();
-  
-  let processedMaterial = { ...material };
-  
-  try {
-      // If there is heavy binary data, move it to IndexedDB
-        if (material.fileUrl) {
-          const fileId = material.fileId || material.id;
-          if (typeof material.fileUrl === "string" && material.fileUrl.startsWith("data:")) {
-            const blob = await dataUrlToBlob(material.fileUrl);
-            await saveFile(fileId, blob, blob.type || material.fileType);
-            processedMaterial.fileType = blob.type || material.fileType;
-            processedMaterial.fileUrl = undefined;
-            processedMaterial.fileId = fileId;
-          } else {
-            const fileUrl = material.fileUrl as unknown;
-            if (fileUrl && typeof fileUrl !== "string" && fileUrl instanceof Blob) {
-              await saveFile(fileId, fileUrl, fileUrl.type || material.fileType);
-              processedMaterial.fileType = fileUrl.type || material.fileType;
-              processedMaterial.fileUrl = undefined;
-              processedMaterial.fileId = fileId;
-            } else if (typeof material.fileUrl === "string" && material.fileUrl.startsWith("blob:")) {
-              processedMaterial.fileUrl = undefined;
-              processedMaterial.fileId = fileId;
-            }
-          }
-        }
-        if (material.pageImages && material.pageImages.length > 0) {
-          const fileId = material.fileId || material.id;
-          const first = material.pageImages[0] as any;
-          if (first instanceof Blob) {
-            await saveFile(fileId + "_thumbs", material.pageImages as unknown as Blob[], "image/jpeg");
-            processedMaterial.pageImages = [];
-            processedMaterial.fileId = fileId;
-          } else if (typeof first === "string" && first.startsWith("data:")) {
-            const blobs = await Promise.all((material.pageImages as string[]).map((img) => dataUrlToBlob(img)));
-            await saveFile(fileId + "_thumbs", blobs, "image/jpeg");
-            processedMaterial.pageImages = [];
-            processedMaterial.fileId = fileId;
-          } else if (typeof first === "string" && first.startsWith("blob:")) {
-            processedMaterial.pageImages = [];
-            processedMaterial.fileId = fileId;
-          }
-        }
-
-     if (index >= 0) {
-       materials[index] = { ...processedMaterial, updatedAt: now };
-     } else {
-       materials.push({ 
-         ...processedMaterial, 
-         createdAt: processedMaterial.createdAt || now, 
-         updatedAt: now 
-       });
-     }
-
-     localStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify(materials));
-     
-     // Return hydrated representation for UI optimism
-     return getMaterials().map(m => m.id === material.id ? material : m);
-  } catch (e) {
-     console.error("Critical Storage Error saving material:", e);
-     throw new Error("IndexedDB or LocalStorage save failed");
-  }
+  // ═══ FIRESTORE ENFORCEMENT ═══
+  // Browser LocalStorage ingestion is now disabled per user request.
+  // All saves must go through the API/Firestore.
+  console.log("Local storage saveMaterial disabled. Use API instead.");
+  return getMaterials(); 
 }
 
 /** Delete Material */

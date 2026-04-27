@@ -8,7 +8,6 @@ import {
 } from "lucide-react";
 import { useGetCategories, useGetMe, useGetMaterials } from "@workspace/api-client-react";
 import { checkOAISCompliance } from "@/data/metadataUtils";
-import { getMaterials } from "@/data/storage";
 
 const ACCESS_CONFIG = {
   public: {
