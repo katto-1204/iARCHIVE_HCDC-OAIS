@@ -273,7 +273,7 @@ router.get("/materials/:id", async (req, res) => {
       related = relatedSnap.docs
         .map((d) => ({ id: d.id, ...d.data() }))
         .filter((r) => r.id !== m.id)
-        .sort((a, b) => {
+        .sort((a: any, b: any) => {
           const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
           const db2 = b.createdAt ? new Date(b.createdAt).getTime() : 0;
           return db2 - da;
