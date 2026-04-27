@@ -356,6 +356,7 @@ export const SAMPLE_HIERARCHY: HierarchyNode = {
 export interface ArchivalMaterial {
   id: string;
   uniqueId: string;           // YYiACCNNNNNNN format
+  materialId?: string | null; // Unified ID used by API
   // All 36 metadata fields
   referenceCode?: string | null;
   title?: string | null;
