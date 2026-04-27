@@ -123,11 +123,11 @@ router.post("/materials", requireAuth, async (req, res) => {
       return seq == null ? acc : Math.max(acc, seq);
     }, 0);
     const seqNo = maxSeq + 1;
-    const materialId = generateMaterialId(catNo, seqNo);
-    const id = generateId();
-    const sipId = `SIP-${new Date().getFullYear()}${String(new Date().getMonth()+1).padStart(2,"0")}${String(new Date().getDate()).padStart(2,"0")}-${String(seqNo).padStart(3,"0")}`;
-    const aipId = `AIP-${new Date().getFullYear()}-${String(seqNo).padStart(4,"0")}`;
-    const ingestDate = new Date().toISOString().split("T")[0];
+    const materialId = body.materialId || body.uniqueId || generateMaterialId(catNo, seqNo);
+    const id = body.id || generateId();
+    const sipId = body.sipId || `SIP-${new Date().getFullYear()}${String(new Date().getMonth()+1).padStart(2,"0")}${String(new Date().getDate()).padStart(2,"0")}-${String(seqNo).padStart(3,"0")}`;
+    const aipId = body.aipId || `AIP-${new Date().getFullYear()}-${String(seqNo).padStart(4,"0")}`;
+    const ingestDate = body.ingestDate || new Date().toISOString().split("T")[0];
     const cataloger = user.name;
     const dateCataloged = ingestDate;
     const preferredCitation = body.preferredCitation || `${body.creator || "Author"}. (${body.date?.split("-")[0] || new Date().getFullYear()}). ${body.title}. Holy Cross of Davao College. [${materialId}]`;
@@ -220,7 +220,9 @@ router.get("/materials/:id", async (req, res) => {
     let docSnap = await db.collection("materials").doc(id).get();
     if (!docSnap.exists) {
       const byMaterialId = await db.collection("materials").where("materialId", "==", id).limit(1).get();
-      docSnap = byMaterialId.docs[0];
+      if (!byMaterialId.empty) {
+        docSnap = byMaterialId.docs[0];
+      }
     }
     if (!docSnap || !docSnap.exists) { 
       const mat = jsonStoreGetMaterial(id);

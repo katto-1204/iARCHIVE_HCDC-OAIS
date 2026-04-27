@@ -19,6 +19,7 @@ import {
 import { format } from "date-fns";
 import { useGetMaterials, useGetFeedbacks, useMarkFeedbackRead, useGetAuditLogs, useDeleteMaterial } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
+import { getMaterials } from "@/data/storage";
 
 type FilterTab = "all" | "complete" | "partial" | "incomplete";
 type DashboardView = "dashboard" | "feedback";
@@ -89,14 +90,37 @@ export default function AdminDashboard() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false);
   const [materialToDelete, setMaterialToDelete] = React.useState<any>(null);
 
-  const { data: materialsData, refetch: refetchMaterials } = useGetMaterials({ limit: 1000 });
+  const { data: materialsData, isLoading: isMaterialsLoading, refetch: refetchMaterials } = useGetMaterials({ limit: 1000 });
   const { data: feedbackData } = useGetFeedbacks();
   const { data: auditData } = useGetAuditLogs({ limit: 15 });
   const markRead = useMarkFeedbackRead();
   const deleteMat = useDeleteMaterial();
   const { toast } = useToast();
   
-  const materials = materialsData?.materials || [];
+  const [materials, setMaterials] = React.useState<ArchivalMaterial[]>([]);
+
+  React.useEffect(() => {
+    if (materialsData?.materials) {
+      const localMats = getMaterials();
+      const apiIdMap = new Set<string>();
+      materialsData.materials.forEach((m: any) => {
+        if (m.id) apiIdMap.add(m.id);
+        if (m.uniqueId) apiIdMap.add(m.uniqueId);
+        if (m.materialId) apiIdMap.add(m.materialId);
+      });
+
+      const localOnlyMats = localMats.filter(m => {
+        const hasId = m.id && apiIdMap.has(m.id);
+        const hasUniqueId = m.uniqueId && apiIdMap.has(m.uniqueId);
+        const hasMaterialId = m.materialId && apiIdMap.has(m.materialId);
+        return !hasId && !hasUniqueId && !hasMaterialId;
+      });
+
+      setMaterials([...materialsData.materials, ...localOnlyMats]);
+    } else {
+      setMaterials(getMaterials());
+    }
+  }, [materialsData]);
   const feedbacks = feedbackData || [];
   const activityFeed = auditData?.logs ?? [];
   

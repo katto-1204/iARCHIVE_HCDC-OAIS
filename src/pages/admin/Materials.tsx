@@ -130,24 +130,58 @@ export default function AdminMaterials() {
     return counts;
   }, [materials]);
 
+  const { data: apiMaterialsData, isLoading: apiMaterialsLoading, refetch: refetchMaterials } = useGetMaterialsApi({ limit: 1000 });
+
   React.useEffect(() => {
     setCurrentPage(1);
   }, [search, selectedHierarchyItem, approvalFilter]);
 
   React.useEffect(() => {
-    setMaterials(getMaterials());
-    setMaterialsLoading(false);
-  }, []);
+    if (apiMaterialsData?.materials) {
+      // Merge with local storage to avoid flickering and allow offline support
+      // Firestore (API) data always takes precedence
+      const localMats = getMaterials();
+      
+      // Create a set of IDs from API (both primary ID and uniqueId/materialId)
+      const apiIdMap = new Set<string>();
+      apiMaterialsData.materials.forEach((m: any) => {
+        if (m.id) apiIdMap.add(m.id);
+        if (m.uniqueId) apiIdMap.add(m.uniqueId);
+        if (m.materialId) apiIdMap.add(m.materialId);
+      });
+
+      // Filter local materials that aren't already represented in the API results
+      const localOnlyMats = localMats.filter(m => {
+        const hasId = m.id && apiIdMap.has(m.id);
+        const hasUniqueId = m.uniqueId && apiIdMap.has(m.uniqueId);
+        const hasMaterialId = m.materialId && apiIdMap.has(m.materialId);
+        return !hasId && !hasUniqueId && !hasMaterialId;
+      });
+
+      setMaterials([...apiMaterialsData.materials, ...localOnlyMats]);
+      setMaterialsLoading(false);
+    } else {
+      // While loading or if API fails, show what we have in local storage
+      setMaterials(getMaterials());
+      setMaterialsLoading(apiMaterialsLoading);
+    }
+  }, [apiMaterialsData, apiMaterialsLoading]);
 
   React.useEffect(() => {
-    const sync = () => setMaterials(getMaterials());
+    const sync = () => {
+       if (!apiMaterialsData?.materials) {
+           setMaterials(getMaterials());
+       } else {
+           refetchMaterials();
+       }
+    };
     window.addEventListener("storage", sync);
     window.addEventListener("focus", sync);
     return () => {
       window.removeEventListener("storage", sync);
       window.removeEventListener("focus", sync);
     };
-  }, []);
+  }, [apiMaterialsData, refetchMaterials]);
 
   // Material detail expansion
   const [selectedMaterial, setSelectedMaterial] = React.useState<ArchivalMaterial | null>(null);
@@ -796,8 +830,15 @@ export default function AdminMaterials() {
       approvedBy: status === "approved" ? (me?.name || "Admin") : undefined,
     } as ArchivalMaterial;
 
+    try {
+      await updateMaterial({ id: material.id, data: updatedMaterial });
+    } catch (err) {
+      console.error("Failed to update approval status in Firestore:", err);
+    }
+
     const updated = await saveMaterial(updatedMaterial as any);
     setMaterials(updated);
+    refetchMaterials();
 
     if (material.approvalStatus === "pending") {
       updateIngestRequest(material.id, status);
@@ -829,6 +870,7 @@ export default function AdminMaterials() {
         // Local storage sync fallback for production resilience
         const updated = await deleteMaterial(materialToDelete);
         setMaterials(updated);
+        refetchMaterials();
         
         addActivity({
           user: me?.name || "Admin",
@@ -856,6 +898,7 @@ export default function AdminMaterials() {
         if (status === 404) {
            const updated = await deleteMaterial(materialToDelete);
            setMaterials(updated);
+           refetchMaterials();
            setDeleteDialogOpen(false);
            setMaterialToDelete(null);
         }
