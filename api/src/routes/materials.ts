@@ -202,7 +202,6 @@ router.post("/materials", requireAuth, async (req, res) => {
       updatedAt: now,
     };
     
-    // Chunking logic for large Base64 files
     if (newMat.fileUrl && newMat.fileUrl.length > 800000) {
       console.log(`File is large (${newMat.fileUrl.length} chars). Chunking into materialChunks...`);
       const fullStr = newMat.fileUrl;
@@ -219,6 +218,22 @@ router.post("/materials", requireAuth, async (req, res) => {
       (newMat as any).isFileChunked = true;
       (newMat as any).chunksCount = chunksCount;
       newMat.fileUrl = "CHUNKED";
+    }
+
+    // Handle pageImages separately to avoid Firestore document size limit (1MB)
+    if (body.pageImages && Array.isArray(body.pageImages)) {
+      console.log(`Saving ${body.pageImages.length} page images to materialPages...`);
+      for (let i = 0; i < body.pageImages.length; i++) {
+        await db.collection("materialPages").doc(`${id}_page_${i}`).set({
+          materialId: id,
+          pageIndex: i,
+          data: body.pageImages[i]
+        });
+      }
+      (newMat as any).hasPageImages = true;
+      (newMat as any).pageCount = body.pageImages.length;
+      // DO NOT save the full pageImages array in the main document
+      delete (newMat as any).pageImages;
     }
 
     await db.collection("materials").doc(id).set(newMat);
@@ -262,6 +277,17 @@ router.get("/materials/:id", async (req, res) => {
         if (cSnap.exists) reconstructed += cSnap.data()?.data || "";
       }
       m.fileUrl = reconstructed;
+    }
+
+    // Fetch page images if they exist
+    if (m.hasPageImages) {
+      const pagesSnap = await db.collection("materialPages")
+        .where("materialId", "==", m.id)
+        .get();
+      m.pageImages = pagesSnap.docs
+        .map(d => d.data())
+        .sort((a: any, b: any) => (a.pageIndex || 0) - (b.pageIndex || 0))
+        .map(d => d.data);
     }
 
     const catsSnap = await db.collection("categories").get();
@@ -371,6 +397,27 @@ router.put("/materials/:id", requireAuth, async (req, res) => {
       updateData.isFileChunked = true;
       updateData.chunksCount = chunksCount;
       updateData.fileUrl = "CHUNKED";
+    }
+
+    // Handle pageImages updates
+    if (body.pageImages && Array.isArray(body.pageImages)) {
+      console.log(`Updating ${body.pageImages.length} page images...`);
+      // Delete old pages first (optional but cleaner)
+      const oldPages = await db.collection("materialPages").where("materialId", "==", id).get();
+      const batch = db.batch();
+      oldPages.docs.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+
+      for (let i = 0; i < body.pageImages.length; i++) {
+        await db.collection("materialPages").doc(`${id}_page_${i}`).set({
+          materialId: id,
+          pageIndex: i,
+          data: body.pageImages[i]
+        });
+      }
+      updateData.hasPageImages = true;
+      updateData.pageCount = body.pageImages.length;
+      delete (updateData as any).pageImages;
     }
 
     await docRef.update(updateData);
@@ -495,6 +542,18 @@ router.delete("/materials/:id", requireAuth, async (req, res) => {
         }
       } catch (e) {
         console.error("Failed to clean up chunks during deletion:", e);
+      }
+    }
+
+    // Clean up pages if material has them
+    if (m.hasPageImages) {
+      try {
+        const pagesSnap = await db.collection("materialPages").where("materialId", "==", id).get();
+        const batch = db.batch();
+        pagesSnap.docs.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+      } catch (e) {
+        console.error("Failed to clean up pages during deletion:", e);
       }
     }
 

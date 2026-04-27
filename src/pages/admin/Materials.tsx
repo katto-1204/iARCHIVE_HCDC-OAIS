@@ -2031,7 +2031,8 @@ export default function AdminMaterials() {
                 
                 // Strip non-serializable fields before sending to API
                 delete apiData.fileData;
-                delete apiData.pageImages; // Remove Blob arrays — we'll handle thumbnails separately
+                // Keep pageImages so they can be saved to the cloud
+                // delete apiData.pageImages; // REMOVED: We now handle this on the backend
                 delete apiData.fileId; // IndexedDB ref, not relevant for Firestore
                 
                 // Convert main file Blob to Base64 for Firestore storage
@@ -2056,6 +2057,21 @@ export default function AdminMaterials() {
                   }
                 } else if (pdfPreviewImages.length > 0 && typeof pdfPreviewImages[0] === 'string' && !pdfPreviewImages[0].startsWith('blob:')) {
                   apiData.thumbnailUrl = pdfPreviewImages[0];
+                }
+                
+                // Convert all page images to Base64 for Firestore storage
+                if (apiData.pageImages && apiData.pageImages.length > 0) {
+                  try {
+                    const base64Pages = await Promise.all(
+                      apiData.pageImages.map(async (img: any) => {
+                        if (img instanceof Blob) return await fileToBase64(img);
+                        return img; // already a string
+                      })
+                    );
+                    apiData.pageImages = base64Pages;
+                  } catch (err) {
+                    console.error("Page images conversion failed:", err);
+                  }
                 }
                 
                 // Ensure category mapping for API
