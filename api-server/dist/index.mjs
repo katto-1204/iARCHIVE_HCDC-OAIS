@@ -35211,6 +35211,38 @@ function jsonStoreRejectAccessRequest(input) {
   safeWriteJson(ACCESS_REQUESTS_PATH, accessRequests);
   return true;
 }
+var INGEST_REQUESTS_PATH = path2.join(DATA_BASE, "ingest_requests.json");
+function jsonStoreGetIngestRequests(params) {
+  const requests = safeReadJson(INGEST_REQUESTS_PATH, []);
+  let filtered = requests.slice();
+  if (params.status && ["pending", "approved", "rejected"].includes(params.status)) {
+    filtered = filtered.filter((r) => r.status === params.status);
+  }
+  return { requests: filtered.sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime()) };
+}
+function jsonStoreSubmitIngestRequest(input) {
+  const requests = safeReadJson(INGEST_REQUESTS_PATH, []);
+  const newReq = { ...input, status: "pending" };
+  requests.push(newReq);
+  safeWriteJson(INGEST_REQUESTS_PATH, requests);
+  return newReq;
+}
+function jsonStoreApproveIngestRequest(id) {
+  const requests = safeReadJson(INGEST_REQUESTS_PATH, []);
+  const idx = requests.findIndex((r) => r.id === id);
+  if (idx === -1) return false;
+  requests[idx].status = "approved";
+  safeWriteJson(INGEST_REQUESTS_PATH, requests);
+  return true;
+}
+function jsonStoreRejectIngestRequest(id) {
+  const requests = safeReadJson(INGEST_REQUESTS_PATH, []);
+  const idx = requests.findIndex((r) => r.id === id);
+  if (idx === -1) return false;
+  requests[idx].status = "rejected";
+  safeWriteJson(INGEST_REQUESTS_PATH, requests);
+  return true;
+}
 
 // src/routes/auth.ts
 var router2 = (0, import_express2.Router)();
@@ -35781,6 +35813,23 @@ router4.post("/materials", requireAuth, async (req, res) => {
       createdAt: now,
       updatedAt: now
     };
+    if (newMat.fileUrl && newMat.fileUrl.length > 8e5) {
+      console.log(`File is large (${newMat.fileUrl.length} chars). Chunking into materialChunks...`);
+      const fullStr = newMat.fileUrl;
+      const chunkSize = 8e5;
+      let chunksCount = 0;
+      for (let i = 0; i < fullStr.length; i += chunkSize) {
+        await db.collection("materialChunks").doc(`${id}_chunk_${chunksCount}`).set({
+          materialId: id,
+          chunkIndex: chunksCount,
+          data: fullStr.substring(i, i + chunkSize)
+        });
+        chunksCount++;
+      }
+      newMat.isFileChunked = true;
+      newMat.chunksCount = chunksCount;
+      newMat.fileUrl = "CHUNKED";
+    }
     await db.collection("materials").doc(id).set(newMat);
     await logAudit({ action: "CREATE_MATERIAL", entityType: "material", entityId: id, userId: user.userId, userName: user.name, details: `Created material: ${body.title}` });
     const catName = body.categoryId ? cats.find((c) => c.id === body.categoryId)?.name : void 0;
@@ -35809,6 +35858,14 @@ router4.get("/materials/:id", async (req, res) => {
       return;
     }
     const m = { id: docSnap.id, ...docSnap.data() };
+    if (m.isFileChunked) {
+      let reconstructed = "";
+      for (let i = 0; i < (m.chunksCount || 0); i++) {
+        const cSnap = await db.collection("materialChunks").doc(`${m.id}_chunk_${i}`).get();
+        if (cSnap.exists) reconstructed += cSnap.data()?.data || "";
+      }
+      m.fileUrl = reconstructed;
+    }
     const catsSnap = await db.collection("categories").get();
     const catMap = Object.fromEntries(catsSnap.docs.map((c) => [c.id, c.data().name]));
     let related = [];
@@ -35870,7 +35927,7 @@ router4.put("/materials/:id", requireAuth, async (req, res) => {
       return;
     }
     const m = snap.data();
-    await db.collection("materials").doc(id).update({
+    const updateData = {
       title: body.title ?? m.title,
       altTitle: body.altTitle ?? m.altTitle ?? null,
       creator: body.creator ?? m.creator ?? null,
@@ -35888,7 +35945,25 @@ router4.put("/materials/:id", requireAuth, async (req, res) => {
       thumbnailUrl: body.thumbnailUrl !== void 0 ? body.thumbnailUrl : m.thumbnailUrl ?? null,
       status: body.status ?? m.status,
       updatedAt: (/* @__PURE__ */ new Date()).toISOString()
-    });
+    };
+    if (updateData.fileUrl && updateData.fileUrl.length > 8e5 && updateData.fileUrl !== "CHUNKED") {
+      console.log(`Update File is large (${updateData.fileUrl.length} chars). Chunking...`);
+      const fullStr = updateData.fileUrl;
+      const chunkSize = 8e5;
+      let chunksCount = 0;
+      for (let i = 0; i < fullStr.length; i += chunkSize) {
+        await db.collection("materialChunks").doc(`${id}_chunk_${chunksCount}`).set({
+          materialId: id,
+          chunkIndex: chunksCount,
+          data: fullStr.substring(i, i + chunkSize)
+        });
+        chunksCount++;
+      }
+      updateData.isFileChunked = true;
+      updateData.chunksCount = chunksCount;
+      updateData.fileUrl = "CHUNKED";
+    }
+    await db.collection("materials").doc(id).update(updateData);
     await logAudit({ action: "UPDATE_MATERIAL", entityType: "material", entityId: id, userId: user.userId, userName: user.name, details: `Updated material: ${m.title}` });
     const updated = await db.collection("materials").doc(id).get();
     res.json(formatMaterial({ id, ...updated.data() }));
@@ -35913,7 +35988,7 @@ router4.patch("/materials/:id", requireAuth, async (req, res) => {
       return;
     }
     const m = snap.data();
-    await db.collection("materials").doc(id).update({
+    const updateData = {
       title: body.title ?? m.title,
       altTitle: body.altTitle ?? m.altTitle ?? null,
       creator: body.creator ?? m.creator ?? null,
@@ -35930,7 +36005,24 @@ router4.patch("/materials/:id", requireAuth, async (req, res) => {
       thumbnailUrl: body.thumbnailUrl !== void 0 ? body.thumbnailUrl : m.thumbnailUrl ?? null,
       status: body.status ?? m.status,
       updatedAt: (/* @__PURE__ */ new Date()).toISOString()
-    });
+    };
+    if (updateData.fileUrl && updateData.fileUrl.length > 8e5 && updateData.fileUrl !== "CHUNKED") {
+      const fullStr = updateData.fileUrl;
+      const chunkSize = 8e5;
+      let chunksCount = 0;
+      for (let i = 0; i < fullStr.length; i += chunkSize) {
+        await db.collection("materialChunks").doc(`${id}_chunk_${chunksCount}`).set({
+          materialId: id,
+          chunkIndex: chunksCount,
+          data: fullStr.substring(i, i + chunkSize)
+        });
+        chunksCount++;
+      }
+      updateData.isFileChunked = true;
+      updateData.chunksCount = chunksCount;
+      updateData.fileUrl = "CHUNKED";
+    }
+    await db.collection("materials").doc(id).update(updateData);
     await logAudit({ action: "UPDATE_MATERIAL", entityType: "material", entityId: id, userId: user.userId, userName: user.name, details: `Updated material: ${m.title}` });
     const updated = await db.collection("materials").doc(id).get();
     res.json(formatMaterial({ id, ...updated.data() }));
@@ -36180,9 +36272,9 @@ router6.get("/requests", requireAuth, async (req, res) => {
     if (user.role === "student" || user.role === "researcher" || user.role === "alumni" || user.role === "public") {
       query = query.where("userId", "==", user.userId);
     }
-    query = query.orderBy("createdAt", "desc");
     const snapshot = await query.get();
     const rows = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    rows.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
     const total = rows.length;
     const totalPages = Math.ceil(total / limit);
     const offset = (page - 1) * limit;
@@ -36276,6 +36368,105 @@ router6.post("/requests/:id/reject", requireAuth, requireRole("admin", "archivis
       return;
     }
     res.json({ message: "Request rejected" });
+  }
+});
+router6.get("/ingest-requests", requireAuth, requireRole("admin", "archivist"), async (req, res) => {
+  const status = req.query.status;
+  try {
+    const db = getFirestoreDb();
+    let query = db.collection("ingestRequests");
+    if (status && ["pending", "approved", "rejected"].includes(status)) {
+      query = query.where("status", "==", status);
+    }
+    const snapshot = await query.get();
+    const rows = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    rows.sort((a, b) => new Date(b.requestedAt || 0).getTime() - new Date(a.requestedAt || 0).getTime());
+    res.json({ requests: rows });
+  } catch {
+    res.json(jsonStoreGetIngestRequests({ status }));
+  }
+});
+router6.post("/ingest-requests", requireAuth, requireRole("admin", "archivist"), async (req, res) => {
+  const user = req.user;
+  const { materialId, materialTitle, hierarchyPath } = req.body;
+  if (!materialId || !materialTitle) {
+    res.status(400).json({ error: "Material ID and Title required" });
+    return;
+  }
+  try {
+    const id = generateId();
+    const db = getFirestoreDb();
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    const payload = {
+      id,
+      materialId,
+      materialTitle,
+      hierarchyPath: hierarchyPath || "",
+      requestedBy: user.name || "Unknown",
+      requestedAt: now,
+      status: "pending"
+    };
+    await db.collection("ingestRequests").doc(id).set(payload);
+    await logAudit({ action: "SUBMIT_INGEST", entityType: "request", entityId: id, userId: user.userId, userName: user.name, details: `Submitted ingest request for material: ${materialId}` });
+    res.status(201).json(payload);
+  } catch {
+    const created = jsonStoreSubmitIngestRequest({
+      id: generateId(),
+      materialId,
+      materialTitle,
+      hierarchyPath,
+      requestedBy: user.name || "Unknown",
+      requestedAt: (/* @__PURE__ */ new Date()).toISOString()
+    });
+    if (!created) {
+      res.status(500).json({ error: "Failed to submit ingest request" });
+      return;
+    }
+    res.status(201).json(created);
+  }
+});
+router6.post("/ingest-requests/:id/approve", requireAuth, requireRole("admin", "archivist"), async (req, res) => {
+  const user = req.user;
+  const id = String(req.params.id);
+  try {
+    const db = getFirestoreDb();
+    const snap = await db.collection("ingestRequests").doc(id).get();
+    if (!snap.exists) {
+      res.status(404).json({ error: "Request not found" });
+      return;
+    }
+    await db.collection("ingestRequests").doc(id).update({ status: "approved" });
+    await logAudit({ action: "APPROVE_INGEST", entityType: "request", entityId: id, userId: user.userId, userName: user.name, details: `Approved ingest request` });
+    res.json({ message: "Ingest request approved" });
+  } catch {
+    const ok = jsonStoreApproveIngestRequest(id);
+    if (!ok) {
+      res.status(404).json({ error: "Request not found" });
+      return;
+    }
+    res.json({ message: "Ingest request approved" });
+  }
+});
+router6.post("/ingest-requests/:id/reject", requireAuth, requireRole("admin", "archivist"), async (req, res) => {
+  const user = req.user;
+  const id = String(req.params.id);
+  try {
+    const db = getFirestoreDb();
+    const snap = await db.collection("ingestRequests").doc(id).get();
+    if (!snap.exists) {
+      res.status(404).json({ error: "Request not found" });
+      return;
+    }
+    await db.collection("ingestRequests").doc(id).update({ status: "rejected" });
+    await logAudit({ action: "REJECT_INGEST", entityType: "request", entityId: id, userId: user.userId, userName: user.name, details: `Rejected ingest request` });
+    res.json({ message: "Ingest request rejected" });
+  } catch {
+    const ok = jsonStoreRejectIngestRequest(id);
+    if (!ok) {
+      res.status(404).json({ error: "Request not found" });
+      return;
+    }
+    res.json({ message: "Ingest request rejected" });
   }
 });
 var requests_default = router6;
@@ -36513,6 +36704,16 @@ router9.patch("/:id/read", async (req, res) => {
     res.status(500).json({ error: "Failed to mark feedback as read" });
   }
 });
+router9.delete("/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const db = getFirestoreDb();
+    await db.collection("feedback").doc(id).delete();
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete feedback" });
+  }
+});
 var feedback_default = router9;
 
 // src/routes/index.ts
@@ -36582,8 +36783,8 @@ if (process.env.NODE_ENV !== "production") {
   });
 }
 app.use((0, import_cors.default)());
-app.use(import_express11.default.json());
-app.use(import_express11.default.urlencoded({ extended: true }));
+app.use(import_express11.default.json({ limit: "50mb" }));
+app.use(import_express11.default.urlencoded({ extended: true, limit: "50mb" }));
 app.use((req, res, next) => {
   if (req.method === "POST") {
     const { email, password } = req.body || {};

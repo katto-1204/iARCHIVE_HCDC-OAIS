@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn, compressFile, fileToBase64 } from "@/lib/utils";
 import {
   Search, Plus, Edit, ExternalLink, Layers, Settings2, Download,
-  Upload, FolderTree, ShieldCheck, CheckCircle2, FileText,
+  Upload, FolderTree, ShieldCheck, CheckCircle2, FileText, Folder,
   ZoomIn, ZoomOut, RotateCw, Maximize2, AlertTriangle, ChevronRight, X, Save, FolderOpen, ChevronLeft, Lock,
   CheckCircle, Loader2, Image as ImageIcon, Video, FileDigit
 } from "lucide-react";
@@ -114,6 +114,7 @@ export default function AdminMaterials() {
   const [folderSummaryOpen, setFolderSummaryOpen] = React.useState(false);
   const [folderSummaryData, setFolderSummaryData] = React.useState<{count: number, names: string[]}>({count: 0, names: []});
   const [showHierarchy, setShowHierarchy] = React.useState(false);
+  const [expandedHierarchyPaths, setExpandedHierarchyPaths] = React.useState<string[]>([]);
 
   // Pagination
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -753,6 +754,16 @@ export default function AdminMaterials() {
       const { loadMaterial } = await import('@/data/storage');
       const hydrated = await loadMaterial(mat.id);
       setSelectedMaterial(hydrated || mat);
+
+      // Auto-open hierarchy panel and expand the tree to show this material's location
+      if (mat.hierarchyPath) {
+        setShowHierarchy(true);
+        // Build hierarchy path segments for auto-expansion
+        const parts = (mat.hierarchyPath || "").split(" > ").map(p => p.trim()).filter(Boolean);
+        // Select the subfonds (department) level if present
+        const hierarchyTarget = parts.length > 1 ? parts.slice(1).join(" > ") : parts[0];
+        setExpandedHierarchyPaths(parts);
+      }
     }
   };
 
@@ -1103,10 +1114,11 @@ export default function AdminMaterials() {
               </Button>
             </CardHeader>
             <CardContent className="p-2 max-h-[700px] overflow-y-auto custom-scrollbar">
-              <ArchivalTree node={hierarchyTree} selectedId={selectedHierarchyItem} onSelectItem={(id) => {
+              <ArchivalTree node={hierarchyTree} selectedId={selectedHierarchyItem} expandedPaths={expandedHierarchyPaths} onSelectItem={(id) => {
                 setSelectedHierarchyItem(prev => prev === id ? null : id);
                 setSelectedMaterial(null);
                 setShowHierarchy(true);
+                setExpandedHierarchyPaths([]);
               }} />
             </CardContent>
           </Card>
@@ -1274,6 +1286,28 @@ export default function AdminMaterials() {
                                      <span className="font-mono text-xs font-bold text-muted-foreground">{mat.uniqueId}</span>
                                      <Badge variant="outline" className="text-[9px] bg-emerald-50 text-emerald-700 border-emerald-200 uppercase font-bold px-1.5 py-0.5">Item Level Record</Badge>
                                  </div>
+                                 {/* Hierarchy Breadcrumb Trail */}
+                                 {mat.hierarchyPath && (
+                                   <div className="flex items-center gap-1.5 mt-3 flex-wrap">
+                                     <Folder className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                                     {(mat.hierarchyPath || "").split(" > ").map((segment: string, idx: number, arr: string[]) => (
+                                       <React.Fragment key={idx}>
+                                         <span className={cn(
+                                           "text-[11px] font-semibold px-2 py-0.5 rounded-md transition-colors",
+                                           idx === 0 ? "bg-[#0B3D91]/10 text-[#0B3D91] font-bold" :
+                                           idx === 1 ? "bg-[#4169E1]/10 text-[#4169E1] font-bold" :
+                                           idx === 2 ? "bg-[#0EA5E9]/10 text-[#0EA5E9] font-bold" :
+                                           "bg-muted/60 text-muted-foreground"
+                                         )}>
+                                           {segment.trim()}
+                                         </span>
+                                         {idx < arr.length - 1 && (
+                                           <ChevronRight className="w-3 h-3 text-muted-foreground/40 shrink-0" />
+                                         )}
+                                       </React.Fragment>
+                                     ))}
+                                   </div>
+                                 )}
                                </div>
                                <div className="flex items-center gap-3">
                                  <Badge variant="outline" className={cn("text-[9px] capitalize", approvalBadge)}>
@@ -1940,6 +1974,63 @@ export default function AdminMaterials() {
               } as any;
 
               try {
+                // ═══ FIRESTORE-FIRST: Save to API (Firestore) as the PRIMARY store ═══
+                const apiData: any = { ...newMaterial };
+                
+                // Strip non-serializable fields before sending to API
+                delete apiData.fileData;
+                delete apiData.pageImages; // Remove Blob arrays — we'll handle thumbnails separately
+                delete apiData.fileId; // IndexedDB ref, not relevant for Firestore
+                
+                // Convert main file Blob to Base64 for Firestore storage
+                if (uploadForm.fileData instanceof Blob) {
+                  try {
+                    const compressed = await compressFile(uploadForm.fileData, 0.9);
+                    const base64 = await fileToBase64(compressed);
+                    apiData.fileUrl = base64;
+                  } catch (err) {
+                    console.error("Base64 conversion failed:", err);
+                    // Fall through — fileUrl might still be a URL string
+                  }
+                }
+                
+                // Convert first page thumbnail to base64 for Firestore (for collections display)
+                if (pdfPreviewBlobs.length > 0) {
+                  try {
+                    const thumbBase64 = await fileToBase64(pdfPreviewBlobs[0]);
+                    apiData.thumbnailUrl = thumbBase64;
+                  } catch (err) {
+                    console.error("Thumbnail base64 failed:", err);
+                  }
+                } else if (pdfPreviewImages.length > 0 && typeof pdfPreviewImages[0] === 'string' && !pdfPreviewImages[0].startsWith('blob:')) {
+                  apiData.thumbnailUrl = pdfPreviewImages[0];
+                }
+                
+                // Ensure category mapping for API
+                if (uploadForm.series) {
+                  const cat = categories.find(c => c.name === uploadForm.series);
+                  if (cat) apiData.categoryId = cat.id;
+                }
+                // Also try subfonds as category fallback
+                if (!apiData.categoryId && uploadForm.subfonds) {
+                  const cat = categories.find(c => c.name === uploadForm.subfonds);
+                  if (cat) apiData.categoryId = cat.id;
+                }
+
+                let firestoreSaved = false;
+                try {
+                  if (editingMaterialId) {
+                    await updateMaterial({ id: editingMaterialId, data: apiData });
+                  } else {
+                    const res = await createMaterial({ data: apiData });
+                    if (res && res.id) setLastIngestedId(res.id);
+                  }
+                  firestoreSaved = true;
+                } catch (apiErr: any) {
+                  console.error("Firestore Save Failed:", apiErr);
+                }
+
+                // Local storage sync for offline resilience (always do this as backup)
                 const updated = await saveMaterial(newMaterial);
                 setMaterials(updated);
                 
@@ -1989,63 +2080,24 @@ export default function AdminMaterials() {
                 const toastTitle = editingMaterialId
                   ? "Updated"
                   : (approvalStatus === "pending" ? "Submitted for Approval" : "Ingestion Confirmed");
-                const toastDesc = approvalStatus === "pending"
-                  ? "Material is pending admin approval before publication."
-                  : "Material saved successfully.";
-                
-                // --- API INTEGRATION ---
-                try {
-                  const apiData = { ...newMaterial };
-                  
-                  // Convert File/Blob to Base64 for Firestore storage
-                  if (uploadForm.fileData instanceof Blob) {
-                    try {
-                      const compressed = await compressFile(uploadForm.fileData, 0.9);
-                      const base64 = await fileToBase64(compressed);
-                      (apiData as any).fileUrl = base64;
-                    } catch (err) {
-                      console.error("Base64 conversion failed:", err);
-                    }
-                  }
-                  // Ensure category mapping for API
-                  if (uploadForm.series) {
-                    const cat = categories.find(c => c.name === uploadForm.series);
-                    if (cat) (apiData as any).categoryId = cat.id;
-                  }
+                const toastDesc = firestoreSaved
+                  ? (approvalStatus === "pending"
+                    ? "Material saved to Firestore and pending admin approval."
+                    : "Material saved to Firestore and published successfully.")
+                  : "Saved locally. Firestore sync will retry on next refresh.";
 
-                  if (editingMaterialId) {
-                    await updateMaterial({ id: editingMaterialId, data: apiData });
-                  } else {
-                    const res = await createMaterial({ data: apiData });
-                    if (res && res.id) setLastIngestedId(res.id);
-                  }
-
-                  // Local storage sync for offline resilience
-                  const updated = await saveMaterial(newMaterial);
-                  setMaterials(updated);
-
-                  toast({ title: toastTitle, description: toastDesc });
+                toast({ 
+                  title: toastTitle, 
+                  description: toastDesc,
+                  variant: firestoreSaved ? "default" : "destructive"
+                });
                   
-                  if (!editingMaterialId) {
-                    setSuccessDialogOpen(true);
-                  }
-                  
-                  setChecklistOpen(false);
-                  setEditingMaterialId(null);
-                } catch (apiErr: any) {
-                  console.error("API Save Failed:", apiErr);
-                  toast({ 
-                    title: "Sync Warning", 
-                    description: "Saved locally, but failed to sync with Firestore. Will retry on next refresh.",
-                    variant: "destructive" 
-                  });
-                  
-                  // Fallback to local save even if API fails
-                  const updated = await saveMaterial(newMaterial);
-                  setMaterials(updated);
-                  setChecklistOpen(false);
-                  setEditingMaterialId(null);
+                if (!editingMaterialId) {
+                  setSuccessDialogOpen(true);
                 }
+                  
+                setChecklistOpen(false);
+                setEditingMaterialId(null);
               } catch (e) {
                 toast({ title: "Storage Error", description: "Failed to store material data.", variant: "destructive" });
               }

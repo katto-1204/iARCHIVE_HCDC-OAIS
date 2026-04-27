@@ -5,6 +5,7 @@ import { LEVEL_COLORS, LEVEL_LABELS, type HierarchyNode, type HierarchyLevel } f
 interface ArchivalTreeProps {
   node: HierarchyNode;
   selectedId?: string | null;
+  expandedPaths?: string[];
   onSelectItem?: (materialId: string) => void;
   depth?: number;
 }
@@ -18,11 +19,37 @@ const LEVEL_ICONS: Record<HierarchyLevel, React.ElementType> = {
   item: File,
 };
 
-function TreeNode({ node, selectedId, onSelectItem, depth = 0 }: ArchivalTreeProps) {
-  const [expanded, setExpanded] = React.useState(depth < 2);
+function TreeNode({ node, selectedId, expandedPaths, onSelectItem, depth = 0 }: ArchivalTreeProps) {
+  // Auto-expand if this node's name appears in the expandedPaths array
+  const shouldAutoExpand = React.useMemo(() => {
+    if (!expandedPaths || expandedPaths.length === 0) return depth < 2;
+    // Check if the node name matches any segment in the path
+    return expandedPaths.some(segment => 
+      node.name === segment || 
+      node.name.includes(segment) || 
+      segment.includes(node.name)
+    );
+  }, [expandedPaths, node.name, depth]);
+
+  const [expanded, setExpanded] = React.useState(shouldAutoExpand);
+  
+  // Re-expand when expandedPaths changes (e.g. when user clicks a material)
+  React.useEffect(() => {
+    if (expandedPaths && expandedPaths.length > 0 && shouldAutoExpand) {
+      setExpanded(true);
+    }
+  }, [expandedPaths, shouldAutoExpand]);
+
   const hasChildren = node.children && node.children.length > 0;
   const isItem = node.level === "item";
   const isSelected = node.materialId && node.materialId === selectedId;
+  
+  // Highlight nodes whose name matches the expandedPaths (i.e., the breadcrumb)
+  const isHighlighted = React.useMemo(() => {
+    if (!expandedPaths || expandedPaths.length === 0) return false;
+    return expandedPaths.some(segment => node.name === segment);
+  }, [expandedPaths, node.name]);
+
   const Icon = LEVEL_ICONS[node.level];
   const color = LEVEL_COLORS[node.level];
 
@@ -41,6 +68,7 @@ function TreeNode({ node, selectedId, onSelectItem, depth = 0 }: ArchivalTreePro
         className={`w-full flex items-center gap-2 py-1.5 px-2 rounded-lg text-left text-sm transition-all duration-150 group
           ${isItem ? "hover:bg-primary/5 cursor-pointer" : "hover:bg-muted/50"}
           ${isSelected ? "bg-primary/10 ring-1 ring-primary/30" : ""}
+          ${isHighlighted && !isItem ? "bg-blue-50 ring-1 ring-blue-200" : ""}
         `}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
         onClick={() => {
@@ -74,7 +102,7 @@ function TreeNode({ node, selectedId, onSelectItem, depth = 0 }: ArchivalTreePro
 
         {/* Name and level badge */}
         <div className="flex-1 min-w-0">
-          <span className={`block truncate text-[13px] ${isSelected ? "font-bold text-primary" : isItem ? "text-foreground font-medium" : "text-foreground/80 font-semibold"}`}>
+          <span className={`block truncate text-[13px] ${isSelected ? "font-bold text-primary" : isHighlighted ? "font-bold text-blue-700" : isItem ? "text-foreground font-medium" : "text-foreground/80 font-semibold"}`}>
             {node.name}
           </span>
         </div>
@@ -108,6 +136,7 @@ function TreeNode({ node, selectedId, onSelectItem, depth = 0 }: ArchivalTreePro
               key={child.id}
               node={child}
               selectedId={selectedId}
+              expandedPaths={expandedPaths}
               onSelectItem={onSelectItem}
               depth={depth + 1}
             />
@@ -118,10 +147,10 @@ function TreeNode({ node, selectedId, onSelectItem, depth = 0 }: ArchivalTreePro
   );
 }
 
-export function ArchivalTree({ node, selectedId, onSelectItem }: ArchivalTreeProps) {
+export function ArchivalTree({ node, selectedId, expandedPaths, onSelectItem }: ArchivalTreeProps) {
   return (
     <div className="py-2">
-      <TreeNode node={node} selectedId={selectedId} onSelectItem={onSelectItem} depth={0} />
+      <TreeNode node={node} selectedId={selectedId} expandedPaths={expandedPaths} onSelectItem={onSelectItem} depth={0} />
     </div>
   );
 }

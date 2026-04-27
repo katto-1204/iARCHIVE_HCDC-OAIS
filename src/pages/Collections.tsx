@@ -54,7 +54,7 @@ export default function Collections() {
   const [showFilters, setShowFilters] = React.useState(false);
   const [viewMode, setViewMode] = React.useState<"grid" | "list">("grid");
   const [hoveredCard, setHoveredCard] = React.useState<string | null>(null);
-  const [selectedFolder, setSelectedFolder] = React.useState<{ category: string, series: string } | null>(null);
+  const [selectedFolder, setSelectedFolder] = React.useState<{ category: string, subfonds: string, series: string } | null>(null);
 
   React.useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300);
@@ -116,23 +116,45 @@ export default function Collections() {
   });
 
   // Calculate Folders based on displayMaterials (so they reflect search & access filters too)
-  const foldersMap = new Map<string, { category: string; series: string; count: number; coverImages: string[] }>();
+  const foldersMap = new Map<string, { category: string; subfonds: string; series: string; count: number; coverImages: string[] }>();
   displayMaterials.forEach((mat: any) => {
     const parts = (mat.hierarchyPath || "").split(" > ").filter((p: string) => p.trim() !== "");
     
     let depth = 1;
     if (parts[depth] === "Departmental Sub-fonds") depth++;
     
-    const cat = parts[depth] || parts[depth-1] || "Uncategorized";
+    const subfonds = parts[depth] || parts[depth-1] || "Uncategorized";
     // Folder name is either the last part (series) or "General Series" if it's too shallow
     const ser = parts.length > (depth+1) ? parts[parts.length - 1] : "General Series";
     
-    const finalCat = parts.length < depth ? "HCDC Collections" : cat;
+    const finalSubfonds = parts.length < depth ? "HCDC Collections" : subfonds;
     const finalSer = (parts.length === depth && parts[0] === "HCDC") ? "General Series" : ser;
 
-    const key = `${finalCat}::${finalSer}`;
+    // Determine the top-level category based on subfonds type
+    // Group all colleges/departments under "Academic Departments"
+    // Keep administrative, publications, photographs as separate categories
+    let topCategory = "Other Collections";
+    const isDepartmental = parts[1] === "Departmental Sub-fonds";
+    const lowerSubfonds = finalSubfonds.toLowerCase();
+    
+    if (isDepartmental || lowerSubfonds.includes("college") || lowerSubfonds.includes("school") || 
+        lowerSubfonds.includes("cet") || lowerSubfonds.includes("ccje") || lowerSubfonds.includes("chatme") || 
+        lowerSubfonds.includes("husocom") || lowerSubfonds.includes("come") || lowerSubfonds.includes("sbme") || 
+        lowerSubfonds.includes("ste") || lowerSubfonds.includes("blis")) {
+      topCategory = "Academic Departments";
+    } else if (lowerSubfonds.includes("admin") || lowerSubfonds.includes("board") || lowerSubfonds.includes("strategic")) {
+      topCategory = "Administrative Records";
+    } else if (lowerSubfonds.includes("publication") || lowerSubfonds.includes("yearbook") || lowerSubfonds.includes("journal")) {
+      topCategory = "Publications";
+    } else if (lowerSubfonds.includes("photo") || lowerSubfonds.includes("image") || lowerSubfonds.includes("visual")) {
+      topCategory = "Photographs & Visual Media";
+    } else if (lowerSubfonds.includes("research") || lowerSubfonds.includes("faculty")) {
+      topCategory = "Research Output";
+    }
+
+    const key = `${finalSubfonds}::${finalSer}`;
     if (!foldersMap.has(key)) {
-      foldersMap.set(key, { category: finalCat, series: finalSer, count: 0, coverImages: [] });
+      foldersMap.set(key, { category: topCategory, subfonds: finalSubfonds, series: finalSer, count: 0, coverImages: [] });
     }
     const f = foldersMap.get(key)!;
     f.count++;
@@ -143,13 +165,30 @@ export default function Collections() {
   });
 
   const folders = Array.from(foldersMap.values());
-  const groupedFolders = Array.from(new Set(folders.map(f => f.category)))
-    .sort()
-    .map(cat => ({
-      category: cat,
-      folders: folders.filter(f => f.category === cat).sort((a,b) => a.series.localeCompare(b.series))
-    }))
-    .filter(g => g.folders.length > 0); // Hide empty groups
+  
+  // Group by top-level category first, then by subfonds within each category
+  const categoryOrder = ["Academic Departments", "Research Output", "Administrative Records", "Publications", "Photographs & Visual Media", "Other Collections"];
+  const groupedFolders = categoryOrder
+    .map(topCat => {
+      const catFolders = folders.filter(f => f.category === topCat);
+      if (catFolders.length === 0) return null;
+      
+      // Group folders by subfonds within this category
+      const subfondGroups = Array.from(new Set(catFolders.map(f => f.subfonds)))
+        .sort()
+        .map(sf => ({
+          subfonds: sf,
+          folders: catFolders.filter(f => f.subfonds === sf).sort((a,b) => a.series.localeCompare(b.series))
+        }));
+      
+      return {
+        category: topCat,
+        subfondGroups,
+        folders: catFolders.sort((a,b) => a.subfonds.localeCompare(b.subfonds) || a.series.localeCompare(b.series)),
+        totalCount: catFolders.reduce((sum, f) => sum + f.count, 0)
+      };
+    })
+    .filter(Boolean) as { category: string; subfondGroups: { subfonds: string; folders: typeof folders }[]; folders: typeof folders; totalCount: number }[];
 
   // Apply folder filter for Level 2 items
   const level2Materials = selectedFolder
@@ -159,13 +198,13 @@ export default function Collections() {
         let depth = 1;
         if (parts[depth] === "Departmental Sub-fonds") depth++;
         
-        const cat = parts[depth] || parts[depth-1] || "Uncategorized";
+        const subfonds = parts[depth] || parts[depth-1] || "Uncategorized";
         const ser = parts.length > (depth + 1) ? parts[parts.length - 1] : "General Series";
         
-        const finalCat = parts.length < depth ? "HCDC Collections" : cat;
+        const finalSubfonds = parts.length < depth ? "HCDC Collections" : subfonds;
         const finalSer = (parts.length === depth && parts[0] === "HCDC") ? "General Series" : ser;
 
-        return finalCat === selectedFolder.category && finalSer === selectedFolder.series;
+        return finalSubfonds === selectedFolder.subfonds && finalSer === selectedFolder.series;
       })
     : displayMaterials;
 
@@ -343,7 +382,7 @@ export default function Collections() {
                   Back Options
                 </button>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground px-2 font-medium bg-white/50 border border-border/60 py-1.5 rounded-lg shadow-sm">
-                  <span className="text-[#4169E1]/80 max-w-[120px] truncate" title={selectedFolder.category}>{selectedFolder.category}</span>
+                  <span className="text-[#4169E1]/80 max-w-[120px] truncate" title={selectedFolder.subfonds}>{selectedFolder.subfonds}</span>
                   <ChevronRight className="w-3.5 h-3.5" />
                   <span className="text-foreground font-bold tracking-tight max-w-[150px] truncate" title={selectedFolder.series}>{selectedFolder.series}</span>
                   <span className="px-2 border-l border-border/60 font-black ml-1">{level2Materials.length} Items</span>
@@ -411,25 +450,43 @@ export default function Collections() {
 
         {/* ═══ LEVEL 1: HIERARCHICAL FOLDERS VIEW ═══ */}
         {!isLoading && !selectedFolder && groupedFolders.length > 0 && (
-          <div className="flex flex-col gap-10">
+          <div className="flex flex-col gap-14">
             {groupedFolders.map((group) => (
               <div key={group.category} className="animate-fade-in">
-                <div className="flex items-center gap-3 mb-5 border-b border-border/60 pb-3">
-                  <div className="w-8 h-8 rounded-lg bg-[#4169E1]/10 flex items-center justify-center text-[#4169E1]">
-                    <Layers className="w-4 h-4" />
+                {/* Category Header */}
+                <div className="flex items-center gap-3 mb-6 pb-3 border-b-2 border-[#4169E1]/20">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#4169E1]/15 to-[#4169E1]/5 flex items-center justify-center text-[#4169E1] shadow-sm">
+                    <Layers className="w-5 h-5" />
                   </div>
-                  <h2 className="text-xl font-black text-[#0a1628] tracking-tight">{group.category}</h2>
-                  <span className="bg-[#4169E1]/10 text-[#4169E1] px-2 py-0.5 rounded-full text-xs font-bold">{group.folders.length} Series</span>
+                  <div>
+                    <h2 className="text-2xl font-black text-[#0a1628] tracking-tight">{group.category}</h2>
+                    <p className="text-xs text-muted-foreground font-medium mt-0.5">{group.totalCount} materials across {group.subfondGroups.length} sub-fonds</p>
+                  </div>
+                  <span className="bg-[#4169E1]/10 text-[#4169E1] px-3 py-1 rounded-full text-xs font-bold ml-auto">{group.folders.length} Series</span>
                 </div>
+                
+                {/* Subfonds Groups within this category */}
+                <div className="flex flex-col gap-8">
+                {group.subfondGroups.map((sfGroup) => (
+                  <div key={sfGroup.subfonds}>
+                    {/* Subfonds label - only show if there are multiple subfonds in this category */}
+                    {group.subfondGroups.length > 1 && (
+                      <div className="flex items-center gap-2 mb-4 ml-1">
+                        <div className="w-1.5 h-1.5 rounded-full bg-[#4169E1]" />
+                        <span className="text-sm font-bold text-[#0a1628]/70 uppercase tracking-wider">{sfGroup.subfonds}</span>
+                        <div className="flex-1 h-px bg-border/40" />
+                        <span className="text-[10px] font-bold text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full">{sfGroup.folders.reduce((s, f) => s + f.count, 0)} items</span>
+                      </div>
+                    )}
                 <div className={viewMode === "grid" 
                   ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" 
                   : "flex flex-col gap-3"
                 }>
-                  {group.folders.map((folder, folderIdx) => (
+                  {sfGroup.folders.map((folder, folderIdx) => (
                     viewMode === "grid" ? (
                       <div
                         key={folder.series}
-                        onClick={() => { setSelectedFolder({ category: folder.category, series: folder.series }); window.scrollTo({ top: 300, behavior: 'smooth' }); }}
+                        onClick={() => { setSelectedFolder({ category: folder.category, subfonds: folder.subfonds, series: folder.series }); window.scrollTo({ top: 300, behavior: 'smooth' }); }}
                         className="group relative h-[380px] bg-transparent cursor-pointer transition-all duration-500 hover:-translate-y-3 pointer-events-auto"
                       >
                         {/* Top Part: Gradient + File Stack */}
@@ -479,7 +536,7 @@ export default function Collections() {
                            
                            <div className="mt-2">
                              <h3 className="text-white text-xl font-bold leading-tight line-clamp-2 mb-2 group-hover:text-[#4169E1] transition-colors">{folder.series}</h3>
-                             <p className="text-white/40 text-xs font-medium">{group.category}</p>
+                             <p className="text-white/40 text-xs font-medium">{folder.subfonds}</p>
                            </div>
 
                            <div className="mt-auto flex items-center justify-between">
@@ -499,7 +556,7 @@ export default function Collections() {
                     ) : (
                       <div
                         key={folder.series}
-                        onClick={() => { setSelectedFolder({ category: folder.category, series: folder.series }); window.scrollTo({ top: 300, behavior: 'smooth' }); }}
+                        onClick={() => { setSelectedFolder({ category: folder.category, subfonds: folder.subfonds, series: folder.series }); window.scrollTo({ top: 300, behavior: 'smooth' }); }}
                         className="bg-white border border-border/60 rounded-[2rem] p-6 hover:shadow-[0_20px_50px_rgba(0,0,0,0.1)] transition-all cursor-pointer group relative overflow-hidden"
                       >
                          {/* Stacked Preview Logic */}
@@ -533,7 +590,7 @@ export default function Collections() {
 
                          <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
-                               <p className="text-[10px] text-[#4169E1] uppercase tracking-[0.2em] font-black">{group.category}</p>
+                               <p className="text-[10px] text-[#4169E1] uppercase tracking-[0.2em] font-black">{folder.subfonds}</p>
                             </div>
                             <h3 className="text-xl font-display font-black text-[#0a1628] leading-tight group-hover:text-[#4169E1] transition-colors">{folder.series}</h3>
                             <div className="flex items-center justify-between mt-4">
@@ -549,6 +606,9 @@ export default function Collections() {
                       </div>
                     )
                   ))}
+                </div>
+                  </div>
+                ))}
                 </div>
               </div>
             ))}
