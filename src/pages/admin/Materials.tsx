@@ -2033,8 +2033,8 @@ export default function AdminMaterials() {
                   mainFileBase64 = apiData.fileUrl;
                 }
                 
-                // If main file is large (> 500KB base64), use chunked upload
-                if (mainFileBase64.length > 500000) {
+                // If main file is large (> 200KB base64), use chunked upload
+                if (mainFileBase64.length > 200000) {
                   console.log(`File is large (${mainFileBase64.length} chars). Using chunked upload.`);
                   apiData.fileUrl = "PENDING_UPLOAD";
                 } else if (mainFileBase64.length > 0) {
@@ -2117,7 +2117,7 @@ export default function AdminMaterials() {
                       description: "Large document detected. Uploading in chunks...",
                     });
                     
-                    const chunkSize = 500000;
+                    const chunkSize = 200000;
                     const totalChunks = Math.ceil(mainFileBase64.length / chunkSize);
                     
                     for (let i = 0; i < totalChunks; i++) {

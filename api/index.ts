@@ -30,8 +30,8 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // TOTAL WAR BYPASS - Guaranteed login for demo accounts regardless of Firebase state
 app.post("/api/auth/login", (req, res, next) => {
