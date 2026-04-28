@@ -193,6 +193,8 @@ export default function AdminMaterials() {
   const [checklistValues, setChecklistValues] = React.useState<Record<string, string>>({});
   const [successDialogOpen, setSuccessDialogOpen] = React.useState(false);
   const [lastIngestedId, setLastIngestedId] = React.useState<string | null>(null);
+  const [ingestBusy, setIngestBusy] = React.useState(false);
+  const [ingestStage, setIngestStage] = React.useState("Preparing ingest payload...");
 
   const { mutateAsync: createMaterial, isPending: isCreating } = useCreateMaterial();
   const { mutateAsync: updateMaterial, isPending: isUpdating } = useUpdateMaterial();
@@ -2074,6 +2076,8 @@ export default function AdminMaterials() {
                </Button>
             ) : (
                <Button onClick={async () => {
+              setIngestBusy(true);
+              setIngestStage("Preparing ingest payload...");
               // Corrected hierarchy path to use "Departmental Sub-fonds" as requested
               const hierarchyPath = `HCDC > Departmental Sub-fonds > ${uploadForm.subfonds}${uploadForm.program ? ' > ' + uploadForm.program : ''}${uploadForm.series ? ' > ' + uploadForm.series : ''}`;
               const existingApproval = (selectedMaterial as any)?.approvalStatus;
@@ -2109,6 +2113,7 @@ export default function AdminMaterials() {
 
               try {
                 // ═══ FIRESTORE-FIRST: Save to API (Firestore) as the PRIMARY store ═══
+                setIngestStage("Saving metadata to Firestore...");
                 const apiData: any = { ...newMaterial };
                 
                 // Strip non-serializable fields before sending to API
@@ -2179,6 +2184,7 @@ export default function AdminMaterials() {
 
                 try {
                   // A. Save main record (Metadata + PDF file)
+                  setIngestStage(editingMaterialId ? "Updating existing record..." : "Creating archival record...");
                   if (editingMaterialId) {
                     await updateMaterial({ id: editingMaterialId, data: apiData });
                   } else {
@@ -2189,6 +2195,7 @@ export default function AdminMaterials() {
 
                   // B. Granular Page Uploads (one by one to bypass payload limits)
                   if (finalId && pagesToUpload.length > 0) {
+                    setIngestStage(`Uploading ${pagesToUpload.length} page image(s)...`);
                     const pageToast = toast({
                       title: "Uploading Pages",
                       description: `Saving ${pagesToUpload.length} pages to Firestore...`,
@@ -2215,6 +2222,7 @@ export default function AdminMaterials() {
 
                   // C. Chunked Main File Upload (if it was too large for the initial payload)
                   if (finalId && mainFileBase64.length > 0) {
+                    setIngestStage("Uploading large document in chunks...");
                     const chunkToast = toast({
                       title: "Uploading Document",
                       description: "Large document detected. Uploading in chunks...",
@@ -2281,6 +2289,7 @@ export default function AdminMaterials() {
                 });
 
                 if (approvalStatus === "pending") {
+                  setIngestStage("Submitting approval request...");
                   submitIngestRequest({
                     data: {
                       materialId: newMaterial.uniqueId,
@@ -2325,6 +2334,8 @@ export default function AdminMaterials() {
                 setEditingMaterialId(null);
               } catch (e) {
                 toast({ title: "Storage Error", description: "Failed to store material data.", variant: "destructive" });
+              } finally {
+                setIngestBusy(false);
               }
             }} className="bg-emerald-600 hover:bg-emerald-700" disabled={isCreating || isUpdating}>
               {(isCreating || isUpdating) ? (
@@ -2341,9 +2352,31 @@ export default function AdminMaterials() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={ingestBusy} onOpenChange={(open) => { if (!ingestBusy) setIngestBusy(open); }}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-[#0a1628]">
+              <Loader2 className="w-5 h-5 animate-spin text-indigo-600" />
+              Ingesting Material
+            </DialogTitle>
+            <DialogDescription>
+              Please keep this tab open while we save files and metadata.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-2 rounded-xl border border-indigo-100 bg-indigo-50/60 p-4">
+            <p className="text-sm font-semibold text-indigo-800">{ingestStage}</p>
+            <p className="text-xs text-indigo-600 mt-1">This may take longer for large files and multi-page documents.</p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* ═══ Successful Ingest Modal ═══ */}
       <Dialog open={successDialogOpen} onOpenChange={setSuccessDialogOpen}>
         <DialogContent className="max-w-md p-0 overflow-hidden border-none shadow-2xl rounded-3xl">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Ingestion successful</DialogTitle>
+            <DialogDescription>Archival material was saved and indexed successfully.</DialogDescription>
+          </DialogHeader>
           <div className="bg-emerald-600 h-2 w-full" />
           <div className="p-8 flex flex-col items-center text-center">
             <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-6 shadow-inner animate-in zoom-in-50 duration-500">

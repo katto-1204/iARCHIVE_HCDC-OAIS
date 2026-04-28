@@ -67,6 +67,26 @@ export function PublicNavbar({ isTransparentOnTop = false }: { isTransparentOnTo
           </Link>
         </div>
 
+        {/* Logged-out CTA outside navbar (top state only) */}
+        {!user && (
+          <div
+            className={`hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 items-center gap-2 pointer-events-auto transition-all duration-500 origin-right ${
+              isScrolled ? "opacity-0 scale-90 pointer-events-none" : "opacity-100 scale-100"
+            }`}
+          >
+            <Link href="/login">
+              <button className="px-4 py-2 rounded-full border border-white/20 text-white/85 hover:text-white hover:bg-white/10 text-sm font-bold transition-all">
+                Login
+              </button>
+            </Link>
+            <Link href="/register">
+              <button className="px-4 py-2 rounded-full bg-[#4169E1] hover:bg-[#3558c8] text-white text-sm font-bold transition-all shadow-md">
+                Sign Up
+              </button>
+            </Link>
+          </div>
+        )}
+
         {/* Compact Pill Navbar */}
         <div className={`pointer-events-auto relative flex items-center justify-between rounded-full transition-all duration-500 shadow-xl ring-1 ring-white/5 ${
           isScrolled
@@ -115,7 +135,7 @@ export function PublicNavbar({ isTransparentOnTop = false }: { isTransparentOnTo
               />
             </div>
             
-            {user && (
+            {user ? (
               <div className="flex items-center">
                 <div className="w-px h-6 bg-white/20 mr-4"></div>
                 <Link href={user.role === 'admin' ? "/admin" : user.role === 'archivist' ? "/archivist" : "/student"}>
@@ -130,7 +150,21 @@ export function PublicNavbar({ isTransparentOnTop = false }: { isTransparentOnTo
                   </div>
                 </Link>
               </div>
-            )}
+            ) : isScrolled ? (
+              <div className="flex items-center gap-2">
+                <div className="w-px h-6 bg-white/20 mr-2"></div>
+                <Link href="/login">
+                  <button className="px-3 py-1.5 rounded-full border border-white/20 text-white/85 hover:text-white hover:bg-white/10 text-xs font-bold transition-all">
+                    Login
+                  </button>
+                </Link>
+                <Link href="/register">
+                  <button className="px-3 py-1.5 rounded-full bg-[#4169E1] hover:bg-[#3558c8] text-white text-xs font-bold transition-all">
+                    Sign Up
+                  </button>
+                </Link>
+              </div>
+            ) : null}
           </div>
 
           {/* Mobile Hamburger Menu icon */}
