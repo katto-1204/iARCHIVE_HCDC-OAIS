@@ -17,9 +17,10 @@ import {
   computeDashboardStats,
 } from "@/data/metadataUtils";
 import { format } from "date-fns";
-import { useGetMaterials, useGetFeedbacks, useMarkFeedbackRead, useGetAuditLogs, useDeleteMaterial } from "@workspace/api-client-react";
+import { useGetMaterials, useGetFeedbacks, useMarkFeedbackRead, useGetAuditLogs, useDeleteMaterial, useDeleteFeedback } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
-import { getMaterials } from "@/data/storage";
+import { deleteMaterial as deleteMaterialLocal, getMaterials } from "@/data/storage";
+import { cn } from "@/lib/utils";
 
 type FilterTab = "all" | "complete" | "partial" | "incomplete";
 type DashboardView = "dashboard" | "feedback";
@@ -89,6 +90,11 @@ export default function AdminDashboard() {
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false);
   const [materialToDelete, setMaterialToDelete] = React.useState<any>(null);
+  const [deleteNotFound, setDeleteNotFound] = React.useState(false);
+  const [selectedMaterialIds, setSelectedMaterialIds] = React.useState<Record<string, boolean>>({});
+  const [bulkDeleteOpen, setBulkDeleteOpen] = React.useState(false);
+  const [bulkDeleting, setBulkDeleting] = React.useState(false);
+  const [bulkNotFoundCount, setBulkNotFoundCount] = React.useState(0);
 
   const { data: materialsData, isLoading: isMaterialsLoading, refetch: refetchMaterials } = useGetMaterials({ limit: 1000 });
   const { data: feedbackData } = useGetFeedbacks();
@@ -130,6 +136,22 @@ export default function AdminDashboard() {
 
   const ingestionSeries = React.useMemo(() => buildIngestionSeries(materials), [materials]);
   const maxIngestion = Math.max(...ingestionSeries, 1);
+  const weeklySeries = React.useMemo(() => {
+    const labels = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+    const points = ingestionSeries.slice(-7);
+    return labels.map((label, idx) => ({ label, value: points[idx] ?? 0 }));
+  }, [ingestionSeries]);
+  const stockChartPoints = React.useMemo(() => {
+    if (weeklySeries.length === 0) return "";
+    const weekMax = Math.max(...weeklySeries.map((p) => p.value), 1);
+    return weeklySeries
+      .map((val, i) => {
+        const x = (i / (weeklySeries.length - 1 || 1)) * 100;
+        const y = 100 - (val.value / weekMax) * 85;
+        return `${x},${y}`;
+      })
+      .join(" ");
+  }, [weeklySeries]);
   const totalIngested = ingestionSeries.reduce((a, b) => a + b, 0);
   const pendingApprovals = React.useMemo(
     () => materials.filter((m) => getApprovalStatus(m) === "pending").length,
@@ -140,6 +162,74 @@ export default function AdminDashboard() {
   const growthPct = prevWeek ? Math.round(((lastWeek - prevWeek) / prevWeek) * 100) : (lastWeek > 0 ? 100 : 0);
   const growthLabel = `${growthPct >= 0 ? "+" : ""}${growthPct}%`;
   const growthText = prevWeek ? (growthPct >= 0 ? "Outperforming Target" : "Below Target") : (lastWeek > 0 ? "New Ingest Cycle" : `${totalIngested} total ingested`);
+  
+  const MetricSparklineCard = ({
+    title,
+    value,
+    deltaLabel,
+    series,
+    labels,
+    color = "#16a34a",
+  }: {
+    title: string;
+    value: React.ReactNode;
+    deltaLabel?: string;
+    series: number[];
+    labels: string[];
+    color?: string;
+  }) => {
+    const max = Math.max(...series, 1);
+    const points = series
+      .map((v, i) => {
+        const x = (i / (series.length - 1 || 1)) * 100;
+        const y = 100 - (v / max) * 85;
+        return { x, y, v };
+      });
+    const polyPoints = points.map((p) => `${p.x},${p.y}`).join(" ");
+
+    return (
+      <div className="bg-white border border-border/60 rounded-2xl p-6 shadow-sm">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-[#0a1628]">{title}</h3>
+              <span className="text-muted-foreground text-xs font-black border border-border/60 rounded-full px-2 py-0.5">i</span>
+            </div>
+            <div className="mt-2 text-5xl font-black text-[#0a1628] leading-none">{value}</div>
+          </div>
+          {deltaLabel && (
+            <div
+              className={cn(
+                "shrink-0 text-sm font-black px-3 py-1 rounded-xl border",
+                deltaLabel.startsWith("+")
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  : "bg-red-50 text-red-700 border-red-200",
+              )}
+            >
+              {deltaLabel}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4">
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-[92px]">
+            <defs>
+              <linearGradient id={`sparkFill-${title.replace(/\s+/g, "-")}`} x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor={color} stopOpacity="0.18" />
+                <stop offset="100%" stopColor={color} stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <polygon points={`${polyPoints} 100,100 0,100`} fill={`url(#sparkFill-${title.replace(/\s+/g, "-")})`} />
+            <polyline points={polyPoints} fill="none" stroke={color} strokeWidth="2.4" strokeLinejoin="round" strokeLinecap="round" />
+          </svg>
+          <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground font-semibold uppercase tracking-wider">
+            <span>{labels[0] ?? ""}</span>
+            <span>{labels[labels.length - 1] ?? ""}</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const completionBuckets = React.useMemo(() => {
     const buckets = [
@@ -194,6 +284,33 @@ export default function AdminDashboard() {
     });
   }, [materials, activeFilter]);
 
+  const selectedIds = React.useMemo(
+    () => Object.keys(selectedMaterialIds).filter((id) => selectedMaterialIds[id]),
+    [selectedMaterialIds]
+  );
+
+  const toggleSelected = (id: string, next?: boolean) => {
+    setSelectedMaterialIds((prev) => {
+      const value = typeof next === "boolean" ? next : !prev[id];
+      const updated = { ...prev, [id]: value };
+      if (!value) delete updated[id];
+      return updated;
+    });
+  };
+
+  const clearSelected = () => setSelectedMaterialIds({});
+
+  const allShownSelected = React.useMemo(() => {
+    if (filteredMaterials.length === 0) return false;
+    return filteredMaterials.every((m: any) => !!selectedMaterialIds[m.id]);
+  }, [filteredMaterials, selectedMaterialIds]);
+
+  const someShownSelected = React.useMemo(() => {
+    if (filteredMaterials.length === 0) return false;
+    const any = filteredMaterials.some((m: any) => !!selectedMaterialIds[m.id]);
+    return any && !allShownSelected;
+  }, [filteredMaterials, selectedMaterialIds, allShownSelected]);
+
   const statCards = [
     { title: "Total Materials", value: stats.totalMaterials, icon: Database, color: "#4169E1" },
     { title: "Fully Described", value: stats.fullyDescribed, icon: CheckCircle2, color: "#10B981" },
@@ -208,257 +325,95 @@ export default function AdminDashboard() {
     { id: "incomplete", label: "Incomplete (<50%)", count: materials.filter(m => computeCompletion(m) < 50).length },
   ];
 
+  const compactFeedback = (feedbacks as any[])
+    .slice()
+    .sort((a: any, b: any) => new Date(b.createdAt || b.date || 0).getTime() - new Date(a.createdAt || a.date || 0).getTime())
+    .slice(0, 6);
+
   return (
     <AdminLayout>
-      <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between border-b border-border/50 pb-6">
+      <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <div className="inline-flex items-center gap-2 bg-[#0B3D91]/10 text-[#0B3D91] border border-[#0B3D91]/20 rounded-full px-3 py-1 text-xs font-bold mb-3 uppercase tracking-widest">
-            <ShieldCheck className="w-4 h-4" /> System Administrator
-          </div>
-          <h1 className="text-4xl font-display font-bold text-[#0a1628]">Metadata & Compliance Dashboard</h1>
-          <p className="text-muted-foreground mt-2">ISAD(G) + Dublin Core metadata completeness, OAIS compliance tracking, and collection analytics.</p>
+          <h1 className="text-3xl font-display font-black text-[#0a1628] tracking-tight">Admin Dashboard</h1>
+          <p className="text-sm text-muted-foreground mt-1">Ingestion analytics with quick feedback inbox.</p>
         </div>
-        <div className="mt-4 md:mt-0 text-sm text-muted-foreground flex items-center gap-4">
-          <div className="flex items-center gap-1.5 bg-muted/50 px-4 py-2 rounded-xl border border-border/50">
-             <Activity className="w-4 h-4 text-emerald-500 animate-pulse" />
-             System Status: <span className="font-semibold text-emerald-600">Online</span>
-          </div>
-          <div className="flex bg-slate-100 p-1 rounded-xl border border-border/40">
-             <button 
-               onClick={() => setActiveView("dashboard")}
-               className={`px-4 py-1.5 text-xs font-black uppercase tracking-widest rounded-lg transition-all ${activeView === 'dashboard' ? 'bg-[#4169E1] text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>
-               Insights
-             </button>
-             <button 
-               onClick={() => setActiveView("feedback")}
-               className={`px-4 py-1.5 text-xs font-black uppercase tracking-widest rounded-lg transition-all flex items-center gap-2 ${activeView === 'feedback' ? 'bg-[#4169E1] text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>
-               Feedback
-               {unreadFeedbackCount > 0 && (
-                 <span className="bg-red-500 text-white text-[8px] px-1.5 py-0.5 rounded-full pulse-animation">
-                   {unreadFeedbackCount}
-                 </span>
-               )}
-             </button>
-          </div>
-        </div>
+        <Link href="/admin/collections">
+          <Button className="bg-[#0a1628] hover:bg-[#142742] text-white font-bold rounded-xl h-10 px-4">
+            View Materials
+          </Button>
+        </Link>
       </div>
 
-      {activeView === "feedback" ? (
-        <div className="animate-fade-in">
-           <FeedbackView />
-        </div>
-      ) : (
-        <div className="animate-fade-in">
+      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 mb-10">
+        <MetricSparklineCard
+          title="Ingestion"
+          value={lastWeek}
+          deltaLabel={growthLabel}
+          series={weeklySeries.map((p) => p.value)}
+          labels={weeklySeries.map((p) => p.label)}
+          color="#16a34a"
+        />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-        <Card className="lg:col-span-2 shadow-sm border-border/50 bg-white overflow-hidden">
-          <CardHeader className="border-b border-border/50 pb-4 flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-lg flex items-center gap-2 text-[#0a1628]">
-                <TrendingUp className="w-5 h-5 text-emerald-500" /> Ingestion Velocity
-              </CardTitle>
-              <p className="text-xs text-muted-foreground mt-1">Ingested items tracked over the last 12 weeks. <span className="font-bold text-[#0a1628]">{totalIngested} total</span></p>
+        <div className="bg-white border border-border/60 rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="w-4 h-4 text-[#4169E1]" />
+              <h3 className="text-sm font-black text-[#0a1628]">Feedback</h3>
             </div>
-            <div className="text-right">
-              <span className={`text-2xl font-bold ${growthPct >= 0 ? "text-emerald-600" : "text-red-500"}`}>{growthLabel}</span>
-              <p className={`text-[10px] font-bold uppercase tracking-wider ${growthPct >= 0 ? "text-emerald-600" : "text-red-500"}`}>{growthText}</p>
-            </div>
-          </CardHeader>
-          <CardContent className="p-6 h-[220px] flex items-end gap-1">
-            {ingestionSeries.map((val, i) => {
-              const barHeight = maxIngestion > 0 ? Math.max((val / maxIngestion) * 100, val > 0 ? 12 : 3) : 3;
-              const isLast = i === ingestionSeries.length - 1;
-              return (
-                <div key={i} className="flex-1 flex flex-col items-center group cursor-pointer">
-                  <div 
-                    className={`w-full rounded-t-sm relative transition-all duration-500 ${isLast ? "bg-gradient-to-t from-[#4169E1] to-[#6D8BF5]" : val > 0 ? "bg-[#4169E1]/30 group-hover:bg-[#4169E1]/60" : "bg-muted/20 group-hover:bg-muted/40"}`}
-                    style={{ height: `${barHeight}%`, minHeight: '4px' }}
-                  >
-                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[#0a1628] text-white text-[9px] font-bold px-2.5 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-lg pointer-events-none z-10">
-                      {val} item{val !== 1 ? "s" : ""}
-                    </div>
-                  </div>
-                  <span className={`text-[8px] mt-2 font-bold ${isLast ? "text-[#4169E1]" : "text-muted-foreground"}`}>W{i+1}</span>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm border-border/50 bg-[#0a1628] text-white overflow-hidden relative">
-          <div className="absolute top-0 right-0 w-32 h-32 -mr-8 -mt-8 rounded-full bg-white/5 blur-2xl" />
-          <CardHeader className="border-border/10 pb-4 relative z-10">
-            <CardTitle className="text-sm flex items-center gap-2 uppercase tracking-widest font-bold">
-              <AlertCircle className="w-4 h-4 text-amber-400" /> Attention Required
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0 relative z-10">
-            <div className="divide-y divide-white/10">
-              <div className="px-5 py-3.5 hover:bg-white/5 transition-colors">
-                <div className="text-xs font-bold mb-1 flex items-center gap-2">
-                   <div className={`w-2 h-2 rounded-full ${pendingApprovals > 0 ? "bg-red-500 animate-pulse" : "bg-emerald-500"}`} />
-                   Pending Ingest Approvals
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-white/60">{pendingApprovals} item{pendingApprovals !== 1 ? "s" : ""} awaiting admin approval</span>
-                  <Link href="/admin/collections">
-                    <button className="text-[9px] font-black uppercase text-[#4169E1] hover:text-white transition-colors">Review Queue</button>
-                  </Link>
-                </div>
-              </div>
-              <div className="px-5 py-3.5 hover:bg-white/5 transition-colors">
-                <div className="text-xs font-bold mb-1 flex items-center gap-2">
-                   <div className={`w-2 h-2 rounded-full ${materials.filter(m => computeCompletion(m) < 50).length > 0 ? "bg-amber-500" : "bg-emerald-500"}`} />
-                   Metadata Incomplete
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-white/60">{materials.filter(m => computeCompletion(m) < 50).length} records below 50%</span>
-                  <button className="text-[9px] font-black uppercase text-[#4169E1] hover:text-white transition-colors" onClick={() => setActiveFilter("incomplete")}>Fix Items</button>
-                </div>
-              </div>
-              <div className="px-5 py-3.5 hover:bg-white/5 transition-colors">
-                <div className="text-xs font-bold mb-1 flex items-center gap-2">
-                   <div className={`w-2 h-2 rounded-full ${oaisRate >= 50 ? "bg-[#10B981]" : "bg-amber-500"}`} />
-                   OAIS Integrity Scan
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-white/60">{oaisRate}% of materials OAIS aligned</span>
-                  <span className={`text-[9px] font-bold ${oaisRate >= 50 ? "text-emerald-500" : "text-amber-500"}`}>{oaisRate >= 50 ? "STABLE" : "NEEDS WORK"}</span>
-                </div>
-              </div>
-            </div>
-            <div className="p-5 mt-4">
-              <Link href="/admin/collections">
-                <button className="w-full bg-[#4169E1] hover:bg-[#3151b1] text-white text-[10px] font-bold py-2.5 rounded-lg transition-all shadow-lg">
-                  Run System Maintenance
-                </button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        {statCards.map((card, i) => (
-          <div key={i} className="bg-white border border-border/60 rounded-xl p-4 shadow-sm hover:shadow-md transition-all group">
-             <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 rounded-lg transition-colors" style={{ backgroundColor: card.color + "15" }}>
-                   <card.icon className="w-4 h-4" style={{ color: card.color }} />
-                </div>
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{card.title}</span>
-             </div>
-             <p className="text-2xl font-bold text-[#0a1628] leading-none">{card.value}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <Card className="shadow-sm border-border/50 bg-white">
-          <CardHeader className="border-b border-border/50 pb-4">
-            <CardTitle className="text-sm flex items-center gap-2 text-[#0a1628] uppercase tracking-wider font-bold">
-              <BarChart3 className="w-4 h-4 text-[#4169E1]" /> Metadata Completion Distribution
-            </CardTitle>
-            <p className="text-[10px] text-muted-foreground mt-1">Materials grouped by their metadata completeness range.</p>
-          </CardHeader>
-          <CardContent className="p-6 space-y-3.5">
-            {completionBuckets.map((bucket, i) => (
-              <div key={i} className="flex items-center gap-3 group">
-                <span className="text-[10px] font-bold text-muted-foreground w-[60px] text-right shrink-0 font-mono">{bucket.label}</span>
-                <div className="flex-1 h-8 bg-muted/20 rounded-md overflow-hidden relative">
-                  <div 
-                    className="h-full rounded-md transition-all duration-700 group-hover:brightness-110"
-                    style={{ 
-                      width: `${Math.max((bucket.count / maxBucket) * 100, bucket.count > 0 ? 15 : 0)}%`, 
-                      backgroundColor: bucket.color,
-                      opacity: 0.85
-                    }}
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-[#0a1628]">
-                    {bucket.count}
-                  </span>
-                </div>
-              </div>
-            ))}
-            {materials.length === 0 && (
-              <div className="text-center text-muted-foreground text-xs py-8">No materials ingested yet.</div>
+            {unreadFeedbackCount > 0 && (
+              <span className="text-[11px] font-black bg-red-50 text-red-700 border border-red-200 px-2.5 py-1 rounded-full">
+                {unreadFeedbackCount} new
+              </span>
             )}
-          </CardContent>
-        </Card>
+          </div>
 
-        <Card className="shadow-sm border-border/50 bg-white">
-          <CardHeader className="border-b border-border/50 pb-4">
-            <CardTitle className="text-sm flex items-center gap-2 text-[#0a1628] uppercase tracking-wider font-bold">
-              <Database className="w-4 h-4 text-[#8B5CF6]" /> Collection Type Breakdown
-            </CardTitle>
-            <p className="text-[10px] text-muted-foreground mt-1">Distribution of material types in the archive.</p>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-8">
-              <div className="relative w-[140px] h-[140px] shrink-0">
-                <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-                  {(() => {
-                    let cumulative = 0;
-                    return typeDistribution.filter(t => t.count > 0).map((t, i) => {
-                      const pct = (t.count / totalTyped) * 100;
-                      const offset = cumulative;
-                      cumulative += pct;
-                      return (
-                        <circle
-                          key={i}
-                          cx="18" cy="18" r="15.9155"
-                          fill="none"
-                          stroke={t.color}
-                          strokeWidth="3.5"
-                          strokeDasharray={`${pct} ${100 - pct}`}
-                          strokeDashoffset={`${-offset}`}
-                          strokeLinecap="round"
-                          className="transition-all duration-700"
-                        />
-                      );
-                    });
-                  })()}
-                  <circle cx="18" cy="18" r="12" fill="white" />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-xl font-bold text-[#0a1628]">{materials.length}</span>
-                  <span className="text-[8px] text-muted-foreground font-bold uppercase tracking-wider">Total</span>
-                </div>
+          <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1 custom-scrollbar">
+            {compactFeedback.length === 0 ? (
+              <div className="py-10 text-center text-sm text-muted-foreground">
+                No feedback yet.
               </div>
-              <div className="flex-1 space-y-3">
-                {typeDistribution.map((t, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: t.color }} />
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-[#0a1628]">{t.icon} {t.label}</span>
-                        <span className="text-xs font-bold" style={{ color: t.color }}>{t.count}</span>
-                      </div>
-                      <div className="h-1.5 bg-muted/40 rounded-full mt-1 overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${(t.count / totalTyped) * 100}%`, backgroundColor: t.color }} />
-                      </div>
-                    </div>
+            ) : (
+              compactFeedback.map((f: any) => (
+                <button
+                  key={f.id}
+                  onClick={() => {
+                    if (f.status === "unread") markRead.mutate({ id: f.id });
+                    setActiveView("feedback");
+                  }}
+                  className={cn(
+                    "w-full text-left rounded-xl border px-4 py-3 transition-all",
+                    f.status === "unread"
+                      ? "border-[#4169E1]/30 bg-[#4169E1]/5 hover:bg-[#4169E1]/10"
+                      : "border-border/50 bg-white hover:bg-muted/30"
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs font-bold text-[#0a1628] truncate">{f.name || "Anonymous"}</span>
+                    <span className="text-[10px] text-muted-foreground shrink-0">{f.date || ""}</span>
                   </div>
-                ))}
-              </div>
-            </div>
-            
-            <div className="mt-6 pt-4 border-t border-border/40">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /> OAIS Aligned Rate
-                </span>
-                <span className="text-sm font-bold text-[#0a1628]">{oaisRate}%</span>
-              </div>
-              <div className="h-2.5 bg-muted/40 rounded-full overflow-hidden">
-                <div 
-                  className="h-full rounded-full transition-all duration-1000 bg-gradient-to-r from-emerald-400 to-emerald-600"
-                  style={{ width: `${oaisRate}%` }}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                  <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">{f.message}</p>
+                </button>
+              ))
+            )}
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-border/50 flex justify-between items-center">
+            <span className="text-xs text-muted-foreground">{feedbacks.length} total</span>
+            <button
+              className="text-xs font-black text-[#4169E1] hover:underline"
+              onClick={() => setActiveView("feedback")}
+            >
+              Open inbox →
+            </button>
+          </div>
+        </div>
       </div>
+
+      {activeView === "feedback" && (
+        <div className="animate-fade-in mb-10">
+          <FeedbackView />
+        </div>
+      )}
 
       <Card className="shadow-sm border-border/50 bg-white mb-8">
         <CardHeader className="border-b border-border/50 pb-0 px-5 pt-5">
@@ -466,9 +421,34 @@ export default function AdminDashboard() {
             <CardTitle className="text-lg flex items-center gap-2 text-[#0a1628]">
               <Database className="w-5 h-5 text-[#4169E1]" /> Materials Overview
             </CardTitle>
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Filter className="w-3.5 h-3.5" />
-              {filteredMaterials.length} shown
+            <div className="flex items-center gap-2">
+              {selectedIds.length > 0 && (
+                <>
+                  <span className="text-xs font-bold text-slate-500">{selectedIds.length} selected</span>
+                  <Button
+                    variant="destructive"
+                    className="h-8 px-3 rounded-lg text-xs font-black"
+                    onClick={() => {
+                      setBulkNotFoundCount(0);
+                      setBulkDeleteOpen(true);
+                    }}
+                  >
+                    <Trash2 className="w-3.5 h-3.5 mr-2" />
+                    Delete selected
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-8 px-3 rounded-lg text-xs font-black"
+                    onClick={clearSelected}
+                  >
+                    Clear
+                  </Button>
+                </>
+              )}
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Filter className="w-3.5 h-3.5" />
+                {filteredMaterials.length} shown
+              </div>
             </div>
           </div>
           <div className="flex gap-1 -mb-px">
@@ -489,7 +469,29 @@ export default function AdminDashboard() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="grid grid-cols-[140px_80px_1fr_180px_80px_40px_40px] gap-3 px-5 py-3 bg-muted/30 border-b text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+          <div className="grid grid-cols-[34px_140px_80px_1fr_180px_80px_40px_40px] gap-3 px-5 py-3 bg-muted/30 border-b text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+            <span className="flex items-center justify-center">
+              <input
+                aria-label="Select all shown materials"
+                type="checkbox"
+                className="h-3.5 w-3.5 accent-[#4169E1]"
+                checked={allShownSelected}
+                ref={(el) => {
+                  if (el) el.indeterminate = someShownSelected;
+                }}
+                onChange={(e) => {
+                  const next = e.target.checked;
+                  setSelectedMaterialIds((prev) => {
+                    const updated = { ...prev };
+                    for (const m of filteredMaterials as any[]) {
+                      if (next) updated[m.id] = true;
+                      else delete updated[m.id];
+                    }
+                    return updated;
+                  });
+                }}
+              />
+            </span>
             <span>Unique ID</span>
             <span>Barcode</span>
             <span>Title</span>
@@ -508,9 +510,19 @@ export default function AdminDashboard() {
               return (
                 <div key={mat.id}>
                   <div
-                    className={`grid grid-cols-[140px_80px_1fr_180px_80px_40px_40px] gap-3 px-5 py-3.5 items-center hover:bg-muted/20 transition-colors cursor-pointer ${isExpanded ? "bg-muted/10" : ""}`}
+                    className={`grid grid-cols-[34px_140px_80px_1fr_180px_80px_40px_40px] gap-3 px-5 py-3.5 items-center hover:bg-muted/20 transition-colors cursor-pointer ${isExpanded ? "bg-muted/10" : ""}`}
                     onClick={() => setExpandedId(isExpanded ? null : mat.id)}
                   >
+                    <div className="flex items-center justify-center">
+                      <input
+                        aria-label={`Select material ${mat.uniqueId}`}
+                        type="checkbox"
+                        className="h-3.5 w-3.5 accent-[#4169E1]"
+                        checked={!!selectedMaterialIds[mat.id]}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => toggleSelected(mat.id, e.target.checked)}
+                      />
+                    </div>
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
                       <span className="font-mono text-xs font-bold text-[#0a1628]">{mat.uniqueId}</span>
@@ -628,8 +640,7 @@ export default function AdminDashboard() {
             </div>
           </CardContent>
         </Card>
-        </div>
-      )}
+      
 
       <Modal
         isOpen={deleteConfirmOpen}
@@ -641,6 +652,17 @@ export default function AdminDashboard() {
             <AlertCircle className="w-5 h-5 shrink-0" />
             This action is permanent and cannot be undone.
           </div>
+          {deleteNotFound && (
+            <div className="flex items-start gap-3 p-4 bg-amber-50 rounded-xl text-amber-800 border border-amber-200 font-semibold text-sm">
+              <Info className="w-5 h-5 shrink-0 mt-0.5" />
+              <div>
+                <div className="font-black">Cloud record not found.</div>
+                <div className="text-[12px] font-medium text-amber-800/80 mt-1 leading-relaxed">
+                  This material does not exist in Firestore/API anymore (404). Clicking delete will still remove the orphan record from the dashboard/local cache.
+                </div>
+              </div>
+            </div>
+          )}
           <p className="text-sm text-muted-foreground">
             Are you sure you want to delete <span className="font-bold text-[#0a1628]">"{materialToDelete?.title}"</span>? 
             All associated metadata and file references will be removed from the archive.
@@ -649,7 +671,7 @@ export default function AdminDashboard() {
             <Button 
               variant="outline" 
               className="flex-1"
-              onClick={() => setDeleteConfirmOpen(false)}
+              onClick={() => { setDeleteConfirmOpen(false); setDeleteNotFound(false); }}
             >
               Cancel
             </Button>
@@ -659,17 +681,117 @@ export default function AdminDashboard() {
               isLoading={deleteMat.isPending}
               onClick={() => {
                 if (materialToDelete) {
+                  setDeleteNotFound(false);
                   deleteMat.mutate(materialToDelete.id, {
                     onSuccess: () => {
                       toast({ title: "Material deleted", description: "The record has been permanently removed." });
+                      setMaterials(prev => prev.filter(m => m.id !== materialToDelete.id));
                       setDeleteConfirmOpen(false);
                       setMaterialToDelete(null);
+                      setDeleteNotFound(false);
+                    },
+                    onError: (err: any) => {
+                      const status = err?.status || err?.response?.status;
+                      if (status === 404) {
+                        // Orphan/local-only record: allow deletion from local cache so user can clean up UI.
+                        try { deleteMaterialLocal(materialToDelete.id); } catch {}
+                        setMaterials(prev => prev.filter(m => m.id !== materialToDelete.id));
+                        toast({
+                          title: "Orphan record removed",
+                          description: "Cloud record was not found (404). Removed from local cache/dashboard.",
+                        });
+                        setDeleteConfirmOpen(false);
+                        setMaterialToDelete(null);
+                        setDeleteNotFound(false);
+                        return;
+                      }
+                      toast({
+                        variant: "destructive",
+                        title: "Delete failed",
+                        description: err?.message || "Unable to delete material.",
+                      });
                     }
                   });
                 }
               }}
             >
               Delete Permanently
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={bulkDeleteOpen}
+        onClose={() => setBulkDeleteOpen(false)}
+        title="Confirm Bulk Deletion"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 p-4 bg-red-50 rounded-xl text-red-700 border border-red-100 font-semibold text-sm">
+            <AlertCircle className="w-5 h-5 shrink-0" />
+            This action is permanent and cannot be undone.
+          </div>
+          <div className="flex items-start gap-3 p-4 bg-amber-50 rounded-xl text-amber-800 border border-amber-200 font-semibold text-sm">
+            <Info className="w-5 h-5 shrink-0 mt-0.5" />
+            <div className="text-[12px] font-medium text-amber-800/80 leading-relaxed">
+              If some records are already missing in Firestore/API (404), we will still remove them from the dashboard/local cache.
+            </div>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            You are about to delete <span className="font-black text-[#0a1628]">{selectedIds.length}</span> material{selectedIds.length === 1 ? "" : "s"}.
+          </p>
+          <div className="flex gap-3 pt-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setBulkDeleteOpen(false)}
+              disabled={bulkDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              className="flex-1"
+              isLoading={bulkDeleting}
+              onClick={async () => {
+                const ids = [...selectedIds];
+                if (ids.length === 0) {
+                  setBulkDeleteOpen(false);
+                  return;
+                }
+                setBulkDeleting(true);
+                let notFound = 0;
+                for (const id of ids) {
+                  try {
+                    await (deleteMat as any).mutateAsync(id);
+                  } catch (err: any) {
+                    const status = err?.status || err?.response?.status;
+                    if (status === 404) {
+                      notFound += 1;
+                      try { deleteMaterialLocal(id); } catch {}
+                    } else {
+                      toast({
+                        variant: "destructive",
+                        title: "Delete failed",
+                        description: err?.message || `Unable to delete ${id}`,
+                      });
+                    }
+                  }
+                }
+                setBulkNotFoundCount(notFound);
+                setMaterials((prev) => prev.filter((m) => !selectedMaterialIds[m.id]));
+                clearSelected();
+                setBulkDeleting(false);
+                setBulkDeleteOpen(false);
+                toast({
+                  title: "Bulk delete complete",
+                  description: notFound > 0
+                    ? `Deleted selected materials. ${notFound} were not found in the cloud (404) and were removed locally.`
+                    : "Deleted selected materials.",
+                });
+              }}
+            >
+              Delete selected
             </Button>
           </div>
         </div>
@@ -797,8 +919,11 @@ function RecordDetailPanel({ material }: { material: ArchivalMaterial }) {
 function FeedbackView() {
   const { data: feedbackData } = useGetFeedbacks();
   const markReadMutation = useMarkFeedbackRead();
+  const deleteFeedbackMutation = useDeleteFeedback();
   const feedbacks = Array.isArray(feedbackData) ? feedbackData : [];
   const [selectedFeedback, setSelectedFeedback] = React.useState<any>(null);
+  const [feedbackToDelete, setFeedbackToDelete] = React.useState<any>(null);
+  const [feedbackDeleteOpen, setFeedbackDeleteOpen] = React.useState(false);
 
   const handleMarkRead = (id: string) => {
     markReadMutation.mutate({ id });
@@ -937,7 +1062,14 @@ function FeedbackView() {
                         <Button variant="outline" className="rounded-xl border-slate-200 hover:bg-slate-50 text-xs font-bold h-10 px-6">
                            <Mail className="w-4 h-4 mr-2" /> Reply via Email
                         </Button>
-                        <Button variant="ghost" className="rounded-xl text-red-500 hover:bg-red-50 text-xs font-bold h-10 px-6">
+                        <Button
+                          variant="ghost"
+                          className="rounded-xl text-red-500 hover:bg-red-50 text-xs font-bold h-10 px-6"
+                          onClick={() => {
+                            setFeedbackToDelete(selectedFeedback);
+                            setFeedbackDeleteOpen(true);
+                          }}
+                        >
                            <Trash2 className="w-4 h-4 mr-2" /> Delete Archive
                         </Button>
                      </div>
@@ -958,6 +1090,51 @@ function FeedbackView() {
           )}
         </div>
       </div>
+
+      <Modal
+        isOpen={feedbackDeleteOpen}
+        onClose={() => setFeedbackDeleteOpen(false)}
+        title="Delete Feedback"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 p-4 bg-red-50 rounded-xl text-red-700 border border-red-100 font-semibold text-sm">
+            <AlertCircle className="w-5 h-5 shrink-0" />
+            This action is permanent and cannot be undone.
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Delete feedback from <span className="font-black text-[#0a1628]">{feedbackToDelete?.name || "Anonymous"}</span>?
+          </p>
+          <div className="flex gap-3 pt-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setFeedbackDeleteOpen(false)}
+              disabled={deleteFeedbackMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              className="flex-1"
+              isLoading={deleteFeedbackMutation.isPending}
+              onClick={async () => {
+                const id = feedbackToDelete?.id;
+                if (!id) return;
+                try {
+                  await (deleteFeedbackMutation as any).mutateAsync({ id });
+                  if (selectedFeedback?.id === id) setSelectedFeedback(null);
+                  setFeedbackDeleteOpen(false);
+                  setFeedbackToDelete(null);
+                } catch (err) {
+                  // api-client-react will throw; keep modal open so user can retry.
+                }
+              }}
+            >
+              Delete
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -536,7 +536,11 @@ router.delete("/materials/:id", requireAuth, async (req, res) => {
       }
     }
 
-    if (!snap.exists) { res.status(404).json({ error: "Material not found" }); return; }
+    // Idempotent delete: if it's already gone, treat it as success to avoid noisy 404s in UI.
+    if (!snap.exists) {
+      res.json({ message: "Material already deleted" });
+      return;
+    }
     const m = snap.data() as any;
 
     // Clean up chunks if material was chunked
@@ -569,8 +573,8 @@ router.delete("/materials/:id", requireAuth, async (req, res) => {
   } catch (err: any) {
     console.error("Firestore DELETE failed:", err);
     const ok = jsonStoreDeleteMaterial(id);
-    if (!ok) { res.status(404).json({ error: "Material not found" }); return; }
-    res.json({ message: "Material deleted" });
+    // Also idempotent for local/mock store.
+    res.json({ message: ok ? "Material deleted" : "Material already deleted" });
   }
 });
 

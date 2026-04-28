@@ -43,8 +43,11 @@ type ViewMode = "table" | "detail";
 
 const hierarchyLevels: HierarchyLevel[] = ["subfonds", "series", "subseries", "file"];
 
-const slugify = (value: string) =>
-  value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
+const slugify = (value: string | null | undefined) =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
 
 const buildHierarchyWithMaterials = (base: HierarchyNode, mats: ArchivalMaterial[]): HierarchyNode => {
   const root: HierarchyNode = JSON.parse(JSON.stringify(base));
@@ -762,12 +765,24 @@ export default function AdminMaterials() {
   const paginatedMaterials = filteredMaterials.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const toggleMaterialDetail = async (mat: ArchivalMaterial) => {
-    if (selectedMaterial?.uniqueId === mat.uniqueId) {
+    const selectedKey = selectedMaterial?.id || selectedMaterial?.uniqueId;
+    const targetKey = mat.id || mat.uniqueId;
+    if (selectedKey && targetKey && selectedKey === targetKey) {
       setSelectedMaterial(null);
     } else {
-      // Import dynamically or ensure storage.ts exports loadMaterial
-      const { loadMaterial } = await import('@/data/storage');
-      const hydrated = await loadMaterial(mat.id);
+      // Fetch full server copy first so pageImages/chunked fileUrl are reconstructed.
+      let hydrated: any = null;
+      const routeId = (mat.id || mat.uniqueId) as string;
+      try {
+        const resp = await fetch(`/api/materials/${encodeURIComponent(routeId)}`);
+        if (resp.ok) hydrated = await resp.json();
+      } catch (err) {
+        console.warn("Failed to hydrate material from API:", err);
+      }
+      if (!hydrated) {
+        const { loadMaterial } = await import('@/data/storage');
+        hydrated = await loadMaterial(routeId);
+      }
       setSelectedMaterial(hydrated || mat);
 
       // Auto-open hierarchy panel and expand the tree to show this material's location
@@ -1108,8 +1123,8 @@ export default function AdminMaterials() {
                setEditingMaterialId(null);
 
                // Calculate next material number
-               const latestMatNo = materials.reduce((max, mat) => {
-                 const match = mat.uniqueId.match(/26iA01(\d{7})/);
+              const latestMatNo = materials.reduce((max, mat) => {
+                const match = String(mat.uniqueId || "").match(/^\d{2}iA\d{2}(\d{7})$/);
                  if (match) {
                    const num = parseInt(match[1], 10);
                    return num > max ? num : max;
@@ -1243,7 +1258,7 @@ export default function AdminMaterials() {
                     const pct = computeCompletion(mat);
                     const color = getCompletionColor(pct);
                     const isOAIS = checkOAISCompliance(mat);
-                    const isExpanded = selectedMaterial?.uniqueId === mat.uniqueId;
+                    const isExpanded = (selectedMaterial?.id || selectedMaterial?.uniqueId) === (mat.id || mat.uniqueId);
                     const approvalStatus = approvalStatusFor(mat);
                     const approvalBadge = approvalStatus === "approved"
                       ? "bg-emerald-50 text-emerald-700 border-emerald-200"
@@ -1252,7 +1267,7 @@ export default function AdminMaterials() {
                       : "bg-red-50 text-red-700 border-red-200";
 
                     return (
-                      <React.Fragment key={mat.uniqueId}>
+                      <React.Fragment key={mat.id || `${mat.uniqueId}-${(mat as any).createdAt || "row"}`}>
                         <div className={cn("grid grid-cols-[140px_70px_1fr_120px_70px_90px_120px_60px] gap-2 px-4 py-3 items-center hover:bg-muted/10 transition-colors group cursor-pointer", isExpanded && "bg-muted/5")} onClick={() => toggleMaterialDetail(mat)}>
                           <div className="flex items-center gap-1.5">
                             <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
@@ -1308,7 +1323,9 @@ export default function AdminMaterials() {
                               className="h-7 w-7 text-muted-foreground hover:text-primary"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                window.open(`/materials/${mat.id}`, '_blank');
+                                const materialRouteId = mat.id || mat.uniqueId;
+                                if (!materialRouteId) return;
+                                window.open(`/materials/${materialRouteId}`, '_blank');
                               }}
                             >
                               <ExternalLink className="w-3.5 h-3.5" />
@@ -1409,35 +1426,105 @@ export default function AdminMaterials() {
                                     <span className="text-emerald-400">Public Object</span>
                                   )}
                                </div>
-                               {(selectedMaterial?.fileUrl && typeof selectedMaterial.fileUrl === "string" && selectedMaterial.fileUrl.startsWith("data:application/pdf")) || selectedMaterial?.fileType?.includes("pdf") || selectedMaterial?.format?.includes("pdf") ? (
+                              {(() => {
+                                const sm = selectedMaterial;
+                                if (!sm) {
+                                  return (
+                                    <div className="h-[420px] bg-[#141414] relative overflow-hidden">
+                                      {/* subtle grid + glow */}
+                                      <div className="absolute inset-0 opacity-[0.06] bg-[linear-gradient(to_right,rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.08)_1px,transparent_1px)] bg-[size:24px_24px]" />
+                                      <div className="absolute -top-24 -left-24 w-72 h-72 bg-indigo-500/20 blur-[80px] rounded-full" />
+                                      <div className="absolute -bottom-24 -right-24 w-72 h-72 bg-emerald-500/10 blur-[90px] rounded-full" />
+
+                                      <div className="relative h-full flex flex-col items-center justify-center px-8">
+                                        {/* Card skeleton */}
+                                        <div className="w-full max-w-xl bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl">
+                                          <div className="flex items-center gap-3 mb-5">
+                                            <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/10 animate-pulse" />
+                                            <div className="flex-1">
+                                              <div className="h-3 w-40 rounded bg-white/10 animate-pulse" />
+                                              <div className="h-2 w-28 rounded bg-white/10 mt-2 animate-pulse" />
+                                            </div>
+                                            <div className="h-6 w-16 rounded-full bg-white/10 animate-pulse" />
+                                          </div>
+
+                                          <div className="h-48 rounded-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 relative overflow-hidden">
+                                            <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.2s_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                                            <div className="absolute inset-0 flex items-center justify-center">
+                                              <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center">
+                                                <div className="w-7 h-7 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+                                              </div>
+                                            </div>
+                                          </div>
+
+                                          <div className="mt-5">
+                                            <p className="text-white/80 text-sm font-bold tracking-wide">Loading material preview</p>
+                                            <p className="text-white/40 text-xs mt-1.5 leading-relaxed">
+                                              Fetching pages and reconstructing any chunked files from storage…
+                                            </p>
+                                          </div>
+                                        </div>
+
+                                        <div className="mt-5 text-[10px] font-mono text-white/30 tracking-widest uppercase">
+                                          Please wait…
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                }
+                                const fileUrlStr = typeof sm.fileUrl === "string" ? sm.fileUrl : "";
+                                const isPdf = fileUrlStr.startsWith("data:application/pdf") || sm.fileType?.includes("pdf") || sm.format?.includes("pdf");
+                                const isVideo = sm.fileType?.startsWith("video/") || fileUrlStr.startsWith("data:video/");
+                                const isImage = sm.fileType?.startsWith("image/") || fileUrlStr.startsWith("data:image/");
+                                const hasPages = !!(sm.pageImages && sm.pageImages.length > 0);
+                                const hasRawFile = !!fileUrlStr && fileUrlStr !== "PENDING_UPLOAD" && fileUrlStr !== "CHUNKED";
+                                if (isPdf) {
+                                  return (
                                    <div className="relative w-full h-[700px] bg-[#333]">
-                                      <object data={selectedMaterial.fileUrl} type="application/pdf" className="w-full h-full">
-                                         <iframe src={selectedMaterial.fileUrl} className="w-full h-full border-0">
+                                      <object data={sm.fileUrl} type="application/pdf" className="w-full h-full">
+                                         <iframe src={sm.fileUrl} className="w-full h-full border-0">
                                             <div className="p-8 text-center text-white/50">Your browser does not support embedding PDFs.</div>
                                          </iframe>
                                       </object>
                                    </div>
-                               ) : selectedMaterial?.fileType?.startsWith("video/") || (selectedMaterial?.fileUrl && typeof selectedMaterial.fileUrl === "string" && selectedMaterial.fileUrl.startsWith("data:video/")) ? (
-                                   <video src={selectedMaterial.fileUrl} controls className="w-full h-[600px] object-contain bg-black" />
-                               ) : selectedMaterial?.pageImages && selectedMaterial.pageImages.length > 0 ? (
+                                  );
+                                }
+                                if (isVideo) {
+                                  return (
+                                   <video src={sm.fileUrl} controls className="w-full h-[600px] object-contain bg-black" />
+                                  );
+                                }
+                                if (hasPages) {
+                                  return (
                                    <div className="flex overflow-x-auto gap-4 p-8 snap-x bg-[#1a1a1a] custom-scrollbar scroll-smooth">
-                                       {selectedMaterial.pageImages.map((img, i) => (
+                                       {sm.pageImages?.map((img, i) => (
                                           <div key={i} className="shrink-0 snap-center relative group">
                                              <img src={img} className="h-[600px] object-contain shadow-2xl bg-white border border-white/10 rounded" />
                                              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white backdrop-blur-sm text-[10px] font-bold px-3 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">Page {i + 1}</div>
                                           </div>
                                        ))}
                                    </div>
-                               ) : selectedMaterial?.fileType?.startsWith("image/") || (selectedMaterial?.fileUrl && typeof selectedMaterial.fileUrl === "string" && selectedMaterial.fileUrl.startsWith("data:image/")) ? (
+                                  );
+                                }
+                                if (isImage) {
+                                  return (
                                    <div className="bg-[#1a1a1a] p-8 flex justify-center">
-                                      <img src={selectedMaterial.fileUrl} className="max-h-[600px] max-w-full object-contain rounded shadow-2xl bg-white" />
+                                      <img src={sm.fileUrl} className="max-h-[600px] max-w-full object-contain rounded shadow-2xl bg-white" />
                                    </div>
-                               ) : (
+                                  );
+                                }
+                                return (
                                    <div className="h-[300px] flex flex-col items-center justify-center text-white/30 bg-[#222]">
                                       <FileText className="w-12 h-12 mb-4 opacity-40" />
                                       <p className="text-sm font-semibold uppercase tracking-wider">No viewable media representation</p>
+                                      {hasRawFile && (
+                                        <a href={fileUrlStr} target="_blank" rel="noreferrer" className="mt-4 text-xs text-indigo-300 underline">
+                                          Open raw file
+                                        </a>
+                                      )}
                                    </div>
-                               )}
+                                );
+                              })()}
                              </div>
                              
                              {/* Re-use MetadataChecklist layout directly! */}
@@ -2038,7 +2125,9 @@ export default function AdminMaterials() {
                 let mainFileBase64 = "";
                 if (uploadForm.fileData instanceof Blob) {
                   try {
-                    const compressed = await compressFile(uploadForm.fileData, 0.9);
+                    // Compress toward 10% of original size before Base64 encoding.
+                    const targetSizeMB = Math.max((uploadForm.fileData.size / (1024 * 1024)) * 0.1, 0.1);
+                    const compressed = await compressFile(uploadForm.fileData, targetSizeMB);
                     mainFileBase64 = await fileToBase64(compressed);
                   } catch (err) {
                     console.error("Base64 conversion failed:", err);
@@ -2052,6 +2141,7 @@ export default function AdminMaterials() {
                 if (mainFileBase64.length > 200000) {
                   console.log(`File is large (${mainFileBase64.length} chars). Using chunked upload.`);
                   apiData.fileUrl = "PENDING_UPLOAD";
+                  apiData.compressedFileBase64 = mainFileBase64; // Keep compressed payload in the main Firestore doc
                 } else if (mainFileBase64.length > 0) {
                   apiData.fileUrl = mainFileBase64;
                   mainFileBase64 = ""; // Clear so we don't double-upload
@@ -2093,10 +2183,8 @@ export default function AdminMaterials() {
                     await updateMaterial({ id: editingMaterialId, data: apiData });
                   } else {
                     const res = await createMaterial({ data: apiData });
-                    if (res && res.id) {
-                      finalId = res.id;
-                      setLastIngestedId(res.id);
-                    }
+                    finalId = (res && res.id) ? res.id : apiData.id;
+                    if (finalId) setLastIngestedId(finalId);
                   }
 
                   // B. Granular Page Uploads (one by one to bypass payload limits)

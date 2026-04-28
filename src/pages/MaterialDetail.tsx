@@ -554,10 +554,36 @@ export default function MaterialDetail() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#f7f8fc] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-[#4169E1] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground text-sm">Loading material...</p>
+      <div className="min-h-screen bg-[#f7f8fc] font-sans">
+        <PublicNavbar isTransparentOnTop={false} />
+        <div className="max-w-7xl mx-auto px-6 pt-24 pb-16">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
+            <div className="bg-white rounded-3xl border border-border/60 shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-border/60">
+                <div className="h-4 w-56 bg-muted/50 rounded animate-pulse" />
+                <div className="h-8 w-3/4 bg-muted/50 rounded mt-3 animate-pulse" />
+              </div>
+              <div className="p-6">
+                <div className="h-[520px] rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50 border border-border/50 relative overflow-hidden">
+                  <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.2s_infinite] bg-gradient-to-r from-transparent via-white/60 to-transparent" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-16 h-16 rounded-2xl bg-white/70 border border-border/60 shadow-sm flex items-center justify-center">
+                      <Loader2 className="w-7 h-7 text-[#4169E1] animate-spin" />
+                    </div>
+                  </div>
+                </div>
+                <p className="mt-4 text-sm font-bold text-[#0a1628]">Loading material</p>
+                <p className="text-xs text-muted-foreground mt-1">Fetching metadata and preparing viewer…</p>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-3xl border border-border/60 shadow-sm p-6">
+              <div className="h-4 w-40 bg-muted/50 rounded animate-pulse" />
+              <div className="h-10 w-full bg-muted/50 rounded mt-4 animate-pulse" />
+              <div className="h-10 w-full bg-muted/50 rounded mt-3 animate-pulse" />
+              <div className="h-10 w-2/3 bg-muted/50 rounded mt-3 animate-pulse" />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -728,32 +754,6 @@ export default function MaterialDetail() {
                 </div>
               </div>
             )}
-
-            {/* OAIS Preservation Info */}
-            <div className="bg-white rounded-2xl border border-border/60 shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-border/60 flex items-center gap-3">
-                <span className="bg-[#0a1628] text-white text-xs font-bold px-2.5 py-1 rounded">OAIS</span>
-                <span className="text-sm font-bold text-foreground">ISO 14721:2012 — Preservation Information</span>
-              </div>
-              <div className="p-5 grid grid-cols-2 md:grid-cols-3 gap-3">
-                {[
-                  { label: "SIP", value: material.sipId || "SIP-0000-001", sub: "Submission Information Package", mono: true },
-                  { label: "AIP", value: material.aipId || "AIP-0000-001", sub: "Archival Information Package", mono: true },
-                  { label: "INGEST", value: fmt(material.ingestDate) || "—", sub: material.ingestBy ? `By ${material.ingestBy}` : "Ingest date", mono: false },
-                  { label: "FIXITY", value: fixityVerified ? "✓ Verified" : "Pending", sub: material.sha256 ? "SHA-256 checksum valid" : "Not yet computed", isGreen: fixityVerified, mono: false },
-                  { label: "FORMAT", value: material.format || "—", sub: "MIME type", mono: false },
-                  { label: "CAPTURE", value: material.scanner || "—", sub: material.resolution ? `${material.resolution} DPI` : "Capture device", mono: false },
-                ].map((item, i) => (
-                  <div key={i} className="bg-[#f7f8fc] rounded-xl p-4 border border-border/40">
-                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">{item.label}</p>
-                    <p className={`text-sm font-bold mb-0.5 ${item.isGreen ? "text-emerald-600" : "text-[#4169E1]"} ${item.mono ? "font-mono" : ""}`}>
-                      {item.value}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{item.sub}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
 
             {/* Related Items */}
             {material.relatedItems && material.relatedItems.length > 0 && (

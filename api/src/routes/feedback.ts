@@ -71,13 +71,14 @@ router.delete("/feedback/:id", requireAuth, requireRole("admin"), async (req, re
     const db = getFirestoreDb();
     if (!db) throw new Error("Firebase unavailable");
     const snap = await db.collection("feedback").doc(id).get();
-    if (!snap.exists) { res.status(404).json({ error: "Feedback not found" }); return; }
+    // Idempotent delete: if it's already gone, treat it as success to avoid noisy 404s in UI.
+    if (!snap.exists) { res.json({ message: "Feedback already deleted" }); return; }
     await db.collection("feedback").doc(id).delete();
     res.json({ message: "Feedback deleted" });
   } catch {
     const idx = memoryFeedbacks.findIndex((f) => f.id === id);
     if (idx >= 0) memoryFeedbacks.splice(idx, 1);
-    res.json({ message: "Feedback deleted" });
+    res.json({ message: idx >= 0 ? "Feedback deleted" : "Feedback already deleted" });
   }
 });
 
