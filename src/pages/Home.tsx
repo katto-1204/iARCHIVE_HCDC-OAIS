@@ -14,7 +14,7 @@ export default function Home() {
   const [, setLocation] = useLocation();
   const { data: stats, isError: statsError } = useGetStats();
   const { data: categories, isError: categoriesError } = useGetCategories();
-  const { data: materials, isError: materialsError } = useGetMaterials({ limit: 3 });
+  const { data: materials, isError: materialsError } = useGetMaterials({ limit: 1000 });
   const { data: user } = useGetMe();
   const [scrollY, setScrollY] = React.useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
@@ -107,6 +107,37 @@ export default function Home() {
     "bg-slate-700",
   ];
 
+  const featuredCollections = React.useMemo(() => {
+    if (!Array.isArray(categories) || categories.length === 0) return [];
+    const materialRows = Array.isArray(materials) ? materials : [];
+
+    const counts = new Map<string, number>();
+    for (const cat of categories as any[]) counts.set(cat.id, 0);
+
+    for (const mat of materialRows as any[]) {
+      let matched = false;
+      if (mat?.categoryId && counts.has(mat.categoryId)) {
+        counts.set(mat.categoryId, (counts.get(mat.categoryId) || 0) + 1);
+        matched = true;
+      }
+      if (!matched && mat?.hierarchyPath) {
+        const path = String(mat.hierarchyPath).toLowerCase();
+        for (const cat of categories as any[]) {
+          if (path.includes(String(cat?.name || "").toLowerCase())) {
+            counts.set(cat.id, (counts.get(cat.id) || 0) + 1);
+            break;
+          }
+        }
+      }
+    }
+
+    return [...(categories as any[])]
+      .filter((cat) => (counts.get(cat.id) || 0) > 0)
+      .sort((a, b) => (counts.get(b.id) || 0) - (counts.get(a.id) || 0))
+      .slice(0, 3)
+      .map((cat) => ({ ...cat, materialCount: counts.get(cat.id) || 0 }));
+  }, [categories, materials]);
+
   return (
     <div className="min-h-screen bg-white font-sans">
       {/* ─── NAVBAR ─── */}
@@ -150,15 +181,10 @@ export default function Home() {
             iArchive is HCDC's secure, OAIS-aligned digital repository — built to preserve, organize,
             and provide controlled access to the institution's historical records and research materials.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex justify-center">
             <Link href="/collections">
-              <button className="inline-flex items-center gap-2 bg-[#4169E1] hover:bg-[#3558c8] text-white font-semibold px-7 py-3.5 rounded-full transition-colors shadow-lg">
+              <button className="inline-flex items-center gap-2 bg-[#4169E1] hover:bg-[#3558c8] text-white font-semibold px-8 py-3.5 rounded-full transition-colors shadow-lg">
                 <Search className="w-4 h-4" /> Explore Archive
-              </button>
-            </Link>
-            <Link href="/login">
-              <button className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold px-7 py-3.5 rounded-full transition-all backdrop-blur-sm hover:scale-105">
-                Login to iArchive <ArrowRight className="w-4 h-4" />
               </button>
             </Link>
           </div>
@@ -198,8 +224,8 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {(Array.isArray(categories)
-              ? categories.slice(0, 3)
+            {(featuredCollections.length > 0
+              ? featuredCollections
               : [
                 { id: "1", name: "Yearbooks", description: "Annual yearbook collection" },
                 { id: "2", name: "Faculty Publications", description: "Academic research and publications" },
@@ -220,6 +246,9 @@ export default function Home() {
                     <p className="text-xs font-bold text-white/50 uppercase tracking-widest mb-1">COLLECTION SERIES</p>
                     <h3 className="text-lg font-bold text-white mb-2 line-clamp-2 leading-snug">{cat.name}</h3>
                     <p className="text-sm text-white/60 line-clamp-2 flex-1">{cat.description || 'Archival materials from this institutional collection series.'}</p>
+                    {!!(cat as any).materialCount && (
+                      <p className="text-[11px] text-white/70 font-semibold mt-2">{(cat as any).materialCount} materials</p>
+                    )}
                     <div className="mt-3 flex items-center gap-2 text-white/70 text-sm font-medium group-hover:text-white transition-colors">
                       Browse Series <ArrowRight className="w-4 h-4" />
                     </div>
