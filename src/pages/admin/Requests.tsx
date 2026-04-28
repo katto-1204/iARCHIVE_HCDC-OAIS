@@ -230,7 +230,7 @@ export default function AdminRequests() {
                   </TableCell>
                   {tab === 'pending' && (
                     <TableCell className="text-right space-x-2 flex justify-end">
-                      <Link href={"/collections/" + (mode === "access" ? req.materialId : req.materialId)}>
+                      <Link href={`/materials/${encodeURIComponent(req.materialId)}`}>
                          <Button size="sm" variant="outline" className="text-[#4169E1] border-[#4169E1]/30 hover:bg-[#4169E1]/10">Preview Item</Button>
                       </Link>
                       {mode === "access" ? (

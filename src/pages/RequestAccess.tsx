@@ -76,7 +76,50 @@ export default function RequestAccess() {
   };
 
   if (isMatLoading || isMeLoading) {
-    return <div className="min-h-screen flex items-center justify-center bg-muted/10"><div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" /></div>;
+    return (
+      <div className="min-h-screen flex flex-col bg-muted/10 font-sans">
+        <div className="bg-white border-b px-6 py-4 flex items-center justify-between sticky top-0 z-50">
+          <Link href="/collections" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors font-medium">
+            <ArrowLeft className="w-4 h-4" /> Back to Collections
+          </Link>
+          <img src={`${import.meta.env.BASE_URL}logos/iarchive%20logo.png`} alt="iArchive" className="h-6 w-auto" />
+        </div>
+
+        <div className="flex-1 flex items-center justify-center p-4 md:p-8">
+          <div className="w-full max-w-5xl bg-white rounded-3xl shadow-2xl overflow-hidden border border-muted-foreground/10 flex flex-col md:flex-row min-h-[600px]">
+            <div className="w-full md:w-5/12 bg-[#050a14] p-10 relative overflow-hidden">
+              <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')]" />
+              <div className="relative z-10 space-y-5">
+                <div className="h-6 w-32 rounded-full bg-white/10 animate-pulse" />
+                <div className="aspect-[3/4] w-full rounded-2xl bg-white/10 border border-white/10 relative overflow-hidden">
+                  <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.2s_infinite] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+                </div>
+                <div className="h-7 w-4/5 rounded bg-white/10 animate-pulse" />
+                <div className="h-4 w-1/2 rounded bg-white/10 animate-pulse" />
+              </div>
+            </div>
+
+            <div className="w-full md:w-7/12 p-10 lg:p-16 flex flex-col">
+              <div className="mb-10">
+                <div className="h-10 w-56 rounded bg-muted/60 animate-pulse" />
+                <div className="h-4 w-4/5 rounded bg-muted/40 mt-4 animate-pulse" />
+              </div>
+              <div className="space-y-4 flex-1">
+                <div className="h-4 w-56 rounded bg-muted/40 animate-pulse" />
+                <div className="h-[250px] w-full rounded-2xl bg-muted/40 relative overflow-hidden">
+                  <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.2s_infinite] bg-gradient-to-r from-transparent via-white/50 to-transparent" />
+                </div>
+              </div>
+              <div className="mt-8">
+                <div className="h-16 w-full rounded-2xl bg-[#050a14]/90 flex items-center justify-center text-white text-sm font-semibold">
+                  Loading request form...
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (!material) {

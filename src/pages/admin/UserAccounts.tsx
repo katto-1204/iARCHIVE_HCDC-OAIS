@@ -101,7 +101,12 @@ export default function UserAccounts() {
 
   // Filter: exclude admin/archivist (those belong to Admin Accounts page)
   const filtered = React.useMemo(() => {
-    let list = (data?.users || []).filter((u: any) => u.role !== "admin" && u.role !== "archivist");
+    const isAdminAccount = (u: any) => {
+      const role = String(u?.role || "").toLowerCase();
+      const category = String(u?.userCategory || "").toLowerCase();
+      return role === "admin" || role === "archivist" || category === "administrator" || category === "staff";
+    };
+    let list = (data?.users || []).filter((u: any) => !isAdminAccount(u));
     
     if (search) {
       const q = search.toLowerCase();
@@ -124,7 +129,11 @@ export default function UserAccounts() {
   const paginatedUsers = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   // Count stats
-  const allUsers = (data?.users || []).filter((u: any) => u.role !== "admin" && u.role !== "archivist");
+  const allUsers = (data?.users || []).filter((u: any) => {
+    const role = String(u?.role || "").toLowerCase();
+    const category = String(u?.userCategory || "").toLowerCase();
+    return !(role === "admin" || role === "archivist" || category === "administrator" || category === "staff");
+  });
   const categoryCounts = React.useMemo(() => {
     const counts: Record<string, number> = {};
     allUsers.forEach((u: any) => {

@@ -120,8 +120,50 @@ export default function AdminUsers() {
   };
 
   const filtered = React.useMemo(() => {
-    // Only show admin and archivist accounts on this page
-    let list = (data?.users || []).filter((u: any) => u.role === 'admin' || u.role === 'archivist');
+    const isAdminAccount = (u: any) => {
+      const role = String(u?.role || "").toLowerCase();
+      const category = String(u?.userCategory || "").toLowerCase();
+      return role === "admin" || role === "archivist" || category === "administrator" || category === "staff";
+    };
+
+    // Only admin/archivist accounts are shown on this page.
+    let list = (data?.users || []).filter((u: any) => isAdminAccount(u));
+
+    // Remove duplicate identities by email first.
+    const byEmail = new Map<string, any>();
+    for (const u of list) {
+      const key = String(u?.email || u?.id || "").toLowerCase();
+      if (!key) continue;
+      if (!byEmail.has(key)) {
+        byEmail.set(key, u);
+        continue;
+      }
+      const existing = byEmail.get(key);
+      const existingActive = String(existing?.status || "").toLowerCase() === "active";
+      const nextActive = String(u?.status || "").toLowerCase() === "active";
+      if (!existingActive && nextActive) byEmail.set(key, u);
+    }
+    list = Array.from(byEmail.values());
+
+    // Enforce a single System Admin row in Admin Accounts.
+    const isSystemAdmin = (u: any) => {
+      const role = String(u?.role || "").toLowerCase();
+      const category = String(u?.userCategory || "").toLowerCase();
+      return role === "admin" || category === "administrator";
+    };
+    const adminRows = list.filter(isSystemAdmin);
+    if (adminRows.length > 1) {
+      const pickScore = (u: any) => {
+        const isActive = String(u?.status || "").toLowerCase() === "active" ? 100 : 0;
+        const isDemo = String(u?.id || "").toLowerCase().includes("demo") || String(u?.email || "").toLowerCase().includes("demo");
+        const notDemo = isDemo ? 0 : 10;
+        const created = new Date(u?.createdAt || 0).getTime() || 0;
+        return isActive + notDemo + created / 1_000_000_000_000;
+      };
+      const keep = adminRows.sort((a: any, b: any) => pickScore(b) - pickScore(a))[0];
+      list = list.filter((u: any) => !isSystemAdmin(u) || u.id === keep.id);
+    }
+
     if (!search) return list;
     const q = search.toLowerCase();
     return list.filter(u =>
@@ -147,7 +189,7 @@ export default function AdminUsers() {
         <div className="flex items-center gap-2 bg-primary/5 border border-primary/10 rounded-xl px-4 py-2">
           <Users className="w-5 h-5 text-primary" />
           <span className="text-sm font-semibold text-primary">
-            {data?.users?.length || 0} {tab} users
+            {filtered.length} {tab} users
           </span>
         </div>
       </div>
