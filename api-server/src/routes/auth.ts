@@ -18,10 +18,34 @@ function getDemoUserByEmail(email?: string) {
   return DEMO_USERS.find((u) => u.email.toLowerCase() === (email || "").toLowerCase());
 }
 
+async function resolveUserProfile(db: FirebaseFirestore.Firestore, uid: string, email?: string) {
+  const byUid = await db.collection("users").doc(uid).get();
+  if (byUid.exists) return byUid;
+
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (!normalizedEmail) return byUid;
+
+  const byEmail = await db.collection("users").where("email", "==", normalizedEmail).limit(1).get();
+  if (byEmail.empty) return byUid;
+
+  const existingDoc = byEmail.docs[0];
+  const existingData = existingDoc.data() as any;
+  await db.collection("users").doc(uid).set(
+    {
+      ...existingData,
+      id: uid,
+      email: existingData?.email || normalizedEmail,
+      updatedAt: new Date().toISOString(),
+    },
+    { merge: true }
+  );
+  return db.collection("users").doc(uid).get();
+}
+
 async function signInWithPassword(email: string, password: string) {
-  const apiKey = process.env["FIREBASE_API_KEY"];
+  const apiKey = process.env["FIREBASE_API_KEY"] || process.env["VITE_FIREBASE_API_KEY"];
   if (!apiKey) {
-    throw new Error("Missing FIREBASE_API_KEY");
+    throw new Error("Missing FIREBASE_API_KEY (or VITE_FIREBASE_API_KEY)");
   }
   const res = await fetch(
     `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
@@ -40,7 +64,7 @@ async function signInWithPassword(email: string, password: string) {
 }
 
 async function verifyIdTokenRestFallback(idToken: string) {
-  const apiKey = process.env["FIREBASE_API_KEY"];
+  const apiKey = process.env["FIREBASE_API_KEY"] || process.env["VITE_FIREBASE_API_KEY"];
   if (!apiKey) {
     throw new Error("Missing FIREBASE_API_KEY for token lookup");
   }
@@ -116,7 +140,7 @@ router.post("/auth/login", async (req, res) => {
     let profile: any = null;
     try {
       const db = getFirestoreDb();
-      const profileSnap = await db.collection("users").doc(decoded.uid).get();
+      const profileSnap = await resolveUserProfile(db, decoded.uid, decoded.email);
       if (!profileSnap.exists) {
         const now = new Date().toISOString();
         profile = {
@@ -284,7 +308,7 @@ router.post("/auth/register", async (req, res) => {
 router.get("/auth/me", requireAuth, async (req, res) => {
   try {
     const db = getFirestoreDb();
-    const snap = await db.collection("users").doc(req.user!.userId).get();
+    const snap = await resolveUserProfile(db, req.user!.userId, req.user!.email);
     if (!snap.exists) {
       const demoUser = DEMO_USERS.find((u) => u.id === req.user!.userId || u.email === req.user!.email);
       if (demoUser) {

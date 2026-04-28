@@ -25,7 +25,24 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     const db = getFirestoreDb();
     
     if (db) {
-      const profileSnap = await db.collection("users").doc(decoded.uid).get();
+      let profileSnap = await db.collection("users").doc(decoded.uid).get();
+      if (!profileSnap.exists && decoded.email) {
+        const normalizedEmail = String(decoded.email).trim().toLowerCase();
+        const byEmail = await db.collection("users").where("email", "==", normalizedEmail).limit(1).get();
+        if (!byEmail.empty) {
+          const existingData = byEmail.docs[0].data() as any;
+          await db.collection("users").doc(decoded.uid).set(
+            {
+              ...existingData,
+              id: decoded.uid,
+              email: existingData?.email || normalizedEmail,
+              updatedAt: new Date().toISOString(),
+            },
+            { merge: true }
+          );
+          profileSnap = await db.collection("users").doc(decoded.uid).get();
+        }
+      }
       if (profileSnap.exists) {
         const profile = profileSnap.data() as any;
         const status = profile?.status || "active";
