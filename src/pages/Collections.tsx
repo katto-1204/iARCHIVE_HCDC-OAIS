@@ -4,10 +4,11 @@ import { PublicNavbar } from "@/components/PublicNavbar";
 import {
   Search, SlidersHorizontal, Lock, ShieldAlert, FileText, Database, X,
   User, CheckCircle, BookOpen, Calendar, Layers, Eye, Grid3X3, List,
-  ArrowUpRight, ArrowRight, Clock, Tag, Filter, Sparkles, LayoutDashboard, Folder, FolderOpen, ChevronRight, CornerDownRight, ArrowLeft
+  ArrowUpRight, ArrowRight, Clock, Tag, Filter, Sparkles, LayoutDashboard, Folder, ChevronRight, CornerDownRight, ArrowLeft
 } from "lucide-react";
 import { useGetCategories, useGetMe, useGetMaterials } from "@workspace/api-client-react";
 import { checkOAISCompliance } from "@/data/metadataUtils";
+import { cn } from "@/lib/utils";
 
 const ACCESS_CONFIG = {
   public: {
@@ -53,7 +54,7 @@ export default function Collections() {
   const [showFilters, setShowFilters] = React.useState(false);
   const [viewMode, setViewMode] = React.useState<"grid" | "list">("grid");
   const [hoveredCard, setHoveredCard] = React.useState<string | null>(null);
-  const [selectedFolder, setSelectedFolder] = React.useState<{ category: string, subfonds: string, series: string } | null>(null);
+  const [navigationPath, setNavigationPath] = React.useState<Array<{ level: "fonds" | "subfonds" | "series"; name: string }>>([]);
 
   React.useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300);
@@ -189,23 +190,23 @@ export default function Collections() {
     })
     .filter(Boolean) as { category: string; subfondGroups: { subfonds: string; folders: typeof folders }[]; folders: typeof folders; totalCount: number }[];
 
-  // Apply folder filter for Level 2 items
-  const level2Materials = selectedFolder
+  const selectedFonds = navigationPath.find((p) => p.level === "fonds")?.name;
+  const selectedSubfonds = navigationPath.find((p) => p.level === "subfonds")?.name;
+  const selectedSeries = navigationPath.find((p) => p.level === "series")?.name;
+  const currentDepth = navigationPath.length;
+
+  const level2Materials = selectedFonds && selectedSubfonds && selectedSeries
     ? displayMaterials.filter((m: any) => {
         const parts = (m.hierarchyPath || "").split(" > ").filter((p: string) => p.trim() !== "");
-        
         let depth = 1;
         if (parts[depth] === "Departmental Sub-fonds") depth++;
-        
-        const subfonds = parts[depth] || parts[depth-1] || "Uncategorized";
-        const ser = parts.length > (depth + 1) ? parts[parts.length - 1] : "General Series";
-        
+        const subfonds = parts[depth] || parts[depth - 1] || "Uncategorized";
+        const ser = parts.length > depth + 1 ? parts[parts.length - 1] : "General Series";
         const finalSubfonds = parts.length < depth ? "HCDC Collections" : subfonds;
-        const finalSer = (parts.length === depth && parts[0] === "HCDC") ? "General Series" : ser;
-
-        return finalSubfonds === selectedFolder.subfonds && finalSer === selectedFolder.series;
+        const finalSer = parts.length === depth && parts[0] === "HCDC" ? "General Series" : ser;
+        return finalSubfonds === selectedSubfonds && finalSer === selectedSeries;
       })
-    : displayMaterials;
+    : [];
 
   // Stats
   const visibleMaterials = materials.filter((mat: any) => {
@@ -356,7 +357,7 @@ export default function Collections() {
                 </button>
               ))}
               <button
-                onClick={() => { setCategory(""); setAccess(""); setSearch(""); setShowOaisOnly(false); setSelectedFolder(null); }}
+                onClick={() => { setCategory(""); setAccess(""); setSearch(""); setShowOaisOnly(false); setNavigationPath([]); }}
                 className="text-white/40 text-xs hover:text-white transition-colors px-3 font-semibold"
               >
                 Clear all
@@ -371,20 +372,37 @@ export default function Collections() {
         {/* Results Header */}
         <div className="flex flex-col sm:flex-row items-center justify-between mb-7 gap-4">
           <div className="flex items-center gap-4 flex-wrap">
-            {selectedFolder ? (
+            {navigationPath.length > 0 ? (
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setSelectedFolder(null)}
+                  onClick={() => setNavigationPath((prev) => prev.slice(0, -1))}
                   className="bg-white border border-border text-foreground text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-[#4169E1]/5 transition-colors shadow-sm"
                 >
                   <ArrowLeft className="w-4 h-4 text-muted-foreground mr-1" />
-                  Back Options
+                  Back
                 </button>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground px-2 font-medium bg-white/50 border border-border/60 py-1.5 rounded-lg shadow-sm">
-                  <span className="text-[#4169E1]/80 max-w-[120px] truncate" title={selectedFolder.subfonds}>{selectedFolder.subfonds}</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                  <span className="text-foreground font-bold tracking-tight max-w-[150px] truncate" title={selectedFolder.series}>{selectedFolder.series}</span>
-                  <span className="px-2 border-l border-border/60 font-black ml-1">{level2Materials.length} Items</span>
+                  <button
+                    onClick={() => setNavigationPath([])}
+                    className="text-[#4169E1] hover:underline font-semibold"
+                  >
+                    Collections
+                  </button>
+                  {navigationPath.map((segment, idx) => (
+                    <React.Fragment key={`${segment.level}-${segment.name}`}>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                      <button
+                        onClick={() => setNavigationPath(navigationPath.slice(0, idx + 1))}
+                        className={cn(
+                          "max-w-[180px] truncate",
+                          idx === navigationPath.length - 1 ? "text-foreground font-bold" : "text-[#4169E1]/80 hover:underline"
+                        )}
+                        title={segment.name}
+                      >
+                        {segment.name}
+                      </button>
+                    </React.Fragment>
+                  ))}
                 </div>
               </div>
             ) : (
@@ -439,7 +457,7 @@ export default function Collections() {
               No archival materials match your current filters. Try adjusting your search terms or clearing active filters.
             </p>
             <button
-              onClick={() => { setSearch(""); setCategory(""); setAccess(""); setShowOaisOnly(false); setSelectedFolder(null); }}
+              onClick={() => { setSearch(""); setCategory(""); setAccess(""); setShowOaisOnly(false); setNavigationPath([]); }}
               className="bg-[#4169E1] text-white font-bold px-8 py-3 rounded-xl text-sm hover:bg-[#3558c8] transition-all shadow-lg hover:-translate-y-0.5"
             >
               Clear All Filters
@@ -447,167 +465,182 @@ export default function Collections() {
           </div>
         )}
 
-        {/* ═══ LEVEL 1: HIERARCHICAL FOLDERS VIEW ═══ */}
-        {!isLoading && !selectedFolder && groupedFolders.length > 0 && (
+        {!isLoading && currentDepth < 3 && (
           <div className="flex flex-col gap-14">
-            {groupedFolders.map((group) => (
-              <div key={group.category} className="animate-fade-in">
-                {/* Category Header */}
-                <div className="flex items-center gap-3 mb-6 pb-3 border-b-2 border-[#4169E1]/20">
+            {(currentDepth === 0
+              ? groupedFolders.flatMap((group) =>
+                  group.subfondGroups.map((sfGroup) => ({
+                    fonds: group.category,
+                    subfonds: sfGroup.subfonds,
+                    folders: sfGroup.folders,
+                  }))
+                )
+              : currentDepth === 1
+              ? groupedFolders
+                  .filter((group) => group.category === selectedFonds)
+                  .flatMap((group) =>
+                    group.subfondGroups
+                      .filter((sfGroup) => sfGroup.subfonds === selectedSubfonds)
+                      .map((sfGroup) => ({
+                        fonds: group.category,
+                        subfonds: sfGroup.subfonds,
+                        folders: sfGroup.folders,
+                      }))
+                  )
+              : groupedFolders
+                  .filter((group) => group.category === selectedFonds)
+                  .flatMap((group) =>
+                    group.subfondGroups
+                      .filter((sfGroup) => sfGroup.subfonds === selectedSubfonds)
+                      .map((sfGroup) => ({
+                        fonds: group.category,
+                        subfonds: sfGroup.subfonds,
+                        folders: sfGroup.folders.filter((f) => f.series === selectedSeries),
+                      }))
+                  )
+            ).map((section) => (
+              <div key={`${section.fonds}-${section.subfonds}`} className="animate-fade-in">
+                <button
+                  onClick={() =>
+                    setNavigationPath([
+                      { level: "fonds", name: section.fonds },
+                      { level: "subfonds", name: section.subfonds },
+                    ])
+                  }
+                  className="w-full text-left flex items-center gap-3 mb-6 pb-3 border-b-2 border-[#4169E1]/20"
+                >
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#4169E1]/15 to-[#4169E1]/5 flex items-center justify-center text-[#4169E1] shadow-sm">
                     <Layers className="w-5 h-5" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-black text-[#0a1628] tracking-tight">{group.category}</h2>
-                    <p className="text-xs text-muted-foreground font-medium mt-0.5">{group.totalCount} materials across {group.subfondGroups.length} sub-fonds</p>
+                    <h2 className="text-2xl font-black text-[#0a1628] tracking-tight">{section.subfonds}</h2>
+                    <p className="text-xs text-muted-foreground font-medium mt-0.5">
+                      {section.folders.reduce((s, f) => s + f.count, 0)} materials across {section.folders.length} series
+                    </p>
                   </div>
-                  <span className="bg-[#4169E1]/10 text-[#4169E1] px-3 py-1 rounded-full text-xs font-bold ml-auto">{group.folders.length} Series</span>
-                </div>
-                
-                {/* Subfonds Groups within this category */}
-                <div className="flex flex-col gap-8">
-                {group.subfondGroups.map((sfGroup) => (
-                  <div key={sfGroup.subfonds}>
-                    {/* Subfonds label - only show if there are multiple subfonds in this category */}
-                    {group.subfondGroups.length > 1 && (
-                      <div className="flex items-center gap-2 mb-4 ml-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#4169E1]" />
-                        <span className="text-sm font-bold text-[#0a1628]/70 uppercase tracking-wider">{sfGroup.subfonds}</span>
-                        <div className="flex-1 h-px bg-border/40" />
-                        <span className="text-[10px] font-bold text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full">{sfGroup.folders.reduce((s, f) => s + f.count, 0)} items</span>
-                      </div>
-                    )}
-                <div className={viewMode === "grid" 
-                  ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" 
-                  : "flex flex-col gap-3"
-                }>
-                  {sfGroup.folders.map((folder, folderIdx) => (
-                    viewMode === "grid" ? (
-                      <div
-                        key={folder.series}
-                        onClick={() => { setSelectedFolder({ category: folder.category, subfonds: folder.subfonds, series: folder.series }); window.scrollTo({ top: 300, behavior: 'smooth' }); }}
-                        className="group relative h-[380px] bg-transparent cursor-pointer transition-all duration-500 hover:-translate-y-3 pointer-events-auto"
-                      >
-                        {/* Top Part: Gradient + File Stack */}
-                        <div className={`h-[45%] rounded-[30px] rounded-b-none bg-gradient-to-br ${CARD_GRADIENTS[folderIdx % CARD_GRADIENTS.length]} relative overflow-hidden flex items-end justify-center pb-4 shadow-sm`}>
-                           <div className="absolute inset-0 bg-black/10 transition-opacity group-hover:opacity-0" />
-                           
-                           {/* File Stack (Visual collection of covers) */}
-                           <div className="relative w-40 h-32 flex items-center justify-center -mb-8 transition-transform duration-700 group-hover:-translate-y-4">
-                              {folder.coverImages && folder.coverImages.length > 0 ? (
-                                <>
-                                  {/* Paper 1 (Bottom) */}
-                                  <div className="absolute w-28 h-36 bg-slate-300 rounded-lg -rotate-12 translate-x-4 blur-sm group-hover:blur-0 transition-all duration-700 overflow-hidden border border-white/20">
-                                     {folder.coverImages[2] && <img src={folder.coverImages[2]} className="w-full h-full object-cover opacity-60" />}
-                                  </div>
-                                  {/* Paper 2 (Middle) */}
-                                  <div className="absolute w-28 h-36 bg-slate-200 rounded-lg rotate-6 -translate-x-4 blur-[2px] group-hover:blur-0 transition-all duration-700 overflow-hidden border border-white/30">
-                                     {folder.coverImages[1] && <img src={folder.coverImages[1]} className="w-full h-full object-cover opacity-80" />}
-                                  </div>
-                                  {/* Main Front Paper */}
-                                  <div className="absolute w-28 h-36 bg-white rounded-lg shadow-2xl flex flex-col overflow-hidden border border-white/40">
-                                     <img src={folder.coverImages[0]} className="w-full h-full object-cover" />
-                                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
-                                  </div>
-                                </>
-                              ) : (
-                                <>
-                                  <div className="absolute w-28 h-36 bg-white/40 rounded-lg -rotate-12 translate-x-4 blur-sm group-hover:blur-0 transition-all duration-700" />
-                                  <div className="absolute w-28 h-36 bg-white/60 rounded-lg rotate-6 -translate-x-4 blur-[2px] group-hover:blur-0 transition-all duration-700" />
-                                  <div className="absolute w-28 h-36 bg-white rounded-lg shadow-2xl flex flex-col p-4">
-                                     <div className="w-12 h-1.5 bg-slate-100 rounded-full mb-3" />
-                                     <div className="w-full h-1 bg-slate-50 rounded-full mb-1.5" />
-                                     <div className="w-full h-1 bg-slate-50 rounded-full mb-1.5" />
-                                     <div className="w-full h-1 bg-slate-50 rounded-full mb-1.5" />
-                                     <div className="w-2/3 h-1 bg-slate-50 rounded-full" />
-                                  </div>
-                                </>
-                              )}
-                           </div>
-                        </div>
+                  <span className="bg-[#4169E1]/10 text-[#4169E1] px-3 py-1 rounded-full text-xs font-bold ml-auto">{section.folders.length} Series</span>
+                </button>
 
-                        {/* Bottom Part: Folder Lip & Info (Black Body) */}
-                        <div className="h-[55%] bg-[#1A1A1E] rounded-[30px] rounded-t-none p-8 flex flex-col relative z-20 shadow-2xl">
-                           {/* Folder Lip (The 'Tab') */}
-                           <div className="absolute -top-6 left-0 h-8 w-32 bg-[#1A1A1E] rounded-t-2xl z-30 flex items-center px-6">
-                              <span className="text-[10px] font-black text-white/80 uppercase tracking-widest truncate">{folder.series.split(' ')[0]}</span>
-                           </div>
-                           
-                           <div className="mt-2">
-                             <h3 className="text-white text-xl font-bold leading-tight line-clamp-2 mb-2 group-hover:text-[#4169E1] transition-colors">{folder.series}</h3>
-                             <p className="text-white/40 text-xs font-medium">{folder.subfonds}</p>
-                           </div>
-
-                           <div className="mt-auto flex items-center justify-between">
-                              <div className="flex items-center gap-2.5">
-                                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                                 <span className="text-white/30 text-[11px] font-black uppercase tracking-widest">{folder.count} Digital Files</span>
+                <div className={viewMode === "grid" ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" : "flex flex-col gap-3"}>
+                  {section.folders.map((folder, folderIdx) => (
+                          viewMode === "grid" ? (
+                            <div
+                              key={folder.series}
+                              onClick={() => {
+                                setNavigationPath([
+                                  { level: "fonds", name: section.fonds },
+                                  { level: "subfonds", name: section.subfonds },
+                                  { level: "series", name: folder.series },
+                                ]);
+                                window.scrollTo({ top: 300, behavior: "smooth" });
+                              }}
+                              className="group relative h-[380px] bg-transparent cursor-pointer transition-all duration-500 hover:-translate-y-3 pointer-events-auto"
+                            >
+                              <div className={`h-[45%] rounded-[30px] rounded-b-none bg-gradient-to-br ${CARD_GRADIENTS[folderIdx % CARD_GRADIENTS.length]} relative overflow-hidden flex items-end justify-center pb-4 shadow-sm`}>
+                                <div className="absolute inset-0 bg-black/10 transition-opacity group-hover:opacity-0" />
+                                <div className="relative w-40 h-32 flex items-center justify-center -mb-8 transition-transform duration-700 group-hover:-translate-y-4">
+                                  {folder.coverImages && folder.coverImages.length > 0 ? (
+                                    <>
+                                      <div className="absolute w-28 h-36 bg-slate-300 rounded-lg -rotate-12 translate-x-4 blur-sm group-hover:blur-0 transition-all duration-700 overflow-hidden border border-white/20">
+                                        {folder.coverImages[2] && <img src={folder.coverImages[2]} className="w-full h-full object-cover opacity-60" />}
+                                      </div>
+                                      <div className="absolute w-28 h-36 bg-slate-200 rounded-lg rotate-6 -translate-x-4 blur-[2px] group-hover:blur-0 transition-all duration-700 overflow-hidden border border-white/30">
+                                        {folder.coverImages[1] && <img src={folder.coverImages[1]} className="w-full h-full object-cover opacity-80" />}
+                                      </div>
+                                      <div className="absolute w-28 h-36 bg-white rounded-lg shadow-2xl flex flex-col overflow-hidden border border-white/40">
+                                        <img src={folder.coverImages[0]} className="w-full h-full object-cover" />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <div className="absolute w-28 h-36 bg-white/40 rounded-lg -rotate-12 translate-x-4 blur-sm group-hover:blur-0 transition-all duration-700" />
+                                      <div className="absolute w-28 h-36 bg-white/60 rounded-lg rotate-6 -translate-x-4 blur-[2px] group-hover:blur-0 transition-all duration-700" />
+                                      <div className="absolute w-28 h-36 bg-white rounded-lg shadow-2xl flex flex-col p-4">
+                                        <div className="w-12 h-1.5 bg-slate-100 rounded-full mb-3" />
+                                        <div className="w-full h-1 bg-slate-50 rounded-full mb-1.5" />
+                                        <div className="w-full h-1 bg-slate-50 rounded-full mb-1.5" />
+                                        <div className="w-full h-1 bg-slate-50 rounded-full mb-1.5" />
+                                        <div className="w-2/3 h-1 bg-slate-50 rounded-full" />
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
                               </div>
-                              <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                 <ArrowUpRight className="w-4 h-4 text-white" />
-                              </div>
-                           </div>
-                        </div>
-                        
-                        {/* Reflection overlay */}
-                        <div className="absolute inset-0 rounded-[30px] border border-white/5 pointer-events-none" />
-                      </div>
-                    ) : (
-                      <div
-                        key={folder.series}
-                        onClick={() => { setSelectedFolder({ category: folder.category, subfonds: folder.subfonds, series: folder.series }); window.scrollTo({ top: 300, behavior: 'smooth' }); }}
-                        className="bg-white border border-border/60 rounded-[2rem] p-6 hover:shadow-[0_20px_50px_rgba(0,0,0,0.1)] transition-all cursor-pointer group relative overflow-hidden"
-                      >
-                         {/* Stacked Preview Logic */}
-                         <div className="relative h-48 mb-6 flex items-center justify-center">
-                            {folder.coverImages.length > 0 ? (
-                              <div className="relative w-full h-full">
-                                {folder.coverImages.slice(0, 3).map((img, idx) => (
-                                  <div 
-                                    key={idx}
-                                    className="absolute inset-0 transition-all duration-500 rounded-2xl overflow-hidden border-2 border-white shadow-xl"
-                                    style={{ 
-                                      zIndex: 10 - idx,
-                                      transform: `translateY(${idx * 12}px) scale(${1 - idx * 0.08}) rotate(${idx * 2}deg)`,
-                                      opacity: 1 - idx * 0.2
-                                    }}
-                                  >
-                                    <img src={img} className="w-full h-full object-cover" alt="" />
-                                    <div className="absolute inset-0 bg-black/10 transition-opacity group-hover:opacity-0" />
+                              <div className="h-[55%] bg-[#1A1A1E] rounded-[30px] rounded-t-none p-8 flex flex-col relative z-20 shadow-2xl">
+                                <div className="absolute -top-6 left-0 h-8 w-32 bg-[#1A1A1E] rounded-t-2xl z-30 flex items-center px-6">
+                                  <span className="text-[10px] font-black text-white/80 uppercase tracking-widest truncate">{folder.series.split(" ")[0]}</span>
+                                </div>
+                                <div className="mt-2">
+                                  <h3 className="text-white text-xl font-bold leading-tight line-clamp-2 mb-2 group-hover:text-[#4169E1] transition-colors">{folder.series}</h3>
+                                  <p className="text-white/40 text-xs font-medium">{folder.subfonds}</p>
+                                </div>
+                                <div className="mt-auto flex items-center justify-between">
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                    <span className="text-white/30 text-[11px] font-black uppercase tracking-widest">{folder.count} Digital Files</span>
                                   </div>
-                                ))}
+                                  <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <ArrowUpRight className="w-4 h-4 text-white" />
+                                  </div>
+                                </div>
                               </div>
-                            ) : (
-                              <div className={`w-32 h-40 rounded-2xl bg-gradient-to-br ${CARD_GRADIENTS[folderIdx % CARD_GRADIENTS.length]} flex items-center justify-center shadow-2xl group-hover:scale-105 transition-transform relative`}>
-                                 <Folder className="w-12 h-12 text-white/40" />
-                                 <div className="absolute inset-x-4 bottom-4 h-1 bg-white/20 rounded-full overflow-hidden">
-                                    <div className="w-1/2 h-full bg-white/40" />
-                                 </div>
-                              </div>
-                            )}
-                         </div>
-
-                         <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                               <p className="text-[10px] text-[#4169E1] uppercase tracking-[0.2em] font-black">{folder.subfonds}</p>
+                              <div className="absolute inset-0 rounded-[30px] border border-white/5 pointer-events-none" />
                             </div>
-                            <h3 className="text-xl font-display font-black text-[#0a1628] leading-tight group-hover:text-[#4169E1] transition-colors">{folder.series}</h3>
-                            <div className="flex items-center justify-between mt-4">
-                               <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-xl">
-                                  <Database className="w-3 h-3 text-slate-400" />
-                                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">{folder.count} Items</span>
-                               </div>
-                               <div className="w-10 h-10 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-[#4169E1] group-hover:text-white transition-all shadow-sm group-hover:shadow-[#4169E1]/30 group-hover:-translate-x-1">
-                                  <ArrowRight className="w-5 h-5" />
-                               </div>
+                          ) : (
+                            <div
+                              key={folder.series}
+                              onClick={() => {
+                                setNavigationPath([
+                                  { level: "fonds", name: section.fonds },
+                                  { level: "subfonds", name: section.subfonds },
+                                  { level: "series", name: folder.series },
+                                ]);
+                                window.scrollTo({ top: 300, behavior: "smooth" });
+                              }}
+                              className="bg-white border border-border/60 rounded-[2rem] p-6 hover:shadow-[0_20px_50px_rgba(0,0,0,0.1)] transition-all cursor-pointer group relative overflow-hidden"
+                            >
+                              <div className="relative h-48 mb-6 flex items-center justify-center">
+                                {folder.coverImages.length > 0 ? (
+                                  <div className="relative w-full h-full">
+                                    {folder.coverImages.slice(0, 3).map((img, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="absolute inset-0 transition-all duration-500 rounded-2xl overflow-hidden border-2 border-white shadow-xl"
+                                        style={{ zIndex: 10 - idx, transform: `translateY(${idx * 12}px) scale(${1 - idx * 0.08}) rotate(${idx * 2}deg)`, opacity: 1 - idx * 0.2 }}
+                                      >
+                                        <img src={img} className="w-full h-full object-cover" alt="" />
+                                        <div className="absolute inset-0 bg-black/10 transition-opacity group-hover:opacity-0" />
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className={`w-32 h-40 rounded-2xl bg-gradient-to-br ${CARD_GRADIENTS[folderIdx % CARD_GRADIENTS.length]} flex items-center justify-center shadow-2xl group-hover:scale-105 transition-transform relative`}>
+                                    <Folder className="w-12 h-12 text-white/40" />
+                                    <div className="absolute inset-x-4 bottom-4 h-1 bg-white/20 rounded-full overflow-hidden">
+                                      <div className="w-1/2 h-full bg-white/40" />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <p className="text-[10px] text-[#4169E1] uppercase tracking-[0.2em] font-black">{folder.subfonds}</p>
+                                </div>
+                                <h3 className="text-xl font-display font-black text-[#0a1628] leading-tight group-hover:text-[#4169E1] transition-colors">{folder.series}</h3>
+                                <div className="flex items-center justify-between mt-4">
+                                  <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-xl">
+                                    <Database className="w-3 h-3 text-slate-400" />
+                                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">{folder.count} Items</span>
+                                  </div>
+                                  <div className="w-10 h-10 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-[#4169E1] group-hover:text-white transition-all shadow-sm group-hover:shadow-[#4169E1]/30 group-hover:-translate-x-1">
+                                    <ArrowRight className="w-5 h-5" />
+                                  </div>
+                                </div>
+                              </div>
                             </div>
-                         </div>
-                      </div>
-                    )
-                  ))}
-                </div>
-                  </div>
-                ))}
+                          )
+                        ))}
                 </div>
               </div>
             ))}
@@ -615,7 +648,7 @@ export default function Collections() {
         )}
 
         {/* ═══ LEVEL 2: MATERIALS GRID VIEW ═══ */}
-        {!isLoading && selectedFolder && level2Materials.length > 0 && viewMode === "grid" && (
+        {!isLoading && currentDepth === 3 && level2Materials.length > 0 && viewMode === "grid" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
             {level2Materials.map((mat: any, i: number) => {
               const acc = ACCESS_CONFIG[mat.access as keyof typeof ACCESS_CONFIG] || ACCESS_CONFIG.public;
@@ -752,7 +785,7 @@ export default function Collections() {
         )}
 
         {/* ═══ LEVEL 2: MATERIALS LIST VIEW ═══ */}
-        {!isLoading && selectedFolder && level2Materials.length > 0 && viewMode === "list" && (
+        {!isLoading && currentDepth === 3 && level2Materials.length > 0 && viewMode === "list" && (
           <div className="space-y-3 animate-fade-in">
             {level2Materials.map((mat: any, i: number) => {
               const acc = ACCESS_CONFIG[mat.access as keyof typeof ACCESS_CONFIG] || ACCESS_CONFIG.public;

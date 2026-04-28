@@ -35754,11 +35754,11 @@ router4.post("/materials", requireAuth, async (req, res) => {
       return seq == null ? acc : Math.max(acc, seq);
     }, 0);
     const seqNo = maxSeq + 1;
-    const materialId = generateMaterialId(catNo, seqNo);
-    const id = generateId();
-    const sipId = `SIP-${(/* @__PURE__ */ new Date()).getFullYear()}${String((/* @__PURE__ */ new Date()).getMonth() + 1).padStart(2, "0")}${String((/* @__PURE__ */ new Date()).getDate()).padStart(2, "0")}-${String(seqNo).padStart(3, "0")}`;
-    const aipId = `AIP-${(/* @__PURE__ */ new Date()).getFullYear()}-${String(seqNo).padStart(4, "0")}`;
-    const ingestDate = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+    const materialId = body.materialId || body.uniqueId || generateMaterialId(catNo, seqNo);
+    const id = body.id || materialId || generateId();
+    const sipId = body.sipId || `SIP-${(/* @__PURE__ */ new Date()).getFullYear()}${String((/* @__PURE__ */ new Date()).getMonth() + 1).padStart(2, "0")}${String((/* @__PURE__ */ new Date()).getDate()).padStart(2, "0")}-${String(seqNo).padStart(3, "0")}`;
+    const aipId = body.aipId || `AIP-${(/* @__PURE__ */ new Date()).getFullYear()}-${String(seqNo).padStart(4, "0")}`;
+    const ingestDate = body.ingestDate || (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
     const cataloger = user.name;
     const dateCataloged = ingestDate;
     const preferredCitation = body.preferredCitation || `${body.creator || "Author"}. (${body.date?.split("-")[0] || (/* @__PURE__ */ new Date()).getFullYear()}). ${body.title}. Holy Cross of Davao College. [${materialId}]`;
@@ -35798,6 +35798,22 @@ router4.post("/materials", requireAuth, async (req, res) => {
       physicalLocation: body.physicalLocation ?? null,
       physicalCondition: body.physicalCondition ?? null,
       bindingType: body.bindingType ?? null,
+      levelOfDescription: body.levelOfDescription ?? "Item",
+      extentAndMedium: body.extentAndMedium ?? null,
+      referenceCode: body.referenceCode ?? materialId,
+      dateOfDescription: body.dateOfDescription ?? null,
+      accessConditions: body.accessConditions ?? null,
+      reproductionConditions: body.reproductionConditions ?? null,
+      termsOfUse: body.termsOfUse ?? null,
+      notes: body.notes ?? null,
+      pointsOfAccess: body.pointsOfAccess ?? null,
+      locationOfOriginals: body.locationOfOriginals ?? null,
+      locationOfCopies: body.locationOfCopies ?? null,
+      relatedUnits: body.relatedUnits ?? null,
+      publicationNote: body.publicationNote ?? null,
+      findingAids: body.findingAids ?? null,
+      rulesOrConventions: body.rulesOrConventions ?? null,
+      archivistNote: body.archivistNote ?? null,
       cataloger,
       dateCataloged,
       sipId,
@@ -35830,6 +35846,19 @@ router4.post("/materials", requireAuth, async (req, res) => {
       newMat.chunksCount = chunksCount;
       newMat.fileUrl = "CHUNKED";
     }
+    if (body.pageImages && Array.isArray(body.pageImages)) {
+      console.log(`Saving ${body.pageImages.length} page images to materialPages...`);
+      for (let i = 0; i < body.pageImages.length; i++) {
+        await db.collection("materialPages").doc(`${id}_page_${i}`).set({
+          materialId: id,
+          pageIndex: i,
+          data: body.pageImages[i]
+        });
+      }
+      newMat.hasPageImages = true;
+      newMat.pageCount = body.pageImages.length;
+      delete newMat.pageImages;
+    }
     await db.collection("materials").doc(id).set(newMat);
     await logAudit({ action: "CREATE_MATERIAL", entityType: "material", entityId: id, userId: user.userId, userName: user.name, details: `Created material: ${body.title}` });
     const catName = body.categoryId ? cats.find((c) => c.id === body.categoryId)?.name : void 0;
@@ -35846,7 +35875,9 @@ router4.get("/materials/:id", async (req, res) => {
     let docSnap = await db.collection("materials").doc(id).get();
     if (!docSnap.exists) {
       const byMaterialId = await db.collection("materials").where("materialId", "==", id).limit(1).get();
-      docSnap = byMaterialId.docs[0];
+      if (!byMaterialId.empty) {
+        docSnap = byMaterialId.docs[0];
+      }
     }
     if (!docSnap || !docSnap.exists) {
       const mat = jsonStoreGetMaterial(id);
@@ -35866,12 +35897,25 @@ router4.get("/materials/:id", async (req, res) => {
       }
       m.fileUrl = reconstructed;
     }
+    try {
+      const pagesSnap = await db.collection("materialPages").where("materialId", "==", m.id).get();
+      if (!pagesSnap.empty) {
+        m.pageImages = pagesSnap.docs.map((d) => d.data()).sort((a, b) => (a.pageIndex || 0) - (b.pageIndex || 0)).map((d) => d.data);
+        m.hasPageImages = true;
+      }
+    } catch (e) {
+      console.error("Failed to fetch pages for material:", m.id, e);
+    }
     const catsSnap = await db.collection("categories").get();
     const catMap = Object.fromEntries(catsSnap.docs.map((c) => [c.id, c.data().name]));
     let related = [];
     if (m.categoryId) {
-      const relatedSnap = await db.collection("materials").where("categoryId", "==", m.categoryId).orderBy("createdAt", "desc").limit(8).get();
-      related = relatedSnap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((r) => r.id !== m.id).slice(0, 4);
+      const relatedSnap = await db.collection("materials").where("categoryId", "==", m.categoryId).limit(10).get();
+      related = relatedSnap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((r) => r.id !== m.id).sort((a, b) => {
+        const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const db2 = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return db2 - da;
+      }).slice(0, 4);
     }
     res.json({
       ...formatMaterial(m, m.categoryId ? catMap[m.categoryId] : void 0),
@@ -35921,7 +35965,15 @@ router4.put("/materials/:id", requireAuth, async (req, res) => {
   const body = req.body;
   try {
     const db = getFirestoreDb();
-    const snap = await db.collection("materials").doc(id).get();
+    let docRef = db.collection("materials").doc(id);
+    let snap = await docRef.get();
+    if (!snap.exists) {
+      const byMaterialId = await db.collection("materials").where("materialId", "==", id).limit(1).get();
+      if (!byMaterialId.empty) {
+        snap = byMaterialId.docs[0];
+        docRef = snap.ref;
+      }
+    }
     if (!snap.exists) {
       res.status(404).json({ error: "Material not found" });
       return;
@@ -35943,6 +35995,22 @@ router4.put("/materials/:id", requireAuth, async (req, res) => {
       publisher: body.publisher ?? m.publisher ?? null,
       fileUrl: body.fileUrl !== void 0 ? body.fileUrl : m.fileUrl ?? null,
       thumbnailUrl: body.thumbnailUrl !== void 0 ? body.thumbnailUrl : m.thumbnailUrl ?? null,
+      levelOfDescription: body.levelOfDescription ?? m.levelOfDescription ?? "Item",
+      extentAndMedium: body.extentAndMedium ?? m.extentAndMedium ?? null,
+      referenceCode: body.referenceCode ?? m.referenceCode ?? null,
+      dateOfDescription: body.dateOfDescription ?? m.dateOfDescription ?? null,
+      accessConditions: body.accessConditions ?? m.accessConditions ?? null,
+      reproductionConditions: body.reproductionConditions ?? m.reproductionConditions ?? null,
+      termsOfUse: body.termsOfUse ?? m.termsOfUse ?? null,
+      notes: body.notes ?? m.notes ?? null,
+      pointsOfAccess: body.pointsOfAccess ?? m.pointsOfAccess ?? null,
+      locationOfOriginals: body.locationOfOriginals ?? m.locationOfOriginals ?? null,
+      locationOfCopies: body.locationOfCopies ?? m.locationOfCopies ?? null,
+      relatedUnits: body.relatedUnits ?? m.relatedUnits ?? null,
+      publicationNote: body.publicationNote ?? m.publicationNote ?? null,
+      findingAids: body.findingAids ?? m.findingAids ?? null,
+      rulesOrConventions: body.rulesOrConventions ?? m.rulesOrConventions ?? null,
+      archivistNote: body.archivistNote ?? m.archivistNote ?? null,
       status: body.status ?? m.status,
       updatedAt: (/* @__PURE__ */ new Date()).toISOString()
     };
@@ -35963,9 +36031,26 @@ router4.put("/materials/:id", requireAuth, async (req, res) => {
       updateData.chunksCount = chunksCount;
       updateData.fileUrl = "CHUNKED";
     }
-    await db.collection("materials").doc(id).update(updateData);
+    if (body.pageImages && Array.isArray(body.pageImages)) {
+      console.log(`Updating ${body.pageImages.length} page images...`);
+      const oldPages = await db.collection("materialPages").where("materialId", "==", id).get();
+      const batch = db.batch();
+      oldPages.docs.forEach((doc) => batch.delete(doc.ref));
+      await batch.commit();
+      for (let i = 0; i < body.pageImages.length; i++) {
+        await db.collection("materialPages").doc(`${id}_page_${i}`).set({
+          materialId: id,
+          pageIndex: i,
+          data: body.pageImages[i]
+        });
+      }
+      updateData.hasPageImages = true;
+      updateData.pageCount = body.pageImages.length;
+      delete updateData.pageImages;
+    }
+    await docRef.update(updateData);
     await logAudit({ action: "UPDATE_MATERIAL", entityType: "material", entityId: id, userId: user.userId, userName: user.name, details: `Updated material: ${m.title}` });
-    const updated = await db.collection("materials").doc(id).get();
+    const updated = await docRef.get();
     res.json(formatMaterial({ id, ...updated.data() }));
   } catch {
     const updated = jsonStoreUpdateMaterial(id, body, { userId: user.userId, name: user.name });
@@ -35982,7 +36067,15 @@ router4.patch("/materials/:id", requireAuth, async (req, res) => {
   const body = req.body;
   try {
     const db = getFirestoreDb();
-    const snap = await db.collection("materials").doc(id).get();
+    let docRef = db.collection("materials").doc(id);
+    let snap = await docRef.get();
+    if (!snap.exists) {
+      const byMaterialId = await db.collection("materials").where("materialId", "==", id).limit(1).get();
+      if (!byMaterialId.empty) {
+        snap = byMaterialId.docs[0];
+        docRef = snap.ref;
+      }
+    }
     if (!snap.exists) {
       res.status(404).json({ error: "Material not found" });
       return;
@@ -36003,6 +36096,22 @@ router4.patch("/materials/:id", requireAuth, async (req, res) => {
       publisher: body.publisher ?? m.publisher ?? null,
       fileUrl: body.fileUrl !== void 0 ? body.fileUrl : m.fileUrl ?? null,
       thumbnailUrl: body.thumbnailUrl !== void 0 ? body.thumbnailUrl : m.thumbnailUrl ?? null,
+      levelOfDescription: body.levelOfDescription ?? m.levelOfDescription ?? "Item",
+      extentAndMedium: body.extentAndMedium ?? m.extentAndMedium ?? null,
+      referenceCode: body.referenceCode ?? m.referenceCode ?? null,
+      dateOfDescription: body.dateOfDescription ?? m.dateOfDescription ?? null,
+      accessConditions: body.accessConditions ?? m.accessConditions ?? null,
+      reproductionConditions: body.reproductionConditions ?? m.reproductionConditions ?? null,
+      termsOfUse: body.termsOfUse ?? m.termsOfUse ?? null,
+      notes: body.notes ?? m.notes ?? null,
+      pointsOfAccess: body.pointsOfAccess ?? m.pointsOfAccess ?? null,
+      locationOfOriginals: body.locationOfOriginals ?? m.locationOfOriginals ?? null,
+      locationOfCopies: body.locationOfCopies ?? m.locationOfCopies ?? null,
+      relatedUnits: body.relatedUnits ?? m.relatedUnits ?? null,
+      publicationNote: body.publicationNote ?? m.publicationNote ?? null,
+      findingAids: body.findingAids ?? m.findingAids ?? null,
+      rulesOrConventions: body.rulesOrConventions ?? m.rulesOrConventions ?? null,
+      archivistNote: body.archivistNote ?? m.archivistNote ?? null,
       status: body.status ?? m.status,
       updatedAt: (/* @__PURE__ */ new Date()).toISOString()
     };
@@ -36022,9 +36131,9 @@ router4.patch("/materials/:id", requireAuth, async (req, res) => {
       updateData.chunksCount = chunksCount;
       updateData.fileUrl = "CHUNKED";
     }
-    await db.collection("materials").doc(id).update(updateData);
+    await docRef.update(updateData);
     await logAudit({ action: "UPDATE_MATERIAL", entityType: "material", entityId: id, userId: user.userId, userName: user.name, details: `Updated material: ${m.title}` });
-    const updated = await db.collection("materials").doc(id).get();
+    const updated = await docRef.get();
     res.json(formatMaterial({ id, ...updated.data() }));
   } catch {
     const updated = jsonStoreUpdateMaterial(id, body, { userId: user.userId, name: user.name });
@@ -36040,22 +36149,103 @@ router4.delete("/materials/:id", requireAuth, async (req, res) => {
   const id = String(req.params.id);
   try {
     const db = getFirestoreDb();
-    const snap = await db.collection("materials").doc(id).get();
+    let docRef = db.collection("materials").doc(id);
+    let snap = await docRef.get();
+    if (!snap.exists) {
+      const byMaterialId = await db.collection("materials").where("materialId", "==", id).limit(1).get();
+      if (!byMaterialId.empty) {
+        snap = byMaterialId.docs[0];
+        docRef = snap.ref;
+      }
+    }
     if (!snap.exists) {
       res.status(404).json({ error: "Material not found" });
       return;
     }
     const m = snap.data();
-    await db.collection("materials").doc(id).delete();
+    if (m.isFileChunked) {
+      try {
+        const chunksCount = m.chunksCount || 0;
+        for (let i = 0; i < chunksCount; i++) {
+          await db.collection("materialChunks").doc(`${id}_chunk_${i}`).delete();
+        }
+      } catch (e) {
+        console.error("Failed to clean up chunks during deletion:", e);
+      }
+    }
+    if (m.hasPageImages) {
+      try {
+        const pagesSnap = await db.collection("materialPages").where("materialId", "==", id).get();
+        const batch = db.batch();
+        pagesSnap.docs.forEach((doc) => batch.delete(doc.ref));
+        await batch.commit();
+      } catch (e) {
+        console.error("Failed to clean up pages during deletion:", e);
+      }
+    }
+    await docRef.delete();
     await logAudit({ action: "DELETE_MATERIAL", entityType: "material", entityId: id, userId: user.userId, userName: user.name, details: `Deleted material: ${m.title}` });
     res.json({ message: "Material deleted" });
-  } catch {
+  } catch (err) {
+    console.error("Firestore DELETE failed:", err);
     const ok = jsonStoreDeleteMaterial(id);
     if (!ok) {
       res.status(404).json({ error: "Material not found" });
       return;
     }
     res.json({ message: "Material deleted" });
+  }
+});
+router4.post("/materials/:id/pages", requireAuth, async (req, res) => {
+  const id = String(req.params.id);
+  const { pageIndex, data } = req.body;
+  if (pageIndex === void 0 || !data) {
+    return res.status(400).json({ error: "pageIndex and data are required" });
+  }
+  try {
+    const db = getFirestoreDb();
+    await db.collection("materialPages").doc(`${id}_page_${pageIndex}`).set({
+      materialId: id,
+      pageIndex,
+      data
+    });
+    await db.collection("materials").doc(id).update({
+      hasPageImages: true,
+      updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Failed to save page:", err);
+    res.status(500).json({ error: "Failed to save page" });
+  }
+});
+router4.post("/materials/:id/file/chunks", requireAuth, async (req, res) => {
+  const id = String(req.params.id);
+  const { chunkIndex, totalChunks, data } = req.body;
+  if (chunkIndex === void 0 || !data) {
+    return res.status(400).json({ error: "chunkIndex and data are required" });
+  }
+  try {
+    const db = getFirestoreDb();
+    if (!db) throw new Error("Firebase unavailable");
+    await db.collection("materialChunks").doc(`${id}_chunk_${chunkIndex}`).set({
+      materialId: id,
+      chunkIndex,
+      data
+    });
+    if (chunkIndex === totalChunks - 1) {
+      await db.collection("materials").doc(id).update({
+        isFileChunked: true,
+        chunksCount: totalChunks,
+        fileUrl: "CHUNKED",
+        // Placeholder to indicate data is in chunks
+        updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+      });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Failed to save file chunk:", err);
+    res.status(500).json({ error: "Failed to save file chunk" });
   }
 });
 router4.get("/stats", async (_req, res) => {

@@ -1060,10 +1060,28 @@ export default function AdminMaterials() {
     [materials]
   );
 
-  // Hierarchy Helpers
-  const fondsList = hierarchyTree.children || []; // Departments (CET, BLIS)
-  const currentDeptNode = fondsList.find((f: any) => f.name === uploadForm.subfonds);
-  const programList = currentDeptNode?.children || []; // Programs (Faculty Research, Student Research)
+  // Hierarchy Helpers (driven by categories for proper fonds -> sub-fonds cascading)
+  const fondsOptions = React.useMemo(
+    () => categories.filter((c: any) => c.level === "fonds"),
+    [categories]
+  );
+  const selectedFondsNode = React.useMemo(
+    () => fondsOptions.find((f: any) => f.name === uploadForm.fonds),
+    [fondsOptions, uploadForm.fonds]
+  );
+  const subfondsOptions = React.useMemo(
+    () => selectedFondsNode
+      ? categories.filter((c: any) => c.level === "subfonds" && c.parentId === selectedFondsNode.id)
+      : [],
+    [categories, selectedFondsNode]
+  );
+  React.useEffect(() => {
+    if (!fondsOptions.length) return;
+    const hasValidFonds = fondsOptions.some((f: any) => f.name === uploadForm.fonds);
+    if (!hasValidFonds) {
+      setUploadForm((p) => ({ ...p, fonds: fondsOptions[0].name, subfonds: "", program: "", series: "" }));
+    }
+  }, [fondsOptions, uploadForm.fonds]);
 
   return (
     <AdminLayout>
@@ -1611,19 +1629,18 @@ export default function AdminMaterials() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-border pt-4">
                 <div>
                   <label className="text-muted-foreground text-[10px] font-bold block mb-1.5 uppercase">Category no.</label>
-                  <Select value={uploadForm.catNo} onValueChange={v => setUploadForm({...uploadForm, catNo: v})}>
+                  <Select value={uploadForm.catNo} onValueChange={v => setUploadForm({
+                    ...uploadForm,
+                    catNo: v,
+                    access: v === "01" ? "public" : v === "02" ? "restricted" : "confidential"
+                  })}>
                     <SelectTrigger className={cn("h-9 bg-white font-mono", validationErrors.includes('catNo') && "border-red-500 bg-red-50/50")}>
                       <SelectValue placeholder="Cat No." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="01">01 - Yearbook</SelectItem>
-                      <SelectItem value="02">02 - Research Paper / Publication</SelectItem>
-                      <SelectItem value="03">03 - Administrative Record</SelectItem>
-                      <SelectItem value="04">04 - Capstone / Student Final Output</SelectItem>
-                      <SelectItem value="05">05 - Photograph / Multimedia</SelectItem>
-                      <SelectItem value="06">06 - Newspaper / Press</SelectItem>
-                      <SelectItem value="07">07 - Manuals / Handbooks</SelectItem>
-                      <SelectItem value="08">08 - Certificates / Awards</SelectItem>
+                      <SelectItem value="01">01 - Public Access</SelectItem>
+                      <SelectItem value="02">02 - Restricted Access</SelectItem>
+                      <SelectItem value="03">03 - Confidential Access</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1646,28 +1663,30 @@ export default function AdminMaterials() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5 font-mono">Fonds</label>
-                  <Input value="HCDC — Holy Cross of Davao College" disabled className="bg-muted text-xs font-semibold h-10" />
+                  <Select
+                    value={uploadForm.fonds}
+                    onValueChange={(v) => setUploadForm((p) => ({ ...p, fonds: v, subfonds: "", program: "", series: "" }))}
+                  >
+                    <SelectTrigger className="h-10 bg-white border-border/60 hover:border-[#4169E1]/50 focus:ring-[#4169E1]/20 transition-all font-semibold text-[#0a1628]">
+                      <SelectValue placeholder="Select Fonds" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[300px] overflow-y-auto">
+                      {fondsOptions.map((fonds: any) => (
+                        <SelectItem key={fonds.id} value={fonds.name}>{fonds.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5 font-mono">
                     Sub-fonds (Department)
                   </label>
-                  <Select value={uploadForm.subfonds} onValueChange={v => setUploadForm(p => ({ ...p, subfonds: v }))}>
+                  <Select value={uploadForm.subfonds} onValueChange={v => setUploadForm(p => ({ ...p, subfonds: v, program: "", series: "" }))}>
                     <SelectTrigger className="h-10 bg-white border-border/60 hover:border-[#4169E1]/50 focus:ring-[#4169E1]/20 transition-all font-semibold text-[#0a1628]"><SelectValue placeholder="Select Department" /></SelectTrigger>
                     <SelectContent className="max-h-[300px] overflow-y-auto">
-                      {[
-                        "COLLEGE OF ENGINEERING AND TECHNOLOGY (CET)",
-                        "SCHOOL OF BUSINESS MANAGEMENT (SBME)",
-                        "COLLEGE OF MARITIME EDUCATION (COME)",
-                        "COLLEGE OF CRIMINAL JUSTICE EDUCATION (CCJE)",
-                        "SCHOOL OF TEACHERS EDUCATION (STE)",
-                        "College of Humanities, Social Sciences and Communication (HUSOCOM)",
-                        "College of Hospitality and Tourism Management Education (CHATME)",
-                        "Library and Information Science (BLIS)",
-                        "Basic Education Department",
-                        "Administration",
-                        "Library"
-                      ].map((dept) => <SelectItem key={dept} value={dept}>{dept}</SelectItem>)}
+                      {subfondsOptions.map((subfonds: any) => (
+                        <SelectItem key={subfonds.id} value={subfonds.name}>{subfonds.name}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1690,14 +1709,10 @@ export default function AdminMaterials() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 pt-6 border-t border-dashed">
+              <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mt-6 pt-6 border-t border-dashed">
                 <div>
                   <label className="text-[11px] font-bold text-[#0a1628] mb-1.5 block">Title (Double Check Scan) <span className="text-red-500">*</span></label>
                   <Input placeholder="Material Title" value={uploadForm.title} onChange={e => { setUploadForm({...uploadForm, title: e.target.value}); setValidationErrors(x => x.filter(k => k !== 'title')); }} className={cn("h-9", validationErrors.includes('title') && "border-red-500 bg-red-50/50")} />
-                </div>
-                <div>
-                  <label className="text-[11px] font-bold text-[#0a1628] mb-1.5 block">Creator / Author <span className="text-red-500">*</span></label>
-                  <Input placeholder="e.g. CET Dept" value={uploadForm.creator} onChange={e => { setUploadForm({...uploadForm, creator: e.target.value}); setValidationErrors(x => x.filter(k => k !== 'creator')); }} className={cn("h-9", validationErrors.includes('creator') && "border-red-500 bg-red-50/50")} />
                 </div>
               </div>
             </div>
