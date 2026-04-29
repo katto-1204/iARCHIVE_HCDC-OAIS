@@ -16,6 +16,16 @@ function formatMaterial(m: any, categoryName?: string) {
     materialId: m.materialId || m.material_id || m.id,
     categoryName: catName,
     hierarchyPath: m.hierarchy_path || `HCDC > ${catName} > General Series`,
+    fileUrl: m.file_url,
+    thumbnailUrl: m.thumbnail_url,
+    approvalStatus: m.status,
+    hasPageImages: m.has_page_images,
+    pageCount: m.page_count,
+    isFileChunked: m.is_file_chunked,
+    chunksCount: m.chunks_count,
+    dateCataloged: m.date_cataloged,
+    ingestDate: m.ingest_date,
+    ingestBy: m.ingest_by,
   };
 }
 
@@ -183,7 +193,7 @@ router.post("/materials", requireAuth, async (req, res) => {
       preferred_citation: body.preferredCitation || null,
       file_url: body.fileUrl ?? null,
       thumbnail_url: body.thumbnailUrl ?? null,
-      status: user.role === "admin" ? "published" : "pending",
+      status: (user.role === "admin" || user.role === "archivist") ? "published" : "pending",
       created_by: user.userId,
       created_at: now,
       updated_at: now,

@@ -106,8 +106,8 @@ export default function Collections() {
   ].filter(Boolean) as { key: string; label: string; clear: () => void }[];
 
   const displayMaterials = materials.filter((mat: any) => {
-    const approvalStatus = mat.approvalStatus || "approved";
-    if (!isPrivileged && approvalStatus !== "approved") return false;
+    const status = mat.approvalStatus || mat.status || "approved";
+    if (!isPrivileged && status !== "approved" && status !== "published") return false;
     if (showOaisOnly && !checkOAISCompliance(mat)) return false;
     if (access && mat.access !== access) return false;
     if (subfondsFilter && !(mat.hierarchyPath || "").toLowerCase().includes(subfondsFilter.toLowerCase())) return false;
@@ -115,7 +115,7 @@ export default function Collections() {
        const catObj = categories?.find((c: any) => c.id === category);
        if (catObj && !(mat.hierarchyPath || "").toLowerCase().includes(catObj.name.toLowerCase())) return false;
     }
-    if (!isPrivileged && !mat.fileUrl && !mat.thumbnailUrl) return false;
+    if (!isPrivileged && !mat.fileUrl && !mat.thumbnailUrl && !mat.hasPageImages) return false;
     return true; // Search is handled by the API now
   });
 
@@ -254,8 +254,8 @@ export default function Collections() {
 
   // Stats
   const visibleMaterials = materials.filter((mat: any) => {
-    const approvalStatus = mat.approvalStatus || "approved";
-    return isPrivileged || approvalStatus === "approved";
+    const status = mat.approvalStatus || mat.status || "approved";
+    return isPrivileged || status === "approved" || status === "published";
   });
   const totalPublic = visibleMaterials.filter((m: any) => m.access === "public").length;
   const totalRestricted = visibleMaterials.filter((m: any) => m.access === "restricted").length;
@@ -289,7 +289,7 @@ export default function Collections() {
               Browse the <span className="font-serif italic bg-gradient-to-r from-[#4169E1] to-[#7c94e8] text-transparent bg-clip-text">Archive</span>
             </h1>
             <p className="text-white/40 text-sm max-w-lg leading-relaxed">
-              Explore {materials.length} digitized archival materials from the Holy Cross of Davao College collection.
+              Explore {visibleMaterials.length} digitized archival materials from the Holy Cross of Davao College collection.
             </p>
           </div>
 
