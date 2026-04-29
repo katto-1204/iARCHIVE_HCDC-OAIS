@@ -103,7 +103,7 @@ router.post("/materials", requireAuth, async (req, res) => {
     const id = body.id || materialId || generateId();
     const now = new Date().toISOString();
 
-    const newMat = {
+    const newMat: any = {
       id,
       material_id: materialId,
       title: body.title,
@@ -170,41 +170,52 @@ router.post("/materials", requireAuth, async (req, res) => {
       updated_at: now,
     };
 
-    // Handle large files with chunking in Supabase
+    // 1. Handle large file detection (but don't insert chunks yet)
+    let chunks: string[] = [];
     if (newMat.file_url && newMat.file_url.length > 800000) {
-      console.log(`File is large (${newMat.file_url.length} chars). Chunking into material_chunks...`);
+      console.log(`File is large (${newMat.file_url.length} chars). Preparing chunks...`);
       const fullStr = newMat.file_url;
       const chunkSize = 800000;
-      let chunksCount = 0;
       for (let i = 0; i < fullStr.length; i += chunkSize) {
-        await supabase.from('material_chunks').insert({
-          material_id: id,
-          chunk_index: chunksCount,
-          data: fullStr.substring(i, i + chunkSize)
-        });
-        chunksCount++;
+        chunks.push(fullStr.substring(i, i + chunkSize));
       }
       newMat.file_url = "CHUNKED";
-      (newMat as any).is_file_chunked = true;
-      (newMat as any).chunks_count = chunksCount;
+      newMat.is_file_chunked = true;
+      newMat.chunks_count = chunks.length;
     }
 
-    // Handle page images in Supabase
-    if (body.pageImages && Array.isArray(body.pageImages)) {
-      console.log(`Saving ${body.pageImages.length} page images to material_pages...`);
-      for (let i = 0; i < body.pageImages.length; i++) {
+    // 2. Handle page images detection
+    const pageImages = (body.pageImages && Array.isArray(body.pageImages)) ? body.pageImages : [];
+    if (pageImages.length > 0) {
+      newMat.has_page_images = true;
+      newMat.page_count = pageImages.length;
+    }
+
+    // 3. FIRST: Insert the main material record
+    const { error: mainError } = await supabase.from('materials').insert(newMat);
+    if (mainError) throw mainError;
+
+    // 4. SECOND: Insert chunks (now that the parent ID exists)
+    if (chunks.length > 0) {
+      for (let i = 0; i < chunks.length; i++) {
+        await supabase.from('material_chunks').insert({
+          material_id: id,
+          chunk_index: i,
+          data: chunks[i]
+        });
+      }
+    }
+
+    // 5. THIRD: Insert page images
+    if (pageImages.length > 0) {
+      for (let i = 0; i < pageImages.length; i++) {
         await supabase.from('material_pages').insert({
           material_id: id,
           page_index: i,
-          data: body.pageImages[i]
+          data: pageImages[i]
         });
       }
-      (newMat as any).has_page_images = true;
-      (newMat as any).page_count = body.pageImages.length;
     }
-
-    const { error } = await supabase.from('materials').insert(newMat);
-    if (error) throw error;
 
     await logAudit({ action: "CREATE_MATERIAL", entityType: "material", entityId: id, userId: user.userId, userName: user.name, details: `Created material: ${body.title}` });
     const catName = body.categoryId ? (cats.find((c: any) => c.id === body.categoryId) as any)?.name : undefined;

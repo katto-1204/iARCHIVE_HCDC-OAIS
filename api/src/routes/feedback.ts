@@ -73,6 +73,33 @@ router.patch("/feedback/:id", requireAuth, requireRole("admin", "archivist"), as
   }
 });
 
+router.patch("/feedback/:id/read", requireAuth, requireRole("admin", "archivist"), async (req, res) => {
+  const id = String(req.params.id);
+  try {
+    const { data, error } = await supabase.from('feedbacks').update({
+      read: true,
+      status: "read",
+    }).eq('id', id).select().single();
+    if (error) throw error;
+    res.json({ ...data, createdAt: data.created_at });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to mark as read" });
+  }
+});
+
+router.patch("/feedback/:id/resolve", requireAuth, requireRole("admin", "archivist"), async (req, res) => {
+  const id = String(req.params.id);
+  try {
+    const { data, error } = await supabase.from('feedbacks').update({
+      status: "resolved",
+    }).eq('id', id).select().single();
+    if (error) throw error;
+    res.json({ ...data, createdAt: data.created_at });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to resolve feedback" });
+  }
+});
+
 router.delete("/feedback/:id", requireAuth, requireRole("admin"), async (req, res) => {
   const id = String(req.params.id);
   try {

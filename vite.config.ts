@@ -9,7 +9,7 @@ import type { Plugin } from "vite";
 /* ─── Demo Auth Mock Plugin ─── */
 const DEMO_PASSWORD = "admin123";
 const DEMO_USERS = [
-  { id: "demo-admin", name: "Katto Administrator", email: "admin@hcdc.edu.ph", role: "admin", userCategory: "administrator", institution: "HCDC", status: "active" },
+  { id: "demo-admin", name: "System Administrator", email: "admin@hcdc.edu.ph", role: "admin", userCategory: "administrator", institution: "HCDC", status: "active" },
   { id: "demo-archivist", name: "Demo Archivist", email: "archivist@hcdc.edu.ph", role: "archivist", userCategory: "staff", institution: "HCDC", status: "active" },
   { id: "demo-student", name: "Demo Student", email: "student@hcdc.edu.ph", role: "student", userCategory: "student", institution: "HCDC", status: "active" },
 ];

@@ -192,7 +192,7 @@ export default function AdminDashboard() {
                <Card className="border border-border/50 rounded-[3rem] shadow-sm bg-white overflow-hidden">
                   <div className="p-8 border-b border-border/50 bg-[#0a1628] text-white">
                      <h2 className="text-sm font-black flex items-center gap-3 uppercase tracking-[0.2em]">
-                        <Megaphone className="w-4 h-4 text-red-600" /> Bulletin Engagement
+                        <Megaphone className="w-4 h-4 text-red-600" /> Announcements
                      </h2>
                   </div>
                   <div className="divide-y divide-border/30">

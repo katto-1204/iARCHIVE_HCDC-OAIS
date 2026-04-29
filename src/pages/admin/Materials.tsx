@@ -2343,13 +2343,23 @@ export default function AdminMaterials() {
                   let mainFileBase64 = "";
                   if (uploadForm.fileData instanceof Blob) {
                     try {
-                      // Compress toward 10% of original size before Base64 encoding.
                       const isVideoFile = String(uploadForm.fileData.type || "").startsWith("video/");
-                      const targetSizeMB = isVideoFile ? 1 : Math.max((uploadForm.fileData.size / (1024 * 1024)) * 0.1, 0.1);
+                      // Aggressive target: 0.5MB for documents, 2MB for videos
+                      const targetSizeMB = isVideoFile ? 2.0 : 0.5;
+                      
+                      if (isVideoFile) {
+                        toast({
+                          title: "Compressing Video",
+                          description: "Optimizing video for archival storage. This may take a moment...",
+                        });
+                      } else {
+                        setIngestStage("Optimizing document quality...");
+                      }
+
                       const compressed = await compressFile(uploadForm.fileData, targetSizeMB);
                       mainFileBase64 = await fileToBase64(compressed);
                     } catch (err) {
-                      console.error("Base64 conversion failed:", err);
+                      console.error("Compression/Base64 conversion failed:", err);
                     }
                   } else if (typeof apiData.fileUrl === 'string' && apiData.fileUrl.length > 1000) {
                     // If it's already a base64 string from a previous scan

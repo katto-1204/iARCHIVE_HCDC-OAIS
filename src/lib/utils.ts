@@ -23,10 +23,11 @@ export function generateId() {
  */
 export async function compressFile(file: File | Blob, targetSizeMB = 0.6): Promise<Blob | File> {
   const targetSizeBytes = targetSizeMB * 1024 * 1024;
-  if (file.size <= targetSizeBytes) return file;
-
-  // Only compress images for now
+  
+  // Always try to compress if it's an image or video
   if (file.type.startsWith("image/")) {
+    if (file.size <= targetSizeBytes * 0.5) return file; // Already small enough
+    
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = (event) => {
@@ -36,23 +37,30 @@ export async function compressFile(file: File | Blob, targetSizeMB = 0.6): Promi
           const canvas = document.createElement("canvas");
           let width = img.width;
           let height = img.height;
-          let quality = 0.7; // Start lower than 0.8
+          let quality = 0.6; // Start even lower for aggressive document compression
 
           const compress = () => {
-            // Downscale if too large
-            if (width > 2000 || height > 2000) {
-              width *= 0.7;
-              height *= 0.7;
+            // Downscale aggressively for large archival documents
+            if (width > 1600 || height > 1600) {
+              const scale = 1600 / Math.max(width, height);
+              width *= scale;
+              height *= scale;
             }
             
             canvas.width = width;
             canvas.height = height;
             const ctx = canvas.getContext("2d");
-            ctx?.drawImage(img, 0, 0, width, height);
+            // Improve text legibility in compressed documents by using slightly higher initial sharpening
+            if (ctx) {
+              ctx.imageSmoothingEnabled = true;
+              ctx.imageSmoothingQuality = 'high';
+              ctx.drawImage(img, 0, 0, width, height);
+            }
+            
             canvas.toBlob((blob) => {
               if (blob && blob.size > targetSizeBytes && (quality > 0.1 || width > 400)) {
-                if (quality > 0.2) quality -= 0.1;
-                else { width *= 0.7; height *= 0.7; }
+                if (quality > 0.15) quality -= 0.1;
+                else { width *= 0.8; height *= 0.8; }
                 compress();
               } else {
                 resolve(blob || file);
@@ -66,42 +74,55 @@ export async function compressFile(file: File | Blob, targetSizeMB = 0.6): Promi
     });
   }
   
-  // Basic browser-side video re-encode to reduce payload for Firestore uploads.
+  // Enhanced video compression logic
   if (file.type.startsWith("video/")) {
+    console.log(`Compressing video: ${formatBytes(file.size)} target: ${targetSizeMB}MB`);
     try {
-      const videoBlob = await new Promise<Blob>((resolve, reject) => {
+      const videoBlob = await new Promise<Blob>((resolve) => {
         const video = document.createElement("video");
         video.muted = true;
+        video.playsInline = true;
         video.preload = "auto";
         const objectUrl = URL.createObjectURL(file);
         video.src = objectUrl;
+        
         video.onloadedmetadata = () => {
+          // Calculate bitrate to fit target size
           const duration = Math.max(video.duration || 1, 1);
-          const targetBits = targetSizeBytes * 8;
-          const bitsPerSecond = Math.max(120000, Math.floor(targetBits / duration));
+          // Target slightly under the limit to be safe
+          const targetBits = targetSizeBytes * 0.9 * 8; 
+          const bitsPerSecond = Math.max(150000, Math.floor(targetBits / duration));
 
-          const maxW = 640;
+          // Downscale to mobile-friendly resolution for huge savings
+          const maxW = 480; 
           const scale = Math.min(1, maxW / (video.videoWidth || maxW));
           const width = Math.max(160, Math.floor((video.videoWidth || maxW) * scale));
           const height = Math.max(90, Math.floor((video.videoHeight || (maxW * 9) / 16) * scale));
+          
           const canvas = document.createElement("canvas");
           canvas.width = width;
           canvas.height = height;
           const ctx = canvas.getContext("2d");
-          if (!ctx || !canvas.captureStream) {
+          
+          if (!ctx || !('captureStream' in canvas)) {
             URL.revokeObjectURL(objectUrl);
             resolve(file);
             return;
           }
 
-          const stream = canvas.captureStream(15);
+          // @ts-ignore
+          const stream = canvas.captureStream(20); // 20 FPS for smoothness
           const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp8")
             ? "video/webm;codecs=vp8"
             : "video/webm";
+          
           const chunks: BlobPart[] = [];
-          const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: bitsPerSecond });
+          const recorder = new MediaRecorder(stream, { 
+            mimeType, 
+            videoBitsPerSecond: bitsPerSecond 
+          });
 
-          let raf = 0;
+          let raf: number;
           const draw = () => {
             if (!video.paused && !video.ended) {
               ctx.drawImage(video, 0, 0, width, height);
@@ -112,40 +133,42 @@ export async function compressFile(file: File | Blob, targetSizeMB = 0.6): Promi
           recorder.ondataavailable = (e) => {
             if (e.data && e.data.size > 0) chunks.push(e.data);
           };
+          
           recorder.onstop = () => {
             cancelAnimationFrame(raf);
             URL.revokeObjectURL(objectUrl);
             const out = new Blob(chunks, { type: mimeType });
+            console.log(`Video compression finished: ${formatBytes(out.size)}`);
             resolve(out.size > 0 ? out : file);
-          };
-          recorder.onerror = () => {
-            cancelAnimationFrame(raf);
-            URL.revokeObjectURL(objectUrl);
-            resolve(file);
           };
 
           video.onended = () => recorder.stop();
-          recorder.start(250);
+          recorder.start();
           video.play().then(() => {
             draw();
-          }).catch(() => {
+          }).catch((err) => {
+            console.error("Video play failed during compression:", err);
             recorder.stop();
           });
         };
+        
         video.onerror = () => {
           URL.revokeObjectURL(objectUrl);
           resolve(file);
         };
       });
-      return videoBlob.size <= targetSizeBytes ? videoBlob : videoBlob;
-    } catch {
+      return videoBlob;
+    } catch (err) {
+      console.error("Video compression failed:", err);
       return file;
     }
   }
 
-  // For PDFs or other files, we can't easily compress on frontend.
+  // Fallback for non-compressible formats (PDFs, etc.)
   const fileName = (file as File).name || 'Upload';
-  console.warn(`File ${fileName} is ${formatBytes(file.size)} and exceeds recommended API limits (4.5MB). Using chunked upload for Supabase.`);
+  if (file.size > targetSizeBytes) {
+    console.warn(`File ${fileName} (${formatBytes(file.size)}) exceeds recommended size. Documents like PDFs cannot be natively compressed in-browser; consider a smaller version.`);
+  }
   return file;
 }
 

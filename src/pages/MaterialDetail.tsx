@@ -41,7 +41,8 @@ function MediaViewer({
   pageImages, 
   title,
   isRestricted,
-  canAccess 
+  canAccess,
+  type
 }: { 
   materialId: string;
   pages?: number; 
@@ -49,6 +50,7 @@ function MediaViewer({
   title: string;
   isRestricted: boolean;
   canAccess: boolean;
+  type?: string;
 }) {
   const [currentPage, setCurrentPage] = React.useState(0);
   const [showFullscreen, setShowFullscreen] = React.useState(false);
@@ -285,16 +287,28 @@ function MediaViewer({
                   className="relative shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)] rounded-lg overflow-hidden transition-all duration-500"
                   onContextMenu={(e) => e.preventDefault()}
                 >
-                  <img
-                    src={visibleImages[currentPage]}
-                    alt={`${title} - Page ${currentPage + 1}`}
-                    draggable="false"
-                    onDragStart={(e) => e.preventDefault()}
-                    onContextMenu={(e) => e.preventDefault()}
-                    className={`max-h-[580px] w-auto object-contain transition-all duration-700 ${!canAccess && isRestricted && currentPage >= maxVisiblePages - 1 && loadedPagesCount > maxVisiblePages ? "blur-md opacity-70" : ""}`}
-                  />
-                  {/* Transparent overlay for protection */}
-                  <div className="absolute inset-0 z-10 bg-transparent" />
+                  {visibleImages[currentPage]?.startsWith("data:video/") || type === "Video" ? (
+                    <video
+                      src={visibleImages[currentPage]}
+                      controls
+                      autoPlay={false}
+                      className={`max-h-[580px] w-full object-contain transition-all duration-700 ${!canAccess && isRestricted && currentPage >= maxVisiblePages - 1 && loadedPagesCount > maxVisiblePages ? "blur-md opacity-70" : ""}`}
+                      onContextMenu={(e) => e.preventDefault()}
+                    />
+                  ) : (
+                    <>
+                      <img
+                        src={visibleImages[currentPage]}
+                        alt={`${title} - Page ${currentPage + 1}`}
+                        draggable="false"
+                        onDragStart={(e) => e.preventDefault()}
+                        onContextMenu={(e) => e.preventDefault()}
+                        className={`max-h-[580px] w-auto object-contain transition-all duration-700 ${!canAccess && isRestricted && currentPage >= maxVisiblePages - 1 && loadedPagesCount > maxVisiblePages ? "blur-md opacity-70" : ""}`}
+                      />
+                      {/* Transparent overlay for protection */}
+                      <div className="absolute inset-0 z-10 bg-transparent" />
+                    </>
+                  )}
                   
                   {/* Floating Page Label */}
                   <div className="absolute top-4 left-4 z-20 bg-[#0a1628]/80 backdrop-blur-md text-white text-[10px] px-3 py-1.5 rounded-lg font-bold border border-white/10">
@@ -404,15 +418,27 @@ function MediaViewer({
               className="relative flex items-center justify-center max-h-[85vh] max-w-full"
               onContextMenu={(e) => e.preventDefault()}
             >
-              <img 
-                src={visibleImages[currentPage]} 
-                alt={`${title} - Page ${currentPage + 1}`} 
-                className="max-h-[85vh] max-w-full object-contain"
-                draggable="false"
-                onDragStart={(e) => e.preventDefault()}
-                onContextMenu={(e) => e.preventDefault()}
-              />
-              <div className="absolute inset-0 z-10 bg-transparent" />
+              {visibleImages[currentPage]?.startsWith("data:video/") || type === "Video" ? (
+                <video 
+                  src={visibleImages[currentPage]} 
+                  controls 
+                  autoPlay={false}
+                  className="max-h-[85vh] max-w-full object-contain"
+                  onContextMenu={(e) => e.preventDefault()}
+                />
+              ) : (
+                <>
+                  <img 
+                    src={visibleImages[currentPage]} 
+                    alt={`${title} - Page ${currentPage + 1}`} 
+                    className="max-h-[85vh] max-w-full object-contain"
+                    draggable="false"
+                    onDragStart={(e) => e.preventDefault()}
+                    onContextMenu={(e) => e.preventDefault()}
+                  />
+                  <div className="absolute inset-0 z-10 bg-transparent" />
+                </>
+              )}
             </div>
             {currentPage > 0 && (
               <button onClick={() => goTo(currentPage - 1)} className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-20">
@@ -693,6 +719,7 @@ export default function MaterialDetail() {
                 title={material.title}
                 isRestricted={isRestricted}
                 canAccess={canAccessFull}
+                type={material.type}
               />
             ) : (
               /* Fallback: Only for standalone images or odd formats */

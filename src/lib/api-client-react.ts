@@ -609,6 +609,19 @@ export function useMarkFeedbackRead() {
   });
 }
 
+export function useResolveFeedback() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (args: MutationArgs) =>
+      apiRequest(`/api/feedback/${args.id}/resolve`, {
+        method: "PATCH",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/feedback"] });
+    },
+  });
+}
+
 export function useDeleteFeedback() {
   const queryClient = useQueryClient();
   return useMutation({

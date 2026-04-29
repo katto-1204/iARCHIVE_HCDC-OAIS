@@ -96,9 +96,37 @@ const tables = [
         file_url TEXT,
         thumbnail_url TEXT,
         status TEXT DEFAULT 'pending',
+        is_file_chunked BOOLEAN DEFAULT FALSE,
+        chunks_count INTEGER,
+        has_page_images BOOLEAN DEFAULT FALSE,
+        page_count INTEGER,
         created_by TEXT,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `
+  },
+  {
+    name: 'material_chunks',
+    sql: `
+      CREATE TABLE IF NOT EXISTS material_chunks (
+        id BIGSERIAL PRIMARY KEY,
+        material_id TEXT NOT NULL REFERENCES materials(id) ON DELETE CASCADE,
+        chunk_index INTEGER NOT NULL,
+        data TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `
+  },
+  {
+    name: 'material_pages',
+    sql: `
+      CREATE TABLE IF NOT EXISTS material_pages (
+        id BIGSERIAL PRIMARY KEY,
+        material_id TEXT NOT NULL REFERENCES materials(id) ON DELETE CASCADE,
+        page_index INTEGER NOT NULL,
+        data TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
       );
     `
   },
