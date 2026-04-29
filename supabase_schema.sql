@@ -136,7 +136,7 @@ CREATE TABLE IF NOT EXISTS access_requests (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 7. Audit Logs (New!)
+-- 7. Audit Logs
 CREATE TABLE IF NOT EXISTS audit_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   action TEXT NOT NULL, -- CREATE, UPDATE, DELETE
@@ -146,6 +146,17 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   user_name TEXT,
   details TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 8. Ingest Requests
+CREATE TABLE IF NOT EXISTS ingest_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  material_id TEXT,
+  material_title TEXT NOT NULL,
+  hierarchy_path TEXT,
+  requested_by TEXT,
+  requested_at TIMESTAMPTZ DEFAULT now(),
+  status TEXT DEFAULT 'pending'
 );
 
 -- Trigger Function

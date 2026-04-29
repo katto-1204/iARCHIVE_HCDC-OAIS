@@ -4,7 +4,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { ShieldCheck, Search, LogIn, Sparkles, Lock, Clock, AlertTriangle, XCircle, ShieldAlert, X, Ban, CheckCircle2, Scale, Eye, EyeOff, Database, FileText } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 
 const schema = z.object({
@@ -58,47 +57,58 @@ export default function Login() {
   const onSubmit = async (values: z.infer<typeof schema>) => {
     setIsPending(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: values.email,
-        password: values.password,
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: values.email, password: values.password }),
       });
 
-      if (error) {
-        if (error.message.includes("Invalid login credentials")) {
+      const data = await res.json();
+
+      if (!res.ok) {
+        const message = data.error || "Login failed";
+        if (res.status === 403 && /pending|not active/i.test(message)) {
+          setErrorModal({ type: "pending", title: "Account Pending Approval", message: "Your account is currently being reviewed by our administrators.", suggestion: "You will receive an email once your account has been activated." });
+        } else if (res.status === 403 && /rejected/i.test(message)) {
+          setErrorModal({ type: "rejected", title: "Account Restricted", message: "Your access to this portal has been restricted.", suggestion: "Please contact the HCDC Archival Administration team." });
+        } else if (res.status === 401 || res.status === 404) {
           setErrorModal({ type: "invalid", title: "Invalid Credentials", message: "The email or password you entered is incorrect.", suggestion: "Please try again or register for a new account." });
         } else {
-          setErrorModal({ type: "error", title: "Login Failed", message: error.message });
+          setErrorModal({ type: "error", title: "Login Failed", message });
         }
         return;
       }
 
+      // Store the token for API middleware
+      if (data.token) {
+        localStorage.setItem('iarchive_token', data.token);
+      }
+      if (data.supabaseToken) {
+        localStorage.setItem('supabase_token', data.supabaseToken);
+      }
       if (data.user) {
-        // Fetch profile to get role and status
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', data.user.id)
-          .single();
+        localStorage.setItem('iarchive_user', JSON.stringify(data.user));
+      }
 
-        if (profileError || !profile) {
-          // Fallback if no profile exists yet
-          toast({ title: "Welcome back!", description: `Signed in as ${data.user.email}` });
-          setLocation('/collections');
-          return;
-        }
+      // Determine redirect path based on role
+      const role = data.user?.role || 'student';
+      const redirectPath = role === 'admin' ? '/admin' : role === 'archivist' ? '/archivist' : role === 'student' ? '/student' : '/collections';
 
-        if (profile.status !== 'active') {
-          await supabase.auth.signOut();
-          if (profile.status === 'pending') {
-            setErrorModal({ type: "pending", title: "Account Pending Approval", message: "Your account is currently being reviewed by our administrators.", suggestion: "You will receive an email once your account has been activated." });
-          } else {
-            setErrorModal({ type: "rejected", title: "Account Restricted", message: "Your access to this portal has been restricted.", suggestion: "Please contact the HCDC Archival Administration team." });
-          }
-          return;
-        }
+      // Check if first login — show welcome modal
+      const lastLoginKey = `iarchive_lastlogin_${data.user?.id || values.email}`;
+      const hasLoggedInBefore = localStorage.getItem(lastLoginKey);
 
-        toast({ title: "Welcome back!", description: `Signed in as ${profile.name}` });
-        handleRedirect(profile.role);
+      if (!hasLoggedInBefore) {
+        localStorage.setItem(lastLoginKey, new Date().toISOString());
+        setWelcomeModal({
+          name: data.user?.name || values.email,
+          role: role,
+          redirectPath,
+        });
+      } else {
+        localStorage.setItem(lastLoginKey, new Date().toISOString());
+        toast({ title: "Welcome back!", description: `Signed in as ${data.user?.name || values.email}` });
+        handleRedirect(role);
       }
     } catch (err: any) {
       setErrorModal({ type: "error", title: "System Error", message: "An unexpected error occurred. Please try again later." });
@@ -106,6 +116,7 @@ export default function Login() {
       setIsPending(false);
     }
   };
+
 
 
   const modalConfig = {
