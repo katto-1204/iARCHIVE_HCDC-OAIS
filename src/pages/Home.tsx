@@ -109,50 +109,62 @@ export default function Home() {
 
   const featuredCollections = React.useMemo(() => {
     const cats = Array.isArray(categories) ? categories : [];
-    const mats = Array.isArray(materials) ? materials : [];
+    
+    // 1. Build a lookup map for children and direct counts
+    const childrenMap: Record<string, any[]> = {};
+    const directCounts: Record<string, number> = {};
+    
+    cats.forEach(c => {
+      directCounts[c.id] = c.materialCount || 0;
+      if (c.parentId) {
+        if (!childrenMap[c.parentId]) childrenMap[c.parentId] = [];
+        childrenMap[c.parentId].push(c);
+      }
+    });
 
-    // Only consider subfonds for featured collections on the landing page
-    // And exclude the generic "Departmental Sub-fonds" container
+    // 2. Recursive helper to get total count including all descendants
+    const getTotalCount = (catId: string): number => {
+      let total = directCounts[catId] || 0;
+      const children = childrenMap[catId] || [];
+      children.forEach(child => {
+        total += getTotalCount(child.id);
+      });
+      return total;
+    };
+
+    // 3. Process subfonds with aggregated counts
     const subfonds = cats.filter((c: any) => 
       c.level === "subfonds" && 
       c.name !== "Departmental Sub-fonds" &&
       c.name !== "HCDC Collections"
-    );
+    ).map(item => ({
+      ...item,
+      aggregatedCount: getTotalCount(item.id)
+    }));
 
-    // Calculate dynamic counts based on materials actually in the system
+    // 4. Sort by activity (material count) first, then by featured flag
     return subfonds
-      .map((item: any) => {
-        const count = mats.filter((m: any) => 
-          (m.hierarchyPath || "").toLowerCase().includes(item.name.toLowerCase()) ||
-          m.categoryId === item.id
-        ).length;
-        
-        return {
-          ...item,
-          dynamicCount: count
-        };
-      })
       .sort((a: any, b: any) => {
-        // Primary sort: isFeatured flag (true first)
+        // Primary sort: activity/popularity (material count)
+        const countDiff = (b.aggregatedCount || 0) - (a.aggregatedCount || 0);
+        if (countDiff !== 0) return countDiff;
+        
+        // Secondary sort: manually featured
         if (a.isFeatured && !b.isFeatured) return -1;
         if (!a.isFeatured && b.isFeatured) return 1;
-
-        // Secondary sort: material count (highest first)
-        const countDiff = (b.dynamicCount || 0) - (a.dynamicCount || 0);
-        if (countDiff !== 0) return countDiff;
         
         return 0;
       })
-      .slice(0, 3) // Show top 3 featured/active
+      .slice(0, 3)
       .map((item: any) => ({
         id: item.id,
         name: item.name,
         description: item.description || `Collection of archival records from ${item.name}`,
-        materialCount: item.dynamicCount,
+        materialCount: item.aggregatedCount,
         isFeatured: item.isFeatured,
         href: `/collections?subfonds=${encodeURIComponent(item.name)}`,
       }));
-  }, [categories, materials]);
+  }, [categories]);
 
   return (
     <div className="min-h-screen bg-white font-sans">
@@ -249,7 +261,7 @@ export default function Home() {
               ]
             ).map((cat: any, i) => (
               <Link key={cat.id} href={cat.href || `/collections?category=${cat.id}`}>
-                <div data-stagger className={`reveal-up bg-[#0a1628] rounded-2xl overflow-hidden group cursor-pointer hover:scale-[1.03] transition-all duration-500 shadow-lg hover:shadow-2xl h-[360px] flex flex-col border border-white/5`}>
+                <div data-stagger className={`reveal-up bg-[#0a1628] rounded-2xl overflow-hidden group cursor-pointer hover:scale-[1.03] transition-all duration-500 shadow-lg hover:shadow-2xl h-[420px] flex flex-col border border-white/5`}>
                   <div className="h-44 flex items-center justify-center relative overflow-hidden shrink-0 bg-gradient-to-br from-white/5 to-transparent">
                     <div className="absolute inset-0 opacity-5">
                       <div className="grid grid-cols-6 gap-2 p-4">
@@ -258,21 +270,21 @@ export default function Home() {
                     </div>
                     <FolderOpen className="w-16 h-16 text-[#4169E1] opacity-40 group-hover:scale-110 group-hover:opacity-80 transition-all duration-300" />
                   </div>
-                  <div className="p-6 flex flex-col flex-1">
-                    <div className="flex items-center gap-2 mb-2">
+                  <div className="p-8 flex flex-col flex-1">
+                    <div className="flex items-center gap-2 mb-3">
                       <p className="text-[10px] font-bold text-[#4169E1] uppercase tracking-[0.2em]">ARCHIVAL SUB-FONDS</p>
                       {cat.isFeatured && <Badge className="bg-[#4169E1]/20 text-[#4169E1] border-none text-[9px] h-4 px-1.5 py-0">FEATURED</Badge>}
                     </div>
-                    <h3 className="text-lg font-bold text-white mb-2 line-clamp-2 leading-tight min-h-[3rem]">{cat.name}</h3>
-                    <p className="text-sm text-white/50 line-clamp-2 mb-4 flex-1">{cat.description || `Digitized archival materials and institutional records from ${cat.name}.`}</p>
+                    <h3 className="text-xl font-bold text-white mb-3 line-clamp-2 leading-tight min-h-[3.5rem]">{cat.name}</h3>
+                    <p className="text-sm text-white/50 line-clamp-2 mb-6 flex-1">{cat.description || `Digitized archival materials and institutional records from ${cat.name}.`}</p>
                     
-                    <div className="flex items-center justify-between mt-auto pt-4 border-t border-white/5">
-                      <p className="text-[11px] text-white/70 font-bold bg-white/5 px-2 py-1 rounded flex items-center gap-1.5">
-                        <Layers className="w-3 h-3 text-[#4169E1]" />
+                    <div className="flex items-center justify-between mt-auto pt-6 border-t border-white/10">
+                      <p className="text-[11px] text-white/70 font-bold bg-white/5 px-2.5 py-1.5 rounded flex items-center gap-2">
+                        <Layers className="w-3.5 h-3.5 text-[#4169E1]" />
                         {cat.materialCount || 0} {Number(cat.materialCount) === 1 ? 'Material' : 'Materials'}
                       </p>
-                      <div className="flex items-center gap-1.5 text-[#4169E1] text-xs font-bold group-hover:translate-x-1 transition-transform">
-                        Explore <ArrowRight className="w-3.5 h-3.5" />
+                      <div className="flex items-center gap-2 text-[#4169E1] text-xs font-bold group-hover:translate-x-1.5 transition-all">
+                        Explore Collection <ArrowRight className="w-4 h-4" />
                       </div>
                     </div>
                   </div>
