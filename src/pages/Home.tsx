@@ -109,26 +109,50 @@ export default function Home() {
 
   const featuredCollections = React.useMemo(() => {
     const cats = Array.isArray(categories) ? categories : [];
-    // Only consider subfonds for featured collections on the landing page
-    const subfonds = cats.filter((c: any) => c.level === "subfonds");
+    const mats = Array.isArray(materials) ? materials : [];
 
+    // Only consider subfonds for featured collections on the landing page
+    // And exclude the generic "Departmental Sub-fonds" container
+    const subfonds = cats.filter((c: any) => 
+      c.level === "subfonds" && 
+      c.name !== "Departmental Sub-fonds" &&
+      c.name !== "HCDC Collections"
+    );
+
+    // Calculate dynamic counts based on materials actually in the system
+    // This is more reliable than the category.materialCount field
     return subfonds
+      .map((item: any) => {
+        const count = mats.filter((m: any) => 
+          (m.hierarchyPath || "").toLowerCase().includes(item.name.toLowerCase()) ||
+          m.categoryId === item.id
+        ).length;
+        
+        return {
+          ...item,
+          dynamicCount: count
+        };
+      })
       .sort((a: any, b: any) => {
-        // Primary sort: isFeatured flag
+        // Primary sort: material count (highest first)
+        const countDiff = (b.dynamicCount || 0) - (a.dynamicCount || 0);
+        if (countDiff !== 0) return countDiff;
+        
+        // Secondary sort: isFeatured flag
         if (a.isFeatured && !b.isFeatured) return -1;
         if (!a.isFeatured && b.isFeatured) return 1;
-        // Secondary sort: material count
-        return (b.materialCount || 0) - (a.materialCount || 0);
+        
+        return 0;
       })
-      .slice(0, 3) // Show top 3
+      .slice(0, 3) // Show top 3 most active/featured
       .map((item: any) => ({
         id: item.id,
         name: item.name,
-        description: item.description || `Collection of ${item.name}`,
-        materialCount: item.materialCount,
+        description: item.description || `Collection of archival records from ${item.name}`,
+        materialCount: item.dynamicCount,
         href: `/collections?subfonds=${encodeURIComponent(item.name)}`,
       }));
-  }, [categories]);
+  }, [categories, materials]);
 
   return (
     <div className="min-h-screen bg-white font-sans">
@@ -235,14 +259,15 @@ export default function Home() {
                     <FolderOpen className="w-16 h-16 text-white/30 group-hover:scale-110 transition-transform duration-300" />
                   </div>
                   <div className="p-5 flex flex-col flex-1">
-                    <p className="text-xs font-bold text-white/50 uppercase tracking-widest mb-1">COLLECTION SERIES</p>
+                    <p className="text-xs font-bold text-white/50 uppercase tracking-widest mb-1">ARCHIVAL SUB-FONDS</p>
                     <h3 className="text-lg font-bold text-white mb-2 line-clamp-2 leading-snug">{cat.name}</h3>
-                    <p className="text-sm text-white/60 line-clamp-2 flex-1">{cat.description || 'Archival materials from this institutional collection series.'}</p>
-                    {!!(cat as any).materialCount && (
-                      <p className="text-[11px] text-white/70 font-semibold mt-2">{(cat as any).materialCount} materials</p>
-                    )}
-                    <div className="mt-3 flex items-center gap-2 text-white/70 text-sm font-medium group-hover:text-white transition-colors">
-                      Browse Series <ArrowRight className="w-4 h-4" />
+                    <p className="text-sm text-white/60 line-clamp-2 flex-1">{cat.description || `Digitized archival materials and institutional records from ${cat.name}.`}</p>
+                    <p className="text-[11px] text-[#4169E1] font-bold mt-3 bg-white/10 w-fit px-2 py-0.5 rounded flex items-center gap-1.5">
+                      <Layers className="w-3 h-3" />
+                      {cat.materialCount || 0} {Number(cat.materialCount) === 1 ? 'Material' : 'Materials'}
+                    </p>
+                    <div className="mt-4 flex items-center gap-2 text-white/70 text-sm font-medium group-hover:text-white transition-colors">
+                      Explore Collection <ArrowRight className="w-4 h-4" />
                     </div>
                   </div>
                 </div>
