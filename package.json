@@ -79,6 +79,8 @@
     "zod": "^3.24.2"
   },
   "dependencies": {
+    "@supabase/auth-helpers-react": "^0.15.0",
+    "@supabase/supabase-js": "^2.105.1",
     "@types/bcryptjs": "^3.0.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",

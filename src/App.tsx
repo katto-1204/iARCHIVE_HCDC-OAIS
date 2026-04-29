@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useGetMe } from "@workspace/api-client-react";
 import { Database, Shield, Zap, Lock, Globe } from "lucide-react";
+import { supabase } from "./lib/supabase";
 
 import Home from "@/pages/Home";
 
@@ -231,6 +232,21 @@ function App() {
     // Check if splash was already shown in this session
     return !sessionStorage.getItem("iarchive_splash_shown");
   });
+
+  React.useEffect(() => {
+    // Listen for auth changes to sync token for the legacy fetch interceptor
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.access_token) {
+        localStorage.setItem("iarchive_token", session.access_token);
+      } else if (event === 'SIGNED_OUT') {
+        localStorage.removeItem("iarchive_token");
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const handleSplashFinish = () => {
     sessionStorage.setItem("iarchive_splash_shown", "true");

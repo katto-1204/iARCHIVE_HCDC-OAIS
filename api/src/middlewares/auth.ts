@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { extractToken, JwtPayload, verifyToken } from "../lib/auth.js";
-import { getFirebaseAuth } from "../lib/firebase.js";
-import { getFirestoreDb } from "../lib/firebase.js";
+import { supabase } from "../lib/supabase.js";
 
 declare global {
   namespace Express {
@@ -18,63 +17,48 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     return;
   }
   try {
-    const auth = getFirebaseAuth();
-    if (!auth) throw new Error("Firebase Auth Unavailable");
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
     
-    const decoded = await auth.verifyIdToken(token);
-    const db = getFirestoreDb();
-    
-    if (db) {
-      let profileSnap = await db.collection("users").doc(decoded.uid).get();
-      if (!profileSnap.exists && decoded.email) {
-        const normalizedEmail = String(decoded.email).trim().toLowerCase();
-        const byEmail = await db.collection("users").where("email", "==", normalizedEmail).limit(1).get();
-        if (!byEmail.empty) {
-          const existingData = byEmail.docs[0].data() as any;
-          await db.collection("users").doc(decoded.uid).set(
-            {
-              ...existingData,
-              id: decoded.uid,
-              email: existingData?.email || normalizedEmail,
-              updatedAt: new Date().toISOString(),
-            },
-            { merge: true }
-          );
-          profileSnap = await db.collection("users").doc(decoded.uid).get();
-        }
-      }
-      if (profileSnap.exists) {
-        const profile = profileSnap.data() as any;
-        const status = profile?.status || "active";
-        if (status !== "active") {
-          res.status(403).json({ error: "Account is not active. Please wait for approval." });
-          return;
-        }
-        req.user = {
-          userId: decoded.uid,
-          email: profile?.email || decoded.email || "",
-          role: profile?.role || "student",
-          name: profile?.name || decoded.name || decoded.email || "User",
-        };
-        next();
-        return;
-      }
+    if (authError || !authUser) {
+      throw new Error("Invalid Supabase token");
     }
 
-    req.user = {
-      userId: decoded.uid,
-      email: decoded.email || "",
-      role: (decoded.role as string) || "student",
-      name: (decoded.name as string) || decoded.email || "User",
-    };
+    // Fetch profile for role and status
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', authUser.id)
+      .single();
+
+    if (profileError || !profile) {
+      // If profile doesn't exist, we fallback to default student role but check status
+      req.user = {
+        userId: authUser.id,
+        email: authUser.email || "",
+        role: "student",
+        name: authUser.user_metadata?.full_name || authUser.email || "User",
+      };
+    } else {
+      if (profile.status !== "active") {
+        res.status(403).json({ error: "Account is not active. Please wait for approval." });
+        return;
+      }
+      req.user = {
+        userId: authUser.id,
+        email: profile.email || authUser.email || "",
+        role: profile.role || "student",
+        name: profile.name || authUser.user_metadata?.full_name || "User",
+      };
+    }
     next();
-  } catch {
+  } catch (err: any) {
+    // Legacy support for local JWTs if needed during migration
     try {
       const payload = verifyToken(token);
       req.user = payload;
       next();
     } catch {
-      res.status(401).json({ error: "Invalid token" });
+      res.status(401).json({ error: "Invalid session. Please login again." });
     }
   }
 }

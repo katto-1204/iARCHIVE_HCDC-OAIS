@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { ShieldCheck, Search, LogIn, Sparkles, Lock, Clock, AlertTriangle, XCircle, ShieldAlert, X, Ban, CheckCircle2, Scale, Eye, EyeOff, Database, FileText } from "lucide-react";
-import { useLogin } from "@workspace/api-client-react";
+import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 
 const schema = z.object({
@@ -37,7 +37,7 @@ const privacyContent = [
 export default function Login() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { mutate, isPending } = useLogin();
+  const [isPending, setIsPending] = React.useState(false);
   const [errorModal, setErrorModal] = React.useState<ErrorModalData | null>(null);
   const [welcomeModal, setWelcomeModal] = React.useState<{ name: string; role: string; redirectPath: string } | null>(null);
   const [termsAccepted, setTermsAccepted] = React.useState(false);
@@ -55,38 +55,56 @@ export default function Login() {
     else setLocation('/collections');
   };
 
-  const onSubmit = (data: z.infer<typeof schema>) => {
-    mutate({ data }, {
-      onSuccess: (res) => {
-        localStorage.setItem("iarchive_token", res.token);
-        
-        const path = res.user.role === 'admin' ? '/admin' 
-                   : res.user.role === 'archivist' ? '/archivist'
-                   : res.user.role === 'student' ? '/student' 
-                   : '/collections';
+  const onSubmit = async (values: z.infer<typeof schema>) => {
+    setIsPending(true);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: values.email,
+        password: values.password,
+      });
 
-        if (res.user.isFirstLogin) {
-          setWelcomeModal({ name: res.user.name, role: res.user.role, redirectPath: path });
+      if (error) {
+        if (error.message.includes("Invalid login credentials")) {
+          setErrorModal({ type: "invalid", title: "Invalid Credentials", message: "The email or password you entered is incorrect.", suggestion: "Please try again or register for a new account." });
         } else {
-          toast({ title: "Welcome back!", description: `Signed in as ${res.user.name}` });
-          handleRedirect(res.user.role);
+          setErrorModal({ type: "error", title: "Login Failed", message: error.message });
         }
-      },
-      onError: (err) => {
-        const message = (err as any)?.message || "";
-        if (message === "ACCOUNT_NOT_FOUND") {
-          setErrorModal({ type: "not_found", title: "Account Not Found", message: "We couldn't find an account with that email address.", suggestion: "Please check your email or register for a new account." });
-        } else if (message === "INVALID_PASSWORD") {
-          setErrorModal({ type: "invalid", title: "Invalid Password", message: "The password you entered is incorrect.", suggestion: "Please try again or reset your password if you've forgotten it." });
-        } else if (message === "PENDING_APPROVAL") {
-          setErrorModal({ type: "pending", title: "Account Pending Approval", message: "Your account is currently being reviewed by our administrators.", suggestion: "You will receive an email once your account has been activated." });
-        } else if (/rejected/i.test(message)) {
-          setErrorModal({ type: "rejected", title: "Account Rejected", message, suggestion: "Please contact the HCDC Archival Administration team for more information." });
-        } else {
-          setErrorModal({ type: "error", title: "Login Failed", message: message || "An unexpected error occurred. Please try again." });
-        }
+        return;
       }
-    });
+
+      if (data.user) {
+        // Fetch profile to get role and status
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profileError || !profile) {
+          // Fallback if no profile exists yet
+          toast({ title: "Welcome back!", description: `Signed in as ${data.user.email}` });
+          setLocation('/collections');
+          return;
+        }
+
+        if (profile.status !== 'active') {
+          await supabase.auth.signOut();
+          if (profile.status === 'pending') {
+            setErrorModal({ type: "pending", title: "Account Pending Approval", message: "Your account is currently being reviewed by our administrators.", suggestion: "You will receive an email once your account has been activated." });
+          } else {
+            setErrorModal({ type: "rejected", title: "Account Restricted", message: "Your access to this portal has been restricted.", suggestion: "Please contact the HCDC Archival Administration team." });
+          }
+          return;
+        }
+
+        toast({ title: "Welcome back!", description: `Signed in as ${profile.name}` });
+        handleRedirect(profile.role);
+      }
+    } catch (err: any) {
+      setErrorModal({ type: "error", title: "System Error", message: "An unexpected error occurred. Please try again later." });
+    } finally {
+      setIsPending(false);
+    }
   };
 
 

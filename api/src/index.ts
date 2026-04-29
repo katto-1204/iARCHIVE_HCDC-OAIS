@@ -16,8 +16,15 @@ try {
   console.warn("Could not load .env file, relying on environment variables");
 }
 
+import materialsRouter from "./routes/materials.js";
+import migrationRouter from "./routes/migration.js";
+import announcementsRouter from "./routes/announcements.js";
 import app from "./app.js";
 import { logger } from "./lib/logger.js";
+
+app.use("/api", materialsRouter);
+app.use("/api", migrationRouter);
+app.use("/api", announcementsRouter);
 
 const rawPort = process.env["PORT"] || "5000";
 const port = Number(rawPort);

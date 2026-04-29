@@ -51,6 +51,9 @@ router.get("/materials", async (req, res) => {
   const access = req.query.access as string;
   const categoryId = req.query.category as string;
   try {
+    // EMERGENCY BYPASS: Use JSON store while Firebase quota is exceeded
+    throw new Error("Firebase Quota Exceeded - Falling back to local store");
+    
     const db = getFirestoreDb();
     if (!db) throw new Error("Firebase unavailable");
     let query: FirebaseFirestore.Query = db.collection("materials");
@@ -643,6 +646,7 @@ router.post("/materials/:id/file/chunks", requireAuth, async (req, res) => {
 
 router.get("/stats", async (_req, res) => {
   try {
+    throw new Error("Bypassing Firebase");
     const db = getFirestoreDb();
     if (!db) throw new Error("Firebase unavailable");
     const matCount = await db.collection("materials").where("status", "==", "published").count().get();

@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Lock, UserPlus, ArrowLeft, ChevronRight, CheckCircle2, X, AlertTriangle, MailWarning, PartyPopper, Eye, EyeOff } from "lucide-react";
 import { Button, Input, Label, Badge } from "@/components/ui-components";
-import { useRegister } from "@workspace/api-client-react";
+import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 
 const registerSchema = z.object({
@@ -27,7 +27,7 @@ type ModalData = {
 export default function Register() {
   const [_, setLocation] = useLocation();
   const { toast } = useToast();
-  const { mutate: mutateRegister, isPending } = useRegister();
+  const [isPending, setIsPending] = React.useState(false);
   const [modal, setModal] = React.useState<ModalData | null>(null);
   const [showPassword, setShowPassword] = React.useState(false);
 
@@ -36,19 +36,24 @@ export default function Register() {
     defaultValues: { role: "student" },
   });
 
-  const onSubmit = (data: z.infer<typeof registerSchema>) => {
-    mutateRegister({ data }, {
-      onSuccess: () => {
-        setModal({
-          type: "success",
-          title: "Registration Submitted!",
-          message: "Your account application has been received successfully.",
-          suggestion: "An administrator will review your application and activate your account. You will be able to log in once approved."
-        });
-      },
-      onError: (err: any) => {
-        const message = err?.message || err?.data?.error || "Error registering";
-        if (/already registered|email already|already in use/i.test(message)) {
+  const onSubmit = async (values: z.infer<typeof registerSchema>) => {
+    setIsPending(true);
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: values.email,
+        password: values.password,
+        options: {
+          data: {
+            full_name: values.name,
+            role: values.role,
+            institution: values.institution,
+            purpose: values.purpose || '',
+          }
+        }
+      });
+
+      if (error) {
+        if (error.message.includes("already registered")) {
           setModal({
             type: "duplicate",
             title: "Email Already Registered",
@@ -59,12 +64,28 @@ export default function Register() {
           setModal({
             type: "error",
             title: "Registration Failed",
-            message: message,
-            suggestion: "Please check your information and try again. If the problem persists, contact the administrator."
+            message: error.message,
+            suggestion: "Please check your information and try again."
           });
         }
+        return;
       }
-    });
+
+      setModal({
+        type: "success",
+        title: "Registration Submitted!",
+        message: "Your account application has been received successfully.",
+        suggestion: "An administrator will review your application and activate your account. You will be able to log in once approved."
+      });
+    } catch (err: any) {
+      setModal({
+        type: "error",
+        title: "System Error",
+        message: "An unexpected error occurred. Please try again later.",
+      });
+    } finally {
+      setIsPending(false);
+    }
   };
 
   const modalConfig = {
