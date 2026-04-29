@@ -9,12 +9,13 @@ import {
   Search, Plus, Edit, ExternalLink, Layers, Settings2, Download,
   Upload, FolderTree, ShieldCheck, CheckCircle2, FileText, Folder,
   ZoomIn, ZoomOut, RotateCw, Maximize2, AlertTriangle, ChevronRight, X, Save, FolderOpen, ChevronLeft, Lock,
-  CheckCircle, Loader2, Image as ImageIcon, Video, FileDigit
+  CheckCircle, Loader2, Image as ImageIcon, Video, FileDigit, BarChart3
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArchivalTree } from "@/components/ArchivalTree";
 import { MetadataChecklist } from "@/components/MetadataChecklist";
 import { Barcode } from "@/components/Barcode";
+import { CompletionRing } from "@/components/CompletionRing";
 import {
   SAMPLE_HIERARCHY, COMBINED_FIELDS, LEVEL_LABELS,
   type ArchivalMaterial, type HierarchyNode, type HierarchyLevel
@@ -34,7 +35,7 @@ declare global {
 }
 import {
   computeCompletion, getCompletionColor, checkOAISCompliance,
-  getAllFieldValues, downloadMetadataExcel,
+  getAllFieldValues, downloadMetadataExcel, computeAreaBreakdown, getCompletionCategory
 } from "@/data/metadataUtils";
 import { useToast } from "@/hooks/use-toast";
 import { useGetMe, useGetCategories, useCreateCategory, useCreateMaterial, useUpdateMaterial, useDeleteMaterial, useGetMaterials as useGetMaterialsApi, useSubmitIngestRequest, useUploadMaterialPage, useUploadMaterialFileChunk } from "@workspace/api-client-react";
@@ -1545,37 +1546,34 @@ export default function AdminMaterials() {
                                     </Button>
                                   </div>
                                 )}
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="text-[10px] font-bold text-emerald-600 border-emerald-200 hover:bg-emerald-50 gap-1.5"
-                              <div className="flex items-center gap-3">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="text-[10px] font-bold text-emerald-600 border-emerald-200 hover:bg-emerald-50 gap-1.5"
-                                  onClick={() => {
-                                    const headers = ["Field", "Value"];
-                                    const rows = Object.entries(mat).filter(([k, v]) => typeof v === 'string' || typeof v === 'number').map(([k, v]) => [k, v]);
-                                    const csvContent = [headers.join(","), ...rows.map(r => `"${r[0]}","${String(r[1]).replace(/\n/g, ' ')}"`)].join("\n");
-                                    const blob = new Blob([csvContent], { type: 'text/csv' });
-                                    const url = URL.createObjectURL(blob);
-                                    const link = document.createElement("a");
-                                    link.href = url;
-                                    link.download = `metadata_${mat.uniqueId}.csv`;
-                                    link.click();
-                                  }}
-                                >
-                                  <Download className="w-3.5 h-3.5" /> Metadata CSV
-                                </Button>
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  className="text-[10px] font-bold text-indigo-600 border-indigo-200 hover:bg-indigo-50 gap-1.5" 
-                                  onClick={(e) => handleEditMaterial(mat, e)}
-                                >
-                                  <Edit className="w-3.5 h-3.5" /> Edit Record
-                                </Button>
+                                <div className="flex items-center gap-3">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-[10px] font-bold text-emerald-600 border-emerald-200 hover:bg-emerald-50 gap-1.5"
+                                    onClick={() => {
+                                      const headers = ["Field", "Value"];
+                                      const rows = Object.entries(mat).filter(([k, v]) => typeof v === 'string' || typeof v === 'number').map(([k, v]) => [k, v]);
+                                      const csvContent = [headers.join(","), ...rows.map(r => `"${r[0]}","${String(r[1]).replace(/\n/g, ' ')}"`)].join("\n");
+                                      const blob = new Blob([csvContent], { type: 'text/csv' });
+                                      const url = URL.createObjectURL(blob);
+                                      const link = document.createElement("a");
+                                      link.href = url;
+                                      link.download = `metadata_${mat.uniqueId}.csv`;
+                                      link.click();
+                                    }}
+                                  >
+                                    <Download className="w-3.5 h-3.5" /> Metadata CSV
+                                  </Button>
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="text-[10px] font-bold text-indigo-600 border-indigo-200 hover:bg-indigo-50 gap-1.5" 
+                                    onClick={(e) => handleEditMaterial(mat, e)}
+                                  >
+                                    <Edit className="w-3.5 h-3.5" /> Edit Record
+                                  </Button>
+                                </div>
                               </div>
                             </div>
 
@@ -2403,8 +2401,8 @@ export default function AdminMaterials() {
                   if (uploadForm.fileData instanceof Blob) {
                     try {
                       const isVideoFile = String(uploadForm.fileData.type || "").startsWith("video/");
-                      // Aggressive target: 0.5MB for documents, 2MB for videos
-                      const targetSizeMB = isVideoFile ? 2.0 : 0.5;
+                      // Aggressive compression: 0.3MB for docs, 1.0MB for videos
+                      const targetSizeMB = isVideoFile ? 1.0 : 0.3;
                       
                       if (isVideoFile) {
                         toast({
@@ -2498,7 +2496,8 @@ export default function AdminMaterials() {
                       for (let i = 0; i < pagesToUpload.length; i++) {
                         let pageData = pagesToUpload[i];
                         if (pageData instanceof Blob) {
-                          const compressedPage = await compressFile(pageData, 0.55);
+                          // Ultra-aggressive for page previews (150KB per page)
+                          const compressedPage = await compressFile(pageData, 0.15);
                           pageData = await fileToBase64(compressedPage);
                         }
                         try {

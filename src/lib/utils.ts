@@ -41,8 +41,10 @@ export async function compressFile(file: File | Blob, targetSizeMB = 0.6): Promi
 
           const compress = () => {
             // Downscale aggressively for large archival documents
-            if (width > 1600 || height > 1600) {
-              const scale = 1600 / Math.max(width, height);
+            // If target is small (< 0.5MB), use even smaller dimensions
+            const maxDimension = targetSizeMB < 0.5 ? 1200 : 1600;
+            if (width > maxDimension || height > maxDimension) {
+              const scale = maxDimension / Math.max(width, height);
               width *= scale;
               height *= scale;
             }
@@ -58,9 +60,10 @@ export async function compressFile(file: File | Blob, targetSizeMB = 0.6): Promi
             }
             
             canvas.toBlob((blob) => {
-              if (blob && blob.size > targetSizeBytes && (quality > 0.1 || width > 400)) {
+              if (blob && blob.size > targetSizeBytes && (quality > 0.05 || width > 300)) {
                 if (quality > 0.15) quality -= 0.1;
-                else { width *= 0.8; height *= 0.8; }
+                else if (quality > 0.05) quality -= 0.02;
+                else { width *= 0.7; height *= 0.7; }
                 compress();
               } else {
                 resolve(blob || file);

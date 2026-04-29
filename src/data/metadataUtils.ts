@@ -86,6 +86,7 @@ export function getCompletionCategory(pct: number): "complete" | "partial" | "in
   return "incomplete";
 }
 
+
 /** Color for completion percentage */
 export function getCompletionColor(pct: number): string {
   if (pct >= 100) return "#10B981"; // green
