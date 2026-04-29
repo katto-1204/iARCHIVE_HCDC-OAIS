@@ -245,6 +245,7 @@ function toCategoryResponse(cat: JsonCategory & { materialCount?: number }) {
     description: cat.description ?? null,
     categoryNo: Number(cat.category_no),
     level: getCategoryLevelName(cat.level),
+    isFeatured: !!(cat.is_featured ?? (cat as any).isFeatured ?? false),
     parentId: cat.parent_id ?? null,
     materialCount: Number(cat.materialCount ?? 0),
     createdAt: cat.created_at,

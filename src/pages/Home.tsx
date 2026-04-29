@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { PublicLayout } from "@/components/layout";
 import { PublicNavbar } from "@/components/PublicNavbar";
-import { Button } from "@/components/ui-components";
+import { Button, Badge } from "@/components/ui-components";
 import { useGetStats, useGetCategories, useGetMaterials, useGetMe } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -120,7 +120,6 @@ export default function Home() {
     );
 
     // Calculate dynamic counts based on materials actually in the system
-    // This is more reliable than the category.materialCount field
     return subfonds
       .map((item: any) => {
         const count = mats.filter((m: any) => 
@@ -134,22 +133,23 @@ export default function Home() {
         };
       })
       .sort((a: any, b: any) => {
-        // Primary sort: material count (highest first)
+        // Primary sort: isFeatured flag (true first)
+        if (a.isFeatured && !b.isFeatured) return -1;
+        if (!a.isFeatured && b.isFeatured) return 1;
+
+        // Secondary sort: material count (highest first)
         const countDiff = (b.dynamicCount || 0) - (a.dynamicCount || 0);
         if (countDiff !== 0) return countDiff;
         
-        // Secondary sort: isFeatured flag
-        if (a.isFeatured && !b.isFeatured) return -1;
-        if (!a.isFeatured && b.isFeatured) return 1;
-        
         return 0;
       })
-      .slice(0, 3) // Show top 3 most active/featured
+      .slice(0, 3) // Show top 3 featured/active
       .map((item: any) => ({
         id: item.id,
         name: item.name,
         description: item.description || `Collection of archival records from ${item.name}`,
         materialCount: item.dynamicCount,
+        isFeatured: item.isFeatured,
         href: `/collections?subfonds=${encodeURIComponent(item.name)}`,
       }));
   }, [categories, materials]);
@@ -249,25 +249,31 @@ export default function Home() {
               ]
             ).map((cat: any, i) => (
               <Link key={cat.id} href={cat.href || `/collections?category=${cat.id}`}>
-                <div data-stagger className={`reveal-up ${catColors[i % catColors.length]} rounded-2xl overflow-hidden group cursor-pointer hover:scale-[1.03] transition-all duration-500 shadow-lg hover:shadow-2xl h-[340px] flex flex-col`}>
-                  <div className="h-40 flex items-center justify-center relative overflow-hidden shrink-0">
-                    <div className="absolute inset-0 opacity-10">
+                <div data-stagger className={`reveal-up bg-[#0a1628] rounded-2xl overflow-hidden group cursor-pointer hover:scale-[1.03] transition-all duration-500 shadow-lg hover:shadow-2xl h-[360px] flex flex-col border border-white/5`}>
+                  <div className="h-44 flex items-center justify-center relative overflow-hidden shrink-0 bg-gradient-to-br from-white/5 to-transparent">
+                    <div className="absolute inset-0 opacity-5">
                       <div className="grid grid-cols-6 gap-2 p-4">
                         {[...Array(24)].map((_, j) => <div key={j} className="h-6 bg-white rounded" />)}
                       </div>
                     </div>
-                    <FolderOpen className="w-16 h-16 text-white/30 group-hover:scale-110 transition-transform duration-300" />
+                    <FolderOpen className="w-16 h-16 text-[#4169E1] opacity-40 group-hover:scale-110 group-hover:opacity-80 transition-all duration-300" />
                   </div>
-                  <div className="p-5 flex flex-col flex-1">
-                    <p className="text-xs font-bold text-white/50 uppercase tracking-widest mb-1">ARCHIVAL SUB-FONDS</p>
-                    <h3 className="text-lg font-bold text-white mb-2 line-clamp-2 leading-snug">{cat.name}</h3>
-                    <p className="text-sm text-white/60 line-clamp-2 flex-1">{cat.description || `Digitized archival materials and institutional records from ${cat.name}.`}</p>
-                    <p className="text-[11px] text-[#4169E1] font-bold mt-3 bg-white/10 w-fit px-2 py-0.5 rounded flex items-center gap-1.5">
-                      <Layers className="w-3 h-3" />
-                      {cat.materialCount || 0} {Number(cat.materialCount) === 1 ? 'Material' : 'Materials'}
-                    </p>
-                    <div className="mt-4 flex items-center gap-2 text-white/70 text-sm font-medium group-hover:text-white transition-colors">
-                      Explore Collection <ArrowRight className="w-4 h-4" />
+                  <div className="p-6 flex flex-col flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <p className="text-[10px] font-bold text-[#4169E1] uppercase tracking-[0.2em]">ARCHIVAL SUB-FONDS</p>
+                      {cat.isFeatured && <Badge className="bg-[#4169E1]/20 text-[#4169E1] border-none text-[9px] h-4 px-1.5 py-0">FEATURED</Badge>}
+                    </div>
+                    <h3 className="text-lg font-bold text-white mb-2 line-clamp-2 leading-tight min-h-[3rem]">{cat.name}</h3>
+                    <p className="text-sm text-white/50 line-clamp-2 mb-4 flex-1">{cat.description || `Digitized archival materials and institutional records from ${cat.name}.`}</p>
+                    
+                    <div className="flex items-center justify-between mt-auto pt-4 border-t border-white/5">
+                      <p className="text-[11px] text-white/70 font-bold bg-white/5 px-2 py-1 rounded flex items-center gap-1.5">
+                        <Layers className="w-3 h-3 text-[#4169E1]" />
+                        {cat.materialCount || 0} {Number(cat.materialCount) === 1 ? 'Material' : 'Materials'}
+                      </p>
+                      <div className="flex items-center gap-1.5 text-[#4169E1] text-xs font-bold group-hover:translate-x-1 transition-transform">
+                        Explore <ArrowRight className="w-3.5 h-3.5" />
+                      </div>
                     </div>
                   </div>
                 </div>

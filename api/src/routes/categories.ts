@@ -37,6 +37,7 @@ router.get("/categories", async (_req, res) => {
         level: normalizeCategoryLevel(data.level),
         parentId: data.parentId ?? data.parent_id ?? null,
         categoryNo: Number(data.categoryNo ?? data.category_no ?? 0),
+        isFeatured: !!(data.isFeatured ?? data.is_featured ?? false),
       };
     });
     if (!cats.length || !cats.some((c: any) => c.level === "fonds")) {
@@ -60,7 +61,7 @@ router.get("/categories", async (_req, res) => {
 
 router.post("/categories", requireAuth, requireRole("admin", "archivist"), async (req, res) => {
   const user = req.user!;
-  const { name, description, level, parentId } = req.body;
+  const { name, description, level, parentId, isFeatured } = req.body;
   if (!name || !level) { res.status(400).json({ error: "Name and level required" }); return; }
   try {
     const db = getFirestoreDb();
@@ -74,13 +75,14 @@ router.post("/categories", requireAuth, requireRole("admin", "archivist"), async
       name,
       description: description ?? null,
       level,
+      isFeatured: !!(isFeatured ?? false),
       parentId: parentId ?? null,
       categoryNo,
       createdAt: now,
       updatedAt: now,
     });
     await logAudit({ action: "CREATE_CATEGORY", entityType: "category", entityId: id, userId: user.userId, userName: user.name, details: `Created category: ${name}` });
-    res.status(201).json({ id, name, description: description ?? null, level, parentId: parentId ?? null, categoryNo, createdAt: now, updatedAt: now, materialCount: 0 });
+    res.status(201).json({ id, name, description: description ?? null, level, isFeatured: !!(isFeatured ?? false), parentId: parentId ?? null, categoryNo, createdAt: now, updatedAt: now, materialCount: 0 });
   } catch (err: any) {
     console.error("Firestore category create failed, using JSON store fallback:", err.message);
     const created = jsonStoreCreateCategory({ name, description, level, parentId });
@@ -91,7 +93,7 @@ router.post("/categories", requireAuth, requireRole("admin", "archivist"), async
 router.put("/categories/:id", requireAuth, requireRole("admin", "archivist"), async (req, res) => {
   const user = req.user!;
   const id = String(req.params.id);
-  const { name, description, level, parentId } = req.body;
+  const { name, description, level, parentId, isFeatured } = req.body;
   try {
     const db = getFirestoreDb();
     if (!db) throw new Error("Firebase unavailable");
@@ -103,6 +105,7 @@ router.put("/categories/:id", requireAuth, requireRole("admin", "archivist"), as
       description: description ?? cat.description ?? null,
       level: level ?? cat.level,
       parentId: parentId ?? cat.parentId ?? null,
+      isFeatured: isFeatured !== undefined ? !!isFeatured : (cat.isFeatured ?? cat.is_featured ?? false),
       updatedAt: new Date().toISOString(),
     });
     await logAudit({ action: "UPDATE_CATEGORY", entityType: "category", entityId: id, userId: user.userId, userName: user.name, details: `Updated category: ${name}` });
@@ -117,11 +120,10 @@ router.put("/categories/:id", requireAuth, requireRole("admin", "archivist"), as
   }
 });
 
-// PATCH alias — the frontend sends PATCH for category updates
 router.patch("/categories/:id", requireAuth, requireRole("admin", "archivist"), async (req, res) => {
   const user = req.user!;
   const id = String(req.params.id);
-  const { name, description, level, parentId } = req.body;
+  const { name, description, level, parentId, isFeatured } = req.body;
   try {
     const db = getFirestoreDb();
     if (!db) throw new Error("Firebase unavailable");
@@ -133,6 +135,7 @@ router.patch("/categories/:id", requireAuth, requireRole("admin", "archivist"), 
       description: description ?? cat.description ?? null,
       level: level ?? cat.level,
       parentId: parentId ?? cat.parentId ?? null,
+      isFeatured: isFeatured !== undefined ? !!isFeatured : (cat.isFeatured ?? cat.is_featured ?? false),
       updatedAt: new Date().toISOString(),
     });
     await logAudit({ action: "UPDATE_CATEGORY", entityType: "category", entityId: id, userId: user.userId, userName: user.name, details: `Updated category: ${name}` });
