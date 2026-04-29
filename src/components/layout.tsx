@@ -61,21 +61,28 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
 export function AdminLayout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const { data: user, isLoading } = useGetMe();
-  const { data: reqData } = useGetAccessRequests({ status: 'pending' });
+  const isAdminOrArchivist = user?.role === 'admin' || user?.role === 'archivist';
+
+  const { data: reqData } = useGetAccessRequests({ status: 'pending' }, { enabled: isAdminOrArchivist });
   const pendingReqCount = reqData?.requests?.length || 0;
-  const { data: pendingUsersData } = useGetUsers({ status: 'pending' });
+  
+  const { data: pendingUsersData } = useGetUsers({ status: 'pending' }, { enabled: isAdminOrArchivist });
   const pendingUsersCount = pendingUsersData?.users?.length || 0;
-  const { data: ingestData } = useGetIngestRequests({ status: 'pending' });
+  
+  const { data: ingestData } = useGetIngestRequests({ status: 'pending' }, { enabled: isAdminOrArchivist });
   const pendingIngestCount = ingestData?.length || 0;
-  const { data: auditData } = useGetAuditLogs({ limit: 5 });
+  
+  const { data: auditData } = useGetAuditLogs({ limit: 5 }, { enabled: isAdminOrArchivist });
   const auditBadge = auditData?.logs?.length ? "New" : undefined;
+  
+  const { data: feedbackData } = useGetFeedbacks({ enabled: isAdminOrArchivist });
+  const unreadFeedbackCount = feedbackData?.filter((f: any) => f.status === 'unread').length || 0;
+
   const { mutate: logoutMutate } = useLogout();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [badgeSeenCounts, setBadgeSeenCounts] = React.useState<Record<string, number>>({});
   const [badgeSeenFlags, setBadgeSeenFlags] = React.useState<Record<string, boolean>>({});
   
-  const { data: feedbackData } = useGetFeedbacks();
-  const unreadFeedbackCount = feedbackData?.filter((f: any) => f.status === 'unread').length || 0;
 
   const totalAttentionItems = pendingReqCount + pendingUsersCount + pendingIngestCount + unreadFeedbackCount;
 

@@ -183,7 +183,7 @@ export default function ArchivistDashboard() {
                       <div className="flex items-start justify-between gap-4 mb-3">
                         <h3 className="font-black text-[#0a1628] group-hover:text-blue-600 transition-colors">{ann.title}</h3>
                         <span className="text-[9px] font-black text-muted-foreground/60 whitespace-nowrap bg-muted px-2.5 py-1 rounded-full uppercase tracking-tighter">
-                          {format(new Date(ann.createdAt), "MMM d")}
+                          {ann.createdAt ? format(new Date(ann.createdAt), "MMM d") : "N/A"}
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">{ann.content}</p>

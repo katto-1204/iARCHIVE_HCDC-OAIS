@@ -802,7 +802,7 @@ export default function Collections() {
                                <Calendar className="w-3.5 h-3.5 text-[#4169E1]" />
                             </div>
                             <span className="text-[10px] font-mono font-black text-slate-400">
-                              {mat.date ? new Date(mat.date).getFullYear() : "N/A"}
+                              {mat.date ? (isNaN(new Date(mat.date).getTime()) ? "N/A" : new Date(mat.date).getFullYear()) : "N/A"}
                             </span>
                           </div>
                         </div>
@@ -915,7 +915,7 @@ export default function Collections() {
                         )}
                         <span className="flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
-                          {mat.date ? new Date(mat.date).getFullYear() : "—"}
+                          {mat.date ? (isNaN(new Date(mat.date).getTime()) ? "—" : new Date(mat.date).getFullYear()) : "—"}
                         </span>
                         <span className="flex items-center gap-1">
                           <Tag className="w-3 h-3" />

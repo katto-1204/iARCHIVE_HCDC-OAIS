@@ -142,7 +142,7 @@ export default function StudentDashboard() {
                       <div className="text-[10px] font-black text-[#960000] uppercase tracking-widest mb-1">{mat.categoryName || 'Archives'}</div>
                       <h3 className="font-bold text-[#0a1628] line-clamp-2 leading-tight group-hover:text-[#960000] transition-colors">{mat.title}</h3>
                       <div className="mt-3 flex items-center gap-3 text-muted-foreground text-[10px] font-medium">
-                        <span className="flex items-center gap-1"><History className="w-3 h-3" /> {format(new Date(mat.createdAt), "MMM d")}</span>
+                        <span className="flex items-center gap-1"><History className="w-3 h-3" /> {mat.createdAt ? format(new Date(mat.createdAt), "MMM d") : "N/A"}</span>
                         <span className="w-1 h-1 rounded-full bg-muted-foreground/30" />
                         <span className="flex items-center gap-1 uppercase tracking-tighter"><Shield className="w-3 h-3" /> {mat.accessTier}</span>
                       </div>
@@ -177,7 +177,7 @@ export default function StudentDashboard() {
                         <div>
                           <h3 className="text-lg font-black text-[#0a1628] leading-tight mb-2 group-hover:text-[#960000] transition-colors">{ann.title}</h3>
                           <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">
-                             <Clock className="w-3 h-3" /> {format(new Date(ann.createdAt), "MMMM d, yyyy")}
+                             <Clock className="w-3 h-3" /> {ann.createdAt ? format(new Date(ann.createdAt), "MMMM d, yyyy") : "N/A"}
                           </div>
                         </div>
                       </div>
@@ -249,7 +249,7 @@ export default function StudentDashboard() {
                   </DialogTitle>
                 </DialogHeader>
                 <div className="flex items-center gap-3 mt-6 text-white/40 text-[10px] font-black uppercase tracking-widest">
-                  <Clock className="w-3.5 h-3.5" /> {format(new Date(selectedAnnouncement.createdAt), "MMMM d, yyyy")}
+                  <Clock className="w-3.5 h-3.5" /> {selectedAnnouncement.createdAt ? format(new Date(selectedAnnouncement.createdAt), "MMMM d, yyyy") : "N/A"}
                 </div>
               </div>
 
@@ -296,7 +296,7 @@ export default function StudentDashboard() {
                            <div className="flex-1">
                              <div className="flex items-center justify-between mb-2">
                                <span className="text-xs font-black text-[#0a1628] uppercase">{c.userName}</span>
-                               <span className="text-[10px] text-muted-foreground font-medium">{format(new Date(c.createdAt), "MMM d, h:mm a")}</span>
+                               <span className="text-[10px] text-muted-foreground font-medium">{c.createdAt ? format(new Date(c.createdAt), "MMM d, h:mm a") : "N/A"}</span>
                              </div>
                              <p className="text-sm text-muted-foreground leading-relaxed">{c.content}</p>
                            </div>

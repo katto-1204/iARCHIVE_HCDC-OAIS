@@ -221,7 +221,7 @@ export default function AdminAnnouncements() {
                   
                   <div className="pt-4 border-t border-border/30 flex items-center justify-between text-[10px] text-muted-foreground/60 font-black uppercase tracking-[0.1em]">
                     <div className="flex items-center gap-2">
-                       <Clock className="w-3 h-3" /> {format(new Date(ann.createdAt), "MMM d, yyyy")}
+                       <Clock className="w-3 h-3" /> {ann.createdAt ? format(new Date(ann.createdAt), "MMM d, yyyy") : "N/A"}
                     </div>
                   </div>
                 </div>
@@ -248,7 +248,7 @@ export default function AdminAnnouncements() {
                 <DialogTitle className="text-3xl font-black leading-tight mb-2">
                   {engagementDetail.title}
                 </DialogTitle>
-                <p className="text-white/40 text-sm font-medium">Posted on {format(new Date(engagementDetail.createdAt), "MMMM d, yyyy at h:mm a")}</p>
+                <p className="text-white/40 text-sm font-medium">Posted on {engagementDetail.createdAt ? format(new Date(engagementDetail.createdAt), "MMMM d, yyyy at h:mm a") : "N/A"}</p>
               </div>
 
               <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -299,7 +299,7 @@ export default function AdminAnnouncements() {
                           <div key={c.id} className="relative pl-6 before:absolute before:left-0 before:top-2 before:bottom-0 before:w-1 before:bg-blue-500/20 before:rounded-full">
                              <div className="flex items-center justify-between mb-2">
                                 <span className="text-[11px] font-black text-[#0a1628] uppercase tracking-wider">{c.userName}</span>
-                                <span className="text-[10px] text-muted-foreground font-medium">{format(new Date(c.createdAt), "MMM d, h:mm a")}</span>
+                                <span className="text-[10px] text-muted-foreground font-medium">{c.createdAt ? format(new Date(c.createdAt), "MMM d, h:mm a") : "N/A"}</span>
                              </div>
                              <p className="text-sm text-muted-foreground leading-relaxed font-medium bg-white p-4 rounded-2xl border border-border/50 shadow-sm">{c.content}</p>
                           </div>

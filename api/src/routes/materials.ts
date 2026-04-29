@@ -214,7 +214,7 @@ router.post("/materials", requireAuth, async (req, res) => {
       newMat.page_count = body.pageCount || 0;
     }
 
-    const { data: newMatResult, error: mainError } = await supabase.from('materials').insert(newMat).select().single();
+    const { data: newMatResult, error: mainError } = await supabase.from('materials').upsert(newMat, { onConflict: 'material_id' }).select().single();
     if (mainError) {
       console.error("Supabase error during material insert:", mainError);
       throw mainError;

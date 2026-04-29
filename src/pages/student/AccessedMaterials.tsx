@@ -131,7 +131,7 @@ export default function AccessedMaterials() {
                   <div className="flex items-center justify-between text-xs text-muted-foreground font-bold">
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4" />
-                      {format(new Date(req.createdAt), "MMM d, yyyy")}
+                      {req.createdAt ? format(new Date(req.createdAt), "MMM d, yyyy") : "N/A"}
                     </div>
                     <div className="flex items-center gap-1.5 text-emerald-600">
                       <CheckCircle2 className="w-4 h-4" /> VERIFIED

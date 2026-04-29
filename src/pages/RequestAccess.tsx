@@ -178,7 +178,7 @@ export default function RequestAccess() {
                     <CalendarDays className="w-4 h-4 text-[#4169E1]" />
                     <div className="flex flex-col">
                       <span className="text-[10px] uppercase tracking-wider font-bold opacity-50">Date</span>
-                      <span className="text-xs font-medium">{material.date ? format(new Date(material.date), "MMM d, yyyy") : "Unknown"}</span>
+                      <span className="text-xs font-medium">{material.date ? (isNaN(new Date(material.date).getTime()) ? "Unknown" : format(new Date(material.date), "MMM d, yyyy")) : "Unknown"}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 text-white/50 bg-white/5 p-3 rounded-xl border border-white/5">

@@ -860,9 +860,17 @@ export default function AdminMaterials() {
     }
     // Date sorting
     if (dateSort === "newest") {
-      result.sort((a, b) => new Date(b.createdAt || b.ingestDate || 0).getTime() - new Date(a.createdAt || a.ingestDate || 0).getTime());
+      result.sort((a, b) => {
+        const ta = new Date(b.createdAt || b.ingestDate || 0).getTime();
+        const tb = new Date(a.createdAt || a.ingestDate || 0).getTime();
+        return (isNaN(ta) ? 0 : ta) - (isNaN(tb) ? 0 : tb);
+      });
     } else if (dateSort === "oldest") {
-      result.sort((a, b) => new Date(a.createdAt || a.ingestDate || 0).getTime() - new Date(b.createdAt || b.ingestDate || 0).getTime());
+      result.sort((a, b) => {
+        const ta = new Date(a.createdAt || a.ingestDate || 0).getTime();
+        const tb = new Date(b.createdAt || b.ingestDate || 0).getTime();
+        return (isNaN(ta) ? 0 : ta) - (isNaN(tb) ? 0 : tb);
+      });
     }
     return result;
   }, [materials, search, selectedHierarchyItem, approvalFilter, dateSort]);

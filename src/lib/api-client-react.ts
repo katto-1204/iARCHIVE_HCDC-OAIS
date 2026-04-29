@@ -317,16 +317,210 @@ export function useDeleteAnnouncement() {
         method: "DELETE",
       }),
     onSuccess: () => {
+      if (!token) {
+        return null;
+      }
+      return apiRequest<any>("/api/auth/me", undefined, { allowUnauthorized: true });
+    },
+    retry: false,
+    staleTime: 30_000,
+    enabled: !!token,
+  });
+}
+
+export function useUpdateProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: MutationArgs<any>) =>
+      apiRequest("/api/auth/profile", {
+        method: "PATCH",
+        body: JSON.stringify(args.data),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    },
+  });
+}
+
+export function useLogout() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      try {
+        await signOut(firebaseAuth);
+      } catch {
+        // Ignore client sign-out errors.
+      }
+      return apiRequest("/api/auth/logout", { method: "POST" }, { allowUnauthorized: true });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    },
+  });
+}
+
+export function useGetStats() {
+  return useQuery({
+    queryKey: ["/api/stats"],
+    queryFn: () => apiRequest<any>("/api/stats"),
+  });
+}
+
+export function useGetCategories() {
+  return useQuery({
+    queryKey: ["/api/categories"],
+    queryFn: () => apiRequest<any[]>("/api/categories"),
+  });
+}
+
+export function useCreateCategory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (args: MutationArgs<any>) =>
+      apiRequest("/api/categories", {
+        method: "POST",
+        body: JSON.stringify(args.data || {}),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
+    },
+  });
+}
+
+export function useUpdateCategory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (args: MutationArgs<any>) =>
+      apiRequest(`/api/categories/${args.id}`, {
+        method: "PATCH",
+        body: JSON.stringify(args.data || {}),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
+    },
+  });
+}
+
+export function useDeleteCategory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (args: MutationArgs) =>
+      apiRequest(`/api/categories/${args.id}`, {
+        method: "DELETE",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
+    },
+  });
+}
+
+export function useGetMaterials(params?: { limit?: number; access?: string; search?: string; category?: string; page?: number }) {
+  return useQuery({
+    queryKey: ["/api/materials", params || {}],
+    queryFn: () => {
+      const searchParams = new URLSearchParams();
+      if (params?.limit) searchParams.set("limit", String(params.limit));
+      if (params?.access) searchParams.set("access", params.access);
+      if (params?.search) searchParams.set("search", params.search);
+      if (params?.category) searchParams.set("category", params.category);
+      if (params?.page) searchParams.set("page", String(params.page));
+      const query = searchParams.toString();
+      return apiRequest<{ materials: any[]; total: number; totalPages: number }>(`/api/materials${query ? `?${query}` : ""}`);
+    },
+  });
+}
+
+export function useGetMaterial(id: string | undefined | null) {
+  return useQuery({
+    queryKey: ["/api/materials", id],
+    queryFn: async () => {
+      if (!id) return null;
+      return apiRequest<any>(`/api/materials/${id}`);
+    },
+    enabled: !!id,
+  });
+}
+
+export function useDeleteMaterial() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiRequest<any>(`/api/materials/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
+    },
+  });
+}
+
+export function useCreateMaterial() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (args: MutationArgs<any>) =>
+      apiRequest("/api/materials", {
+        method: "POST",
+        body: JSON.stringify(args.data || {}),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
+    },
+  });
+}
+
+export function useUpdateMaterial() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (args: MutationArgs<any>) =>
+      apiRequest(`/api/materials/${args.id}`, {
+        method: "PUT",
+        body: JSON.stringify(args.data || {}),
+      }),
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/materials"] });
+      queryClient.setQueryData(["/api/materials", data.id], data);
+    },
+  });
+}
+
+
+export function useGetAnnouncements() {
+  return useQuery({
+    queryKey: ["/api/announcements"],
+    queryFn: () => apiRequest<any[]>("/api/announcements"),
+  });
+}
+
+export function useCreateAnnouncement() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (args: MutationArgs<any>) =>
+      apiRequest("/api/announcements", {
+        method: "POST",
+        body: JSON.stringify(args.data || {}),
+      }),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/announcements"] });
     },
   });
 }
 
-export function useGetAccessRequests(params?: { status?: string }) {
+export function useDeleteAnnouncement() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (args: MutationArgs) =>
+      apiRequest(`/api/announcements/${args.id}`, {
+        method: "DELETE",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/announcements"] });
+    },
+  });
+}
+
+export function useGetAccessRequests(params?: { status?: string }, options?: { enabled?: boolean }) {
   const token = typeof window !== 'undefined' ? localStorage.getItem("iarchive_token") : null;
   return useQuery({
     queryKey: ["/api/requests", params || {}],
-    enabled: !!token,
     queryFn: async () => {
       const searchParams = new URLSearchParams();
       if (params?.status) searchParams.set("status", params.status);
@@ -334,6 +528,8 @@ export function useGetAccessRequests(params?: { status?: string }) {
       const data = await apiRequest<{ requests: any[] }>(`/api/requests${query ? `?${query}` : ""}`);
       return { ...data, total: data.requests?.length || 0 };
     },
+    ...options,
+    enabled: !!token && (options?.enabled !== false),
   });
 }
 
@@ -392,7 +588,7 @@ export function useDeleteAccessRequest() {
 // Ingest Requests Hooks
 // =====================
 
-export function useGetIngestRequests(params?: { status?: string }) {
+export function useGetIngestRequests(params?: { status?: string }, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["/api/ingest-requests", params || {}],
     queryFn: async () => {
@@ -402,6 +598,7 @@ export function useGetIngestRequests(params?: { status?: string }) {
       const data = await apiRequest<{ requests: any[] }>(`/api/ingest-requests${query ? `?${query}` : ""}`);
       return data.requests;
     },
+    ...options,
   });
 }
 
@@ -445,7 +642,7 @@ export function useRejectIngestRequest() {
   });
 }
 
-export function useGetUsers(params?: { status?: string }) {
+export function useGetUsers(params?: { status?: string }, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["/api/users", params || {}],
     queryFn: () => {
@@ -454,6 +651,7 @@ export function useGetUsers(params?: { status?: string }) {
       const query = searchParams.toString();
       return apiRequest<{ users: any[] }>(`/api/users${query ? `?${query}` : ""}`);
     },
+    ...options,
   });
 }
 
@@ -538,7 +736,7 @@ export function useCommentAnnouncement() {
   });
 }
 
-export function useGetAuditLogs(params?: { limit?: number }) {
+export function useGetAuditLogs(params?: { limit?: number }, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["/api/audit", params || {}],
     queryFn: async () => {
@@ -567,18 +765,24 @@ export function useGetAuditLogs(params?: { limit?: number }) {
 
       const merged = [...apiLogs, ...localLogs]
         .filter((log) => log && log.createdAt)
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        .sort((a, b) => {
+          const ta = new Date(a.createdAt).getTime();
+          const tb = new Date(b.createdAt).getTime();
+          return (isNaN(tb) ? 0 : tb) - (isNaN(ta) ? 0 : ta);
+        });
 
       const limited = params?.limit ? merged.slice(0, params.limit) : merged;
       return { logs: limited };
     },
+    ...options,
   });
 }
 
-export function useGetFeedbacks() {
+export function useGetFeedbacks(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["/api/feedback"],
     queryFn: () => apiRequest<any[]>("/api/feedback"),
+    ...options,
   });
 }
 
