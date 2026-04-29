@@ -4,7 +4,8 @@ import { Card, CardContent } from "@/components/ui-components";
 import { 
   BookOpen, Search, Shield, Megaphone, ArrowRight, Clock, Star, 
   ArrowUpRight, FileText, CheckCircle2, XCircle, Heart, MessageCircle, 
-  Send, Sparkles, LayoutGrid, Library, Layers, GraduationCap, History
+  Send, Sparkles, LayoutGrid, Library, Layers, GraduationCap, History,
+  X, User
 } from "lucide-react";
 import { 
   useGetAnnouncements, useGetMaterials, useGetAccessRequests, useGetMe,
@@ -12,8 +13,8 @@ import {
 } from "@workspace/api-client-react";
 import { format } from "date-fns";
 import * as React from "react";
-import { getMaterialById } from "@/data/storage";
 import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 export default function StudentDashboard() {
   const { data: user } = useGetMe();
@@ -25,10 +26,11 @@ export default function StudentDashboard() {
   const { mutate: likeAnnouncement } = useLikeAnnouncement();
   const { mutate: commentAnnouncement } = useCommentAnnouncement();
   
-  const [commentingId, setCommentingId] = React.useState<string | null>(null);
+  const [selectedAnnouncement, setSelectedAnnouncement] = React.useState<any>(null);
   const [commentText, setCommentText] = React.useState("");
 
-  const handleLike = (id: string) => {
+  const handleLike = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
     likeAnnouncement(id);
   };
 
@@ -36,7 +38,6 @@ export default function StudentDashboard() {
     if (!commentText.trim()) return;
     commentAnnouncement({ id, data: { content: commentText } });
     setCommentText("");
-    setCommentingId(null);
   };
 
   return (
@@ -166,85 +167,35 @@ export default function StudentDashboard() {
                 activeAnnouncements.map((ann: any) => {
                   const hasLiked = ann.likes?.includes(user?.userId);
                   return (
-                    <div key={ann.id} className="p-8 hover:bg-muted/5 transition-colors">
+                    <div 
+                      key={ann.id} 
+                      className="p-8 hover:bg-muted/5 transition-colors cursor-pointer group"
+                      onClick={() => setSelectedAnnouncement(ann)}
+                    >
                       <div className="flex items-start justify-between gap-4 mb-4">
                         <div>
-                          <h3 className="text-lg font-black text-[#0a1628] leading-tight mb-2">{ann.title}</h3>
+                          <h3 className="text-lg font-black text-[#0a1628] leading-tight mb-2 group-hover:text-[#960000] transition-colors">{ann.title}</h3>
                           <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">
                              <Clock className="w-3 h-3" /> {format(new Date(ann.createdAt), "MMMM d, yyyy")}
                           </div>
                         </div>
                       </div>
                       
-                      <p className="text-sm text-muted-foreground leading-relaxed mb-6 whitespace-pre-line">{ann.content}</p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-6 line-clamp-3">{ann.content}</p>
                       
-                      {/* Social Actions */}
-                      <div className="flex flex-col gap-4">
-                        <div className="flex items-center gap-4">
-                          <button 
-                            onClick={() => handleLike(ann.id)}
-                            className={cn(
-                              "flex items-center gap-2 text-xs font-black transition-all px-4 py-2 rounded-full",
-                              hasLiked 
-                                ? "bg-red-50 text-red-600 shadow-sm" 
-                                : "text-muted-foreground hover:bg-muted/50"
-                            )}
-                          >
-                            <Heart className={cn("w-4 h-4", hasLiked && "fill-current")} />
-                            {ann.likes?.length || 0}
-                          </button>
-                          
-                          <button 
-                            onClick={() => setCommentingId(commentingId === ann.id ? null : ann.id)}
-                            className={cn(
-                              "flex items-center gap-2 text-xs font-black transition-all px-4 py-2 rounded-full",
-                              commentingId === ann.id 
-                                ? "bg-blue-50 text-blue-600 shadow-sm" 
-                                : "text-muted-foreground hover:bg-muted/50"
-                            )}
-                          >
-                            <MessageCircle className="w-4 h-4" />
-                            {ann.comments?.length || 0}
-                          </button>
+                      <div className="flex items-center gap-4">
+                        <div className={cn(
+                          "flex items-center gap-1.5 text-[10px] font-black px-3 py-1 rounded-full",
+                          hasLiked ? "bg-red-50 text-red-600" : "bg-muted text-muted-foreground"
+                        )}>
+                          <Heart className={cn("w-3 h-3", hasLiked && "fill-current")} />
+                          {ann.likes?.length || 0}
                         </div>
-
-                        {/* Comments Display */}
-                        {ann.comments?.length > 0 && (
-                          <div className="space-y-3 pt-4 border-t border-border/30">
-                            {ann.comments.slice(-2).map((c: any) => (
-                              <div key={c.id} className="bg-muted/30 p-4 rounded-2xl">
-                                <div className="flex items-center justify-between mb-1">
-                                  <span className="text-[10px] font-black text-[#0a1628] uppercase">{c.userName}</span>
-                                  <span className="text-[9px] text-muted-foreground/60">{format(new Date(c.createdAt), "MMM d")}</span>
-                                </div>
-                                <p className="text-xs text-muted-foreground">{c.content}</p>
-                              </div>
-                            ))}
-                            {ann.comments.length > 2 && (
-                              <button className="text-[10px] font-black text-blue-600 uppercase tracking-widest pl-2">View {ann.comments.length - 2} more comments</button>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Comment Input */}
-                        {commentingId === ann.id && (
-                          <div className="flex gap-2 animate-in slide-in-from-top-2 duration-300">
-                            <input 
-                              type="text" 
-                              placeholder="Write a comment..." 
-                              className="flex-1 bg-muted/50 border border-border/50 rounded-xl px-4 py-2 text-xs outline-none focus:ring-2 focus:ring-blue-500/20"
-                              value={commentText}
-                              onChange={(e) => setCommentText(e.target.value)}
-                              onKeyDown={(e) => e.key === 'Enter' && handleComment(ann.id)}
-                            />
-                            <button 
-                              onClick={() => handleComment(ann.id)}
-                              className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-600/20 hover:scale-105 active:scale-95 transition-all"
-                            >
-                              <Send className="w-4 h-4" />
-                            </button>
-                          </div>
-                        )}
+                        <div className="flex items-center gap-1.5 text-[10px] font-black bg-muted text-muted-foreground px-3 py-1 rounded-full">
+                          <MessageCircle className="w-3 h-3" />
+                          {ann.comments?.length || 0}
+                        </div>
+                        <span className="ml-auto text-[9px] font-black text-[#960000] uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Read More →</span>
                       </div>
                     </div>
                   );
@@ -277,6 +228,113 @@ export default function StudentDashboard() {
           </Card>
         </div>
       </div>
+
+      {/* ─── Announcement Detail Modal ─── */}
+      <Dialog open={!!selectedAnnouncement} onOpenChange={(open) => !open && setSelectedAnnouncement(null)}>
+        <DialogContent className="max-w-2xl bg-white rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl">
+          {selectedAnnouncement && (
+            <div className="flex flex-col h-[80vh] max-h-[800px]">
+              <div className="p-10 bg-[#0a1628] text-white relative">
+                <div className="absolute top-8 right-8 cursor-pointer hover:rotate-90 transition-transform" onClick={() => setSelectedAnnouncement(null)}>
+                   <X className="w-6 h-6 text-white/40 hover:text-white" />
+                </div>
+                <div className="inline-flex items-center gap-2 bg-red-600 rounded-full px-3 py-1 text-[9px] font-black mb-4 uppercase tracking-[0.2em]">
+                  <Megaphone className="w-3 h-3" /> Official Update
+                </div>
+                <DialogHeader>
+                  <DialogTitle className="text-3xl font-black text-white leading-tight pr-10">
+                    {selectedAnnouncement.title}
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="flex items-center gap-3 mt-6 text-white/40 text-[10px] font-black uppercase tracking-widest">
+                  <Clock className="w-3.5 h-3.5" /> {format(new Date(selectedAnnouncement.createdAt), "MMMM d, yyyy")}
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar">
+                <div className="text-muted-foreground leading-relaxed text-lg font-medium whitespace-pre-line border-l-4 border-[#960000]/20 pl-8">
+                  {selectedAnnouncement.content}
+                </div>
+
+                {/* Engagement Actions */}
+                <div className="flex items-center gap-6 pt-6 border-t border-border/30">
+                  <button 
+                    onClick={(e) => handleLike(e, selectedAnnouncement.id)}
+                    className={cn(
+                      "flex items-center gap-3 px-6 py-3 rounded-2xl font-black text-sm transition-all active:scale-95",
+                      selectedAnnouncement.likes?.includes(user?.userId)
+                        ? "bg-red-50 text-red-600 shadow-sm"
+                        : "bg-muted text-muted-foreground hover:bg-muted/80"
+                    )}
+                  >
+                    <Heart className={cn("w-5 h-5", selectedAnnouncement.likes?.includes(user?.userId) && "fill-current")} />
+                    {selectedAnnouncement.likes?.length || 0} Likes
+                  </button>
+                  <div className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-muted text-muted-foreground font-black text-sm">
+                    <MessageCircle className="w-5 h-5" />
+                    {selectedAnnouncement.comments?.length || 0} Comments
+                  </div>
+                </div>
+
+                {/* Comments List */}
+                <div className="space-y-6">
+                  <h4 className="text-xs font-black text-[#0a1628] uppercase tracking-[0.3em] flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4 text-red-500" /> Discussion
+                  </h4>
+                  
+                  <div className="space-y-4">
+                    {selectedAnnouncement.comments?.length > 0 ? (
+                      selectedAnnouncement.comments.map((c: any) => (
+                        <div key={c.id} className="bg-muted/30 p-6 rounded-[2rem] border border-border/20 flex gap-4">
+                           <div className="w-10 h-10 rounded-full bg-white border border-border/50 flex items-center justify-center shrink-0">
+                             <User className="w-5 h-5 text-muted-foreground" />
+                           </div>
+                           <div className="flex-1">
+                             <div className="flex items-center justify-between mb-2">
+                               <span className="text-xs font-black text-[#0a1628] uppercase">{c.userName}</span>
+                               <span className="text-[10px] text-muted-foreground font-medium">{format(new Date(c.createdAt), "MMM d, h:mm a")}</span>
+                             </div>
+                             <p className="text-sm text-muted-foreground leading-relaxed">{c.content}</p>
+                           </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-12 bg-muted/20 rounded-[2rem] border border-dashed border-border/50">
+                        <MessageCircle className="w-8 h-8 text-muted-foreground/20 mx-auto mb-3" />
+                        <p className="text-xs font-black text-muted-foreground uppercase tracking-widest">No comments yet. Be the first!</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Comment Input Sticky Footer */}
+              <div className="p-8 bg-white border-t border-border/30">
+                <div className="flex gap-3">
+                  <input 
+                    type="text" 
+                    placeholder="Write a public comment..." 
+                    className="flex-1 bg-muted/50 border border-border/50 rounded-2xl px-6 py-4 text-sm outline-none focus:ring-4 focus:ring-red-500/10 focus:border-red-500/20 transition-all"
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleComment(selectedAnnouncement.id)}
+                  />
+                  <button 
+                    onClick={() => handleComment(selectedAnnouncement.id)}
+                    className="bg-[#0a1628] text-white px-8 rounded-2xl flex items-center justify-center shadow-xl shadow-black/10 hover:bg-[#960000] active:scale-95 transition-all"
+                  >
+                    <Send className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
+}
+
+function MessageSquare({ className }: { className?: string }) {
+  return <MessageCircle className={className} />;
 }

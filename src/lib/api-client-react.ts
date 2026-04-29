@@ -378,6 +378,16 @@ export function useRejectRequest() {
   });
 }
 
+export function useDeleteAccessRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiRequest(`/api/requests/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/requests"] });
+    },
+  });
+}
+
 // =====================
 // Ingest Requests Hooks
 // =====================

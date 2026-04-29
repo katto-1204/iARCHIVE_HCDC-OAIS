@@ -163,6 +163,29 @@ router.post("/requests/:id/reject", requireAuth, requireRole("admin", "archivist
   }
 });
 
+router.delete("/requests/:id", requireAuth, async (req, res) => {
+  const user = req.user!;
+  const id = String(req.params.id);
+  try {
+    const db = getFirestoreDb();
+    if (!db) throw new Error("Firebase unavailable");
+    const snap = await db.collection("accessRequests").doc(id).get();
+    if (!snap.exists) { res.status(404).json({ error: "Request not found" }); return; }
+    
+    const reqData = snap.data() as any;
+    if (reqData.userId !== user.userId && user.role !== "admin" && user.role !== "archivist") {
+      res.status(403).json({ error: "Unauthorized" });
+      return;
+    }
+    
+    await db.collection("accessRequests").doc(id).delete();
+    await logAudit({ action: "DELETE_REQUEST", entityType: "request", entityId: id, userId: user.userId, userName: user.name, details: `Deleted access request` });
+    res.json({ message: "Request deleted" });
+  } catch {
+    res.status(500).json({ error: "Failed to delete request" });
+  }
+});
+
 // ============================
 // Ingest Requests Endpoints
 // ============================
