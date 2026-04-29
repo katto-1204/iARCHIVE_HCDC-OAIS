@@ -92,6 +92,13 @@ CREATE TABLE IF NOT EXISTS materials (
   file_url TEXT,
   thumbnail_url TEXT,
   status TEXT DEFAULT 'published',
+  
+  -- Chunking & Page Preview Metadata
+  is_file_chunked BOOLEAN DEFAULT FALSE,
+  chunks_count INTEGER DEFAULT 0,
+  has_page_images BOOLEAN DEFAULT FALSE,
+  page_count INTEGER DEFAULT 0,
+  
   created_by UUID REFERENCES profiles(id),
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
@@ -139,8 +146,8 @@ CREATE TABLE IF NOT EXISTS access_requests (
 -- 7. Audit Logs
 CREATE TABLE IF NOT EXISTS audit_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  action TEXT NOT NULL, -- CREATE, UPDATE, DELETE
-  entity_type TEXT NOT NULL, -- material, category, user
+  action TEXT NOT NULL,
+  entity_type TEXT NOT NULL,
   entity_id TEXT,
   user_id UUID REFERENCES profiles(id),
   user_name TEXT,
@@ -177,7 +184,6 @@ CREATE TABLE IF NOT EXISTS material_pages (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
-
 -- Trigger Function
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
@@ -196,27 +202,40 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Trigger (Drop and Recreate)
+-- Trigger
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- Policies (Safe recreation)
+-- RLS Policies
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE materials ENABLE ROW LEVEL SECURITY;
+ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE announcements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE feedbacks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE access_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ingest_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE material_chunks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE material_pages ENABLE ROW LEVEL SECURITY;
 
-DO $$ 
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Public profiles are viewable by everyone') THEN
-        CREATE POLICY "Public profiles are viewable by everyone" ON profiles FOR SELECT USING (true);
-    END IF;
-    
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can update their own profiles') THEN
-        CREATE POLICY "Users can update their own profiles" ON profiles FOR UPDATE USING (auth.uid() = id);
-    END IF;
+-- Clean up existing policies
+DROP POLICY IF EXISTS "Public profiles are viewable by everyone" ON profiles;
+DROP POLICY IF EXISTS "Users can update their own profiles" ON profiles;
+DROP POLICY IF EXISTS "Public materials are viewable by everyone" ON materials;
+DROP POLICY IF EXISTS "Admins can do everything on materials" ON materials;
+DROP POLICY IF EXISTS "Public categories viewable by everyone" ON categories;
+DROP POLICY IF EXISTS "Admins can manage categories" ON categories;
 
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Public materials are viewable by everyone') THEN
-        CREATE POLICY "Public materials are viewable by everyone" ON materials FOR SELECT USING (access = 'public' OR status = 'published');
-    END IF;
-END $$;
+-- Recreate policies
+CREATE POLICY "Public profiles are viewable by everyone" ON profiles FOR SELECT USING (true);
+CREATE POLICY "Users can update their own profiles" ON profiles FOR UPDATE USING (auth.uid() = id);
+CREATE POLICY "Public materials are viewable by everyone" ON materials FOR SELECT USING (access = 'public' OR status = 'published');
+CREATE POLICY "Admins can do everything on materials" ON materials FOR ALL USING (
+  EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin')
+);
+CREATE POLICY "Public categories viewable by everyone" ON categories FOR SELECT USING (true);
+CREATE POLICY "Admins can manage categories" ON categories FOR ALL USING (
+  EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin')
+);

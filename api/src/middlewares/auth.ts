@@ -53,14 +53,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     }
     next();
   } catch (err: any) {
-    // Legacy support for local JWTs if needed during migration
-    try {
-      const payload = verifyToken(token);
-      req.user = payload;
-      next();
-    } catch {
-      res.status(401).json({ error: "Invalid session. Please login again." });
-    }
+    res.status(401).json({ error: "Invalid session. Please login again." });
   }
 }
 

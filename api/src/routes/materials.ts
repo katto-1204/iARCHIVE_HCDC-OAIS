@@ -223,13 +223,18 @@ router.post("/materials", requireAuth, async (req, res) => {
   } catch (err: any) {
     console.error("Supabase material creation failed!");
     console.error("Error Message:", err.message);
-    console.error("Error Detail:", err.details || "None");
-    console.error("Error Hint:", err.hint || "None");
-    console.error("Full Error:", JSON.stringify(err));
+    
+    let userHint = "Please check your Supabase server logs.";
+    if (err.message?.includes("column") && err.message?.includes("does not exist")) {
+      userHint = "DATABASE SCHEMA MISMATCH: Your Supabase 'materials' table is missing new columns (is_file_chunked, chunks_count, etc.). Please run the updated supabase_schema.sql in your Supabase SQL Editor.";
+    } else if (err.message?.includes("relation") && err.message?.includes("does not exist")) {
+      userHint = "DATABASE TABLE MISSING: One of the required tables (materials, material_chunks, material_pages) was not found. Please run the full supabase_schema.sql script.";
+    }
+
     res.status(500).json({ 
       error: "Failed to create material in Supabase", 
       details: err.message,
-      hint: err.hint 
+      hint: userHint
     });
   }
 });

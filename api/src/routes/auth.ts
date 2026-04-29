@@ -5,41 +5,10 @@ import { supabase } from "../lib/supabase.js";
 
 const router = Router();
 
-const DEMO_PASSWORD = "admin123";
-const DEMO_USERS = [
-  { id: "demo-admin", name: "Demo Admin", email: "admin@hcdc.edu.ph", role: "admin", userCategory: "administrator", institution: "HCDC", status: "active" },
-  { id: "demo-archivist", name: "Demo Archivist", email: "archivist@hcdc.edu.ph", role: "archivist", userCategory: "staff", institution: "HCDC", status: "active" },
-  { id: "demo-student", name: "Demo Student", email: "student@hcdc.edu.ph", role: "student", userCategory: "student", institution: "HCDC", status: "active" },
-] as const;
-
-function getDemoUserByEmail(email?: string) {
-  return DEMO_USERS.find((u) => u.email.toLowerCase() === (email || "").toLowerCase());
-}
-
 router.post("/auth/login", async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
     res.status(400).json({ error: "Email and password required" });
-    return;
-  }
-
-  // Demo accounts should always work
-  const demoUser = getDemoUserByEmail(email);
-  if (demoUser && password === DEMO_PASSWORD) {
-    const token = signToken({ userId: demoUser.id, email: demoUser.email, role: demoUser.role, name: demoUser.name });
-    res.json({
-      token,
-      user: {
-        id: demoUser.id,
-        name: demoUser.name,
-        email: demoUser.email,
-        role: demoUser.role,
-        userCategory: demoUser.userCategory,
-        institution: demoUser.institution,
-        status: demoUser.status,
-        createdAt: new Date().toISOString(),
-      },
-    });
     return;
   }
 
@@ -144,22 +113,6 @@ router.post("/auth/register", async (req, res) => {
 
 router.get("/auth/me", requireAuth, async (req, res) => {
   try {
-    // Check demo users first
-    const demoUser = DEMO_USERS.find((u) => u.id === req.user!.userId || u.email === req.user!.email);
-    if (demoUser) {
-      res.json({
-        id: demoUser.id,
-        name: demoUser.name,
-        email: demoUser.email,
-        role: demoUser.role,
-        userCategory: demoUser.userCategory,
-        institution: demoUser.institution,
-        status: demoUser.status,
-        createdAt: new Date().toISOString(),
-      });
-      return;
-    }
-
     const { data: profile, error } = await supabase.from('profiles').select('*').eq('id', req.user!.userId).single();
     
     if (error || !profile) {
