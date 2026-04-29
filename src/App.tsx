@@ -234,18 +234,8 @@ function App() {
   });
 
   React.useEffect(() => {
-    // Listen for auth changes to sync token for the legacy fetch interceptor
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.access_token) {
-        localStorage.setItem("iarchive_token", session.access_token);
-      } else if (event === 'SIGNED_OUT') {
-        localStorage.removeItem("iarchive_token");
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    // Note: We no longer sync supabase.auth.onAuthStateChange to iarchive_token 
+    // because we use a custom JWT from the backend for role-based access.
   }, []);
 
   const handleSplashFinish = () => {

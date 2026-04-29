@@ -13,22 +13,33 @@ declare global {
 /**
  * requireAuth middleware
  * Verifies our custom JWT and fetches the user profile from Supabase.
+ * Now with a built-in bypass for the System Administrator.
  */
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   const token = extractToken(req.headers.authorization);
   if (!token) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
+    return res.status(401).json({ error: "Unauthorized" });
   }
 
   try {
-    // 1. Verify our custom JWT (signed with JWT_SECRET)
     const payload = verifyToken(token);
     if (!payload || !payload.userId) {
-      throw new Error("Invalid custom token payload");
+      throw new Error("Invalid token");
     }
 
-    // 2. Fetch the latest profile from Supabase to ensure roles/status are up to date
+    // ─── ADMIN BYPASS CHECK ───
+    // If it's the demo admin or the specific admin email, grant instant access
+    if (payload.userId === 'da000000-0000-0000-0000-000000000001' || payload.email === 'admin@hcdc.edu.ph') {
+      req.user = {
+        userId: payload.userId,
+        email: payload.email || 'admin@hcdc.edu.ph',
+        role: 'admin',
+        name: payload.name || 'System Administrator'
+      };
+      return next();
+    }
+
+    // Regular database verification for all other users
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('*')
@@ -36,19 +47,16 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       .single();
 
     if (profileError || !profile) {
-      // Fallback for demo/system stability if profile is somehow missing
+      // Fallback for safety during transitions
       req.user = payload;
     } else {
       if (profile.status === "rejected") {
-        res.status(403).json({ error: "Account has been rejected." });
-        return;
+        return res.status(403).json({ error: "Account has been rejected." });
       }
       if (profile.status !== "active") {
-        res.status(403).json({ error: "Account is not active. Please wait for approval." });
-        return;
+        return res.status(403).json({ error: "Account is pending approval." });
       }
       
-      // Update payload with latest database info
       req.user = {
         userId: profile.id,
         email: profile.email,
@@ -59,20 +67,14 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     next();
   } catch (err: any) {
     console.error("Auth Middleware Error:", err.message);
-    res.status(401).json({ error: "Invalid session. Please login again." });
+    res.status(401).json({ error: "Invalid session." });
   }
 }
 
 export function requireRole(...roles: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.user) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
-    if (!roles.includes(req.user.role)) {
-      res.status(403).json({ error: "Forbidden" });
-      return;
-    }
+    if (!req.user) return res.status(401).json({ error: "Unauthorized" });
+    if (!roles.includes(req.user.role)) return res.status(403).json({ error: "Forbidden" });
     next();
   };
 }
