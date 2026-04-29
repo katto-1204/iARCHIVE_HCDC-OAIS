@@ -1,29 +1,21 @@
 import { Router } from "express";
-import { requireAuth } from "../middlewares/auth.js";
+import { requireAuth, requireRole } from "../middlewares/auth.js";
 import { generateId, generateMaterialId } from "../lib/id.js";
 import { logAudit } from "./audit.js";
 import { supabase } from "../lib/supabase.js";
-import { getFirestoreDb } from "../lib/firebase.js";
-import {
-  jsonStoreCreateMaterial,
-  jsonStoreDeleteMaterial,
-  jsonStoreGetMaterial,
-  jsonStoreUpdateMaterial,
-} from "../lib/jsonStore.js";
 
 const router = Router();
 
 function formatMaterial(m: any, categoryName?: string) {
   const catName = categoryName || m.categoryName || "Uncategorized";
   const idValue = m.id || m.materialId || m.material_id;
-  // Pass through ALL fields from Firestore — the frontend depends on many of them
   return {
     ...m,
     id: idValue,
     uniqueId: m.materialId || m.material_id || m.id,
     materialId: m.materialId || m.material_id || m.id,
     categoryName: catName,
-    hierarchyPath: m.hierarchyPath || `HCDC > ${catName} > General Series`,
+    hierarchyPath: m.hierarchy_path || `HCDC > ${catName} > General Series`,
   };
 }
 
@@ -31,16 +23,6 @@ function materialSeqFromMaterialId(materialId: string) {
   const match = materialId.match(/^(\d{2})iA(\d{2})(\d{7})$/);
   if (!match) return null;
   return Number(match[3]);
-}
-
-function matchesSearch(m: any, search: string) {
-  const s = search.trim().toLowerCase();
-  if (!s) return true;
-  const haystack = [m.title, m.materialId, m.creator, m.description]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-  return haystack.includes(s);
 }
 
 router.get("/materials", async (req, res) => {
@@ -99,44 +81,41 @@ router.post("/materials", requireAuth, async (req, res) => {
   const body = req.body;
   if (!body.title) { res.status(400).json({ error: "Title required" }); return; }
   try {
-    const db = getFirestoreDb();
-    if (!db) throw new Error("Firebase unavailable");
-    const catsSnap = await db.collection("categories").get();
-    const cats = catsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    // Get category info from Supabase
+    const { data: categories } = await supabase.from('categories').select('*');
+    const cats = categories || [];
     const cat = body.categoryId ? cats.find((c: any) => c.id === body.categoryId) : cats[0];
-    const catNo = cat ? Number((cat as any).categoryNo) : 1;
-    const materialsQuery = (cat as any)?.id
-      ? db.collection("materials").where("categoryId", "==", (cat as any).id)
-      : db.collection("materials");
-    const materialsSnap = await materialsQuery.get();
-    const maxSeq = materialsSnap.docs.reduce((acc, doc) => {
-      const seq = materialSeqFromMaterialId((doc.data() as any).materialId || "");
+    const catNo = cat ? Number((cat as any).category_no) : 1;
+
+    // Sequence calculation from Supabase
+    const { data: existingMats } = await supabase
+      .from('materials')
+      .select('material_id')
+      .eq('category_id', body.categoryId);
+    
+    const maxSeq = (existingMats || []).reduce((acc, m) => {
+      const seq = materialSeqFromMaterialId(m.material_id || "");
       return seq == null ? acc : Math.max(acc, seq);
     }, 0);
+    
     const seqNo = maxSeq + 1;
     const materialId = body.materialId || body.uniqueId || generateMaterialId(catNo, seqNo);
     const id = body.id || materialId || generateId();
-    const sipId = body.sipId || `SIP-${new Date().getFullYear()}${String(new Date().getMonth()+1).padStart(2,"0")}${String(new Date().getDate()).padStart(2,"0")}-${String(seqNo).padStart(3,"0")}`;
-    const aipId = body.aipId || `AIP-${new Date().getFullYear()}-${String(seqNo).padStart(4,"0")}`;
-    const ingestDate = body.ingestDate || new Date().toISOString().split("T")[0];
-    const cataloger = user.name;
-    const dateCataloged = ingestDate;
-    const preferredCitation = body.preferredCitation || `${body.creator || "Author"}. (${body.date?.split("-")[0] || new Date().getFullYear()}). ${body.title}. Holy Cross of Davao College. [${materialId}]`;
-
     const now = new Date().toISOString();
+
     const newMat = {
       id,
-      materialId,
+      material_id: materialId,
       title: body.title,
-      altTitle: body.altTitle ?? null,
+      alt_title: body.altTitle ?? null,
       creator: body.creator ?? null,
       description: body.description ?? null,
       date: body.date ?? null,
-      categoryId: body.categoryId ?? (cat as any)?.id ?? null,
-      hierarchyPath: body.hierarchyPath || `HCDC > ${(cat as any)?.name || "Uncategorized"} > General Series`,
+      category_id: body.categoryId ?? (cat as any)?.id ?? null,
+      hierarchy_path: body.hierarchyPath || `HCDC > ${(cat as any)?.name || "Uncategorized"} > General Series`,
       access: body.access || "public",
       format: body.format ?? null,
-      fileSize: body.fileSize ?? null,
+      file_size: body.fileSize ?? null,
       pages: body.pages ?? null,
       language: body.language ?? null,
       publisher: body.publisher ?? null,
@@ -148,177 +127,151 @@ router.post("/materials", requireAuth, async (req, res) => {
       relation: body.relation ?? null,
       coverage: body.coverage ?? null,
       identifier: body.identifier ?? null,
-      archivalHistory: body.archivalHistory ?? null,
-      custodialHistory: body.custodialHistory ?? null,
-      accessionNo: body.accessionNo ?? null,
-      scopeContent: body.scopeContent ?? null,
+      archival_history: body.archivalHistory ?? null,
+      custodial_history: body.custodialHistory ?? null,
+      accession_no: body.accessionNo ?? null,
+      scope_content: body.scopeContent ?? null,
       arrangement: body.arrangement ?? null,
       sha256: body.sha256 ?? null,
       scanner: body.scanner ?? null,
       resolution: body.resolution ?? null,
-      physicalLocation: body.physicalLocation ?? null,
-      physicalCondition: body.physicalCondition ?? null,
-      bindingType: body.bindingType ?? null,
-      levelOfDescription: body.levelOfDescription ?? "Item",
-      extentAndMedium: body.extentAndMedium ?? null,
-      referenceCode: body.referenceCode ?? materialId,
-      dateOfDescription: body.dateOfDescription ?? null,
-      accessConditions: body.accessConditions ?? null,
-      reproductionConditions: body.reproductionConditions ?? null,
-      termsOfUse: body.termsOfUse ?? null,
+      physical_location: body.physicalLocation ?? null,
+      physical_condition: body.physicalCondition ?? null,
+      binding_type: body.bindingType ?? null,
+      level_of_description: body.levelOfDescription ?? "Item",
+      extent_and_medium: body.extentAndMedium ?? null,
+      reference_code: body.referenceCode ?? materialId,
+      date_of_description: body.dateOfDescription ?? null,
+      access_conditions: body.accessConditions ?? null,
+      reproduction_conditions: body.reproductionConditions ?? null,
+      terms_of_use: body.termsOfUse ?? null,
       notes: body.notes ?? null,
-      pointsOfAccess: body.pointsOfAccess ?? null,
-      locationOfOriginals: body.locationOfOriginals ?? null,
-      locationOfCopies: body.locationOfCopies ?? null,
-      relatedUnits: body.relatedUnits ?? null,
-      publicationNote: body.publicationNote ?? null,
-      findingAids: body.findingAids ?? null,
-      rulesOrConventions: body.rulesOrConventions ?? null,
-      archivistNote: body.archivistNote ?? null,
-      cataloger,
-      dateCataloged,
-      sipId,
-      aipId,
-      ingestDate,
-      ingestBy: user.name,
-      fixityStatus: body.sha256 ? "verified" : null,
-      preferredCitation,
-      fileUrl: body.fileUrl ?? null,
-      thumbnailUrl: body.thumbnailUrl ?? null,
+      points_of_access: body.pointsOfAccess ?? null,
+      location_of_originals: body.locationOfOriginals ?? null,
+      location_of_copies: body.locationOfCopies ?? null,
+      related_units: body.relatedUnits ?? null,
+      publication_note: body.publicationNote ?? null,
+      finding_aids: body.findingAids ?? null,
+      rules_or_conventions: body.rulesOrConventions ?? null,
+      archivist_note: body.archivistNote ?? null,
+      cataloger: user.name,
+      date_cataloged: now.split("T")[0],
+      sip_id: body.sipId || null,
+      aip_id: body.aipId || null,
+      ingest_date: now.split("T")[0],
+      ingest_by: user.name,
+      fixity_status: body.sha256 ? "verified" : null,
+      preferred_citation: body.preferredCitation || null,
+      file_url: body.fileUrl ?? null,
+      thumbnail_url: body.thumbnailUrl ?? null,
       status: user.role === "admin" ? "published" : "pending",
-      createdBy: user.userId,
-      createdAt: now,
-      updatedAt: now,
+      created_by: user.userId,
+      created_at: now,
+      updated_at: now,
     };
-    
-    if (newMat.fileUrl && newMat.fileUrl.length > 800000) {
-      console.log(`File is large (${newMat.fileUrl.length} chars). Chunking into materialChunks...`);
-      const fullStr = newMat.fileUrl;
+
+    // Handle large files with chunking in Supabase
+    if (newMat.file_url && newMat.file_url.length > 800000) {
+      console.log(`File is large (${newMat.file_url.length} chars). Chunking into material_chunks...`);
+      const fullStr = newMat.file_url;
       const chunkSize = 800000;
       let chunksCount = 0;
       for (let i = 0; i < fullStr.length; i += chunkSize) {
-        await db.collection("materialChunks").doc(`${id}_chunk_${chunksCount}`).set({
-          materialId: id,
-          chunkIndex: chunksCount,
+        await supabase.from('material_chunks').insert({
+          material_id: id,
+          chunk_index: chunksCount,
           data: fullStr.substring(i, i + chunkSize)
         });
         chunksCount++;
       }
-      (newMat as any).isFileChunked = true;
-      (newMat as any).chunksCount = chunksCount;
-      newMat.fileUrl = "CHUNKED";
+      newMat.file_url = "CHUNKED";
+      (newMat as any).is_file_chunked = true;
+      (newMat as any).chunks_count = chunksCount;
     }
 
-    // Handle pageImages separately to avoid Firestore document size limit (1MB)
+    // Handle page images in Supabase
     if (body.pageImages && Array.isArray(body.pageImages)) {
-      console.log(`Saving ${body.pageImages.length} page images to materialPages...`);
+      console.log(`Saving ${body.pageImages.length} page images to material_pages...`);
       for (let i = 0; i < body.pageImages.length; i++) {
-        await db.collection("materialPages").doc(`${id}_page_${i}`).set({
-          materialId: id,
-          pageIndex: i,
+        await supabase.from('material_pages').insert({
+          material_id: id,
+          page_index: i,
           data: body.pageImages[i]
         });
       }
-      (newMat as any).hasPageImages = true;
-      (newMat as any).pageCount = body.pageImages.length;
-      // DO NOT save the full pageImages array in the main document
-      delete (newMat as any).pageImages;
+      (newMat as any).has_page_images = true;
+      (newMat as any).page_count = body.pageImages.length;
     }
 
-    await db.collection("materials").doc(id).set(newMat);
+    const { error } = await supabase.from('materials').insert(newMat);
+    if (error) throw error;
+
     await logAudit({ action: "CREATE_MATERIAL", entityType: "material", entityId: id, userId: user.userId, userName: user.name, details: `Created material: ${body.title}` });
     const catName = body.categoryId ? (cats.find((c: any) => c.id === body.categoryId) as any)?.name : undefined;
     res.status(201).json(formatMaterial(newMat, catName));
-  } catch {
-    const created = jsonStoreCreateMaterial({ data: body, user: { userId: user.userId, name: user.name } });
-    res.status(201).json(created);
+  } catch (err: any) {
+    console.error("Supabase material creation failed:", err.message);
+    res.status(500).json({ error: "Failed to create material in Supabase" });
   }
 });
 
 router.get("/materials/:id", async (req, res) => {
   const id = String(req.params.id);
   try {
-    const db = getFirestoreDb();
-    if (!db) throw new Error("Firebase unavailable");
-    let docSnap = await db.collection("materials").doc(id).get();
-    if (!docSnap.exists) {
-      const byMaterialId = await db.collection("materials").where("materialId", "==", id).limit(1).get();
-      if (!byMaterialId.empty) {
-        docSnap = byMaterialId.docs[0];
-      }
-    }
-    if (!docSnap || !docSnap.exists) { 
-      const mat = jsonStoreGetMaterial(id);
-      if (mat) {
-        res.json(mat);
-        return;
-      }
-      res.status(404).json({ error: "Material not found" }); 
-      return; 
-    }
-    const m = { id: docSnap.id, ...docSnap.data() } as any;
-    
-    // Reconstruct chunked Base64 fileUrl if necessary
-    if (m.isFileChunked) {
-      let reconstructed = "";
-      for (let i = 0; i < (m.chunksCount || 0); i++) {
-        const cSnap = await db.collection("materialChunks").doc(`${m.id}_chunk_${i}`).get();
-        if (cSnap.exists) reconstructed += cSnap.data()?.data || "";
-      }
-      m.fileUrl = reconstructed;
+    const { data: m, error } = await supabase
+      .from('materials')
+      .select('*')
+      .or(`id.eq.${id},material_id.eq.${id}`)
+      .single();
+
+    if (error || !m) {
+      res.status(404).json({ error: "Material not found" });
+      return;
     }
 
-    // Always try to fetch page images if it's a single material view
-    try {
-      const pagesSnap = await db.collection("materialPages")
-        .where("materialId", "==", m.id)
-        .get();
+    // Reconstruct chunked fileUrl
+    if ((m as any).is_file_chunked) {
+      const { data: chunks, error: chunksErr } = await supabase
+        .from('material_chunks')
+        .select('data')
+        .eq('material_id', m.id)
+        .order('chunk_index', { ascending: true });
       
-      if (!pagesSnap.empty) {
-        m.pageImages = pagesSnap.docs
-          .map(d => d.data())
-          .sort((a: any, b: any) => (a.pageIndex || 0) - (b.pageIndex || 0))
-          .map(d => d.data);
-        m.hasPageImages = true;
+      if (!chunksErr && chunks) {
+        m.file_url = chunks.map(c => c.data).join("");
       }
-    } catch (e) {
-      console.error("Failed to fetch pages for material:", m.id, e);
     }
 
-    const catsSnap = await db.collection("categories").get();
-    const catMap = Object.fromEntries(catsSnap.docs.map((c) => [c.id, (c.data() as any).name]));
-    let related: any[] = [];
-    if (m.categoryId) {
-      // Avoid composite index requirement by sorting in memory if needed
-      const relatedSnap = await db.collection("materials").where("categoryId", "==", m.categoryId).limit(10).get();
-      related = relatedSnap.docs
-        .map((d) => ({ id: d.id, ...d.data() }))
-        .filter((r) => r.id !== m.id)
-        .sort((a: any, b: any) => {
-          const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const db2 = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-          return db2 - da;
-        })
-        .slice(0, 4);
+    // Fetch page images
+    const { data: pages } = await supabase
+      .from('material_pages')
+      .select('data, page_index')
+      .eq('material_id', m.id)
+      .order('page_index', { ascending: true });
+    
+    if (pages && pages.length > 0) {
+      (m as any).pageImages = pages.map(p => p.data);
+      (m as any).hasPageImages = true;
     }
+
+    const { data: cat } = await supabase.from('categories').select('name').eq('id', m.category_id).single();
+    
+    // Fetch related materials
+    const { data: related } = await supabase
+      .from('materials')
+      .select('*')
+      .eq('category_id', m.category_id)
+      .neq('id', m.id)
+      .limit(4)
+      .order('created_at', { ascending: false });
+
     res.json({
-      ...formatMaterial(m, m.categoryId ? catMap[m.categoryId] : undefined),
-      contributor: m.contributor, subject: m.subject, type: m.type, source: m.source,
-      rights: m.rights, relation: m.relation, coverage: m.coverage, identifier: m.identifier,
-      archivalHistory: m.archivalHistory, custodialHistory: m.custodialHistory,
-      accessionNo: m.accessionNo, scopeContent: m.scopeContent, arrangement: m.arrangement,
-      sha256: m.sha256, scanner: m.scanner, resolution: m.resolution,
-      physicalLocation: m.physicalLocation, physicalCondition: m.physicalCondition,
-      bindingType: m.bindingType, cataloger: m.cataloger, dateCataloged: m.dateCataloged,
-      sipId: m.sipId, aipId: m.aipId, ingestDate: m.ingestDate, ingestBy: m.ingestBy,
-      fixityStatus: m.fixityStatus, preferredCitation: m.preferredCitation, fileUrl: m.fileUrl,
-      relatedItems: related.map((r) => formatMaterial(r, r.categoryId ? catMap[r.categoryId] : undefined)),
+      ...formatMaterial(m, cat?.name),
+      relatedItems: (related || []).map(r => formatMaterial(r, cat?.name))
     });
-  } catch (err) {
-    console.error("Material retrieval failed:", err);
-    const mat = jsonStoreGetMaterial(id);
-    if (!mat) { res.status(404).json({ error: "Material not found" }); return; }
-    res.json(mat);
+  } catch (err: any) {
+    console.error("Supabase material retrieval failed:", err.message);
+    res.status(500).json({ error: "Failed to retrieve material" });
   }
 });
 
@@ -327,184 +280,64 @@ router.put("/materials/:id", requireAuth, async (req, res) => {
   const id = String(req.params.id);
   const body = req.body;
   try {
-    const db = getFirestoreDb();
-    if (!db) throw new Error("Firebase unavailable");
-    let docRef = db.collection("materials").doc(id);
-    let snap = await docRef.get();
-    
-    if (!snap.exists) {
-      const byMaterialId = await db.collection("materials").where("materialId", "==", id).limit(1).get();
-      if (!byMaterialId.empty) {
-        snap = byMaterialId.docs[0];
-        docRef = snap.ref;
-      }
-    }
+    const { data: existing, error: fetchErr } = await supabase.from('materials').select('*').or(`id.eq.${id},material_id.eq.${id}`).single();
+    if (fetchErr || !existing) { res.status(404).json({ error: "Material not found" }); return; }
 
-    if (!snap.exists) { res.status(404).json({ error: "Material not found" }); return; }
-    const m = snap.data() as any;
     const updateData: any = {
-      title: body.title ?? m.title,
-      altTitle: body.altTitle ?? m.altTitle ?? null,
-      creator: body.creator ?? m.creator ?? null,
-      description: body.description ?? m.description ?? null,
-      date: body.date ?? m.date ?? null,
-      categoryId: body.categoryId !== undefined ? body.categoryId : m.categoryId,
-      hierarchyPath: body.hierarchyPath !== undefined ? body.hierarchyPath : m.hierarchyPath,
-      access: body.access ?? m.access,
-      format: body.format ?? m.format ?? null,
-      fileSize: body.fileSize ?? m.fileSize ?? null,
-      pages: body.pages ?? m.pages ?? null,
-      language: body.language ?? m.language ?? null,
-      publisher: body.publisher ?? m.publisher ?? null,
-      fileUrl: body.fileUrl !== undefined ? body.fileUrl : m.fileUrl ?? null,
-      thumbnailUrl: body.thumbnailUrl !== undefined ? body.thumbnailUrl : m.thumbnailUrl ?? null,
-      levelOfDescription: body.levelOfDescription ?? m.levelOfDescription ?? "Item",
-      extentAndMedium: body.extentAndMedium ?? m.extentAndMedium ?? null,
-      referenceCode: body.referenceCode ?? m.referenceCode ?? null,
-      dateOfDescription: body.dateOfDescription ?? m.dateOfDescription ?? null,
-      accessConditions: body.accessConditions ?? m.accessConditions ?? null,
-      reproductionConditions: body.reproductionConditions ?? m.reproductionConditions ?? null,
-      termsOfUse: body.termsOfUse ?? m.termsOfUse ?? null,
-      notes: body.notes ?? m.notes ?? null,
-      pointsOfAccess: body.pointsOfAccess ?? m.pointsOfAccess ?? null,
-      locationOfOriginals: body.locationOfOriginals ?? m.locationOfOriginals ?? null,
-      locationOfCopies: body.locationOfCopies ?? m.locationOfCopies ?? null,
-      relatedUnits: body.relatedUnits ?? m.relatedUnits ?? null,
-      publicationNote: body.publicationNote ?? m.publicationNote ?? null,
-      findingAids: body.findingAids ?? m.findingAids ?? null,
-      rulesOrConventions: body.rulesOrConventions ?? m.rulesOrConventions ?? null,
-      archivistNote: body.archivistNote ?? m.archivistNote ?? null,
-      status: body.status ?? m.status,
-      updatedAt: new Date().toISOString(),
+      title: body.title ?? existing.title,
+      alt_title: body.altTitle ?? existing.alt_title,
+      creator: body.creator ?? existing.creator,
+      description: body.description ?? existing.description,
+      date: body.date ?? existing.date,
+      category_id: body.categoryId ?? existing.category_id,
+      hierarchy_path: body.hierarchyPath ?? existing.hierarchy_path,
+      access: body.access ?? existing.access,
+      format: body.format ?? existing.format,
+      file_size: body.fileSize ?? existing.file_size,
+      pages: body.pages ?? existing.pages,
+      language: body.language ?? existing.language,
+      publisher: body.publisher ?? existing.publisher,
+      file_url: body.fileUrl ?? existing.file_url,
+      thumbnail_url: body.thumbnailUrl ?? existing.thumbnail_url,
+      status: body.status ?? existing.status,
+      updated_at: new Date().toISOString(),
     };
 
-    if (updateData.fileUrl && updateData.fileUrl.length > 800000 && updateData.fileUrl !== "CHUNKED") {
-      console.log(`Update File is large (${updateData.fileUrl.length} chars). Chunking...`);
-      const fullStr = updateData.fileUrl;
+    if (body.fileUrl && body.fileUrl.length > 800000 && body.fileUrl !== "CHUNKED") {
+      await supabase.from('material_chunks').delete().eq('material_id', existing.id);
+      const fullStr = body.fileUrl;
       const chunkSize = 800000;
       let chunksCount = 0;
       for (let i = 0; i < fullStr.length; i += chunkSize) {
-        await db.collection("materialChunks").doc(`${id}_chunk_${chunksCount}`).set({
-          materialId: id, chunkIndex: chunksCount, data: fullStr.substring(i, i + chunkSize)
+        await supabase.from('material_chunks').insert({
+          material_id: existing.id, chunk_index: chunksCount, data: fullStr.substring(i, i + chunkSize)
         });
         chunksCount++;
       }
-      updateData.isFileChunked = true;
-      updateData.chunksCount = chunksCount;
-      updateData.fileUrl = "CHUNKED";
+      updateData.file_url = "CHUNKED";
+      updateData.is_file_chunked = true;
+      updateData.chunks_count = chunksCount;
     }
 
-    // Handle pageImages updates
     if (body.pageImages && Array.isArray(body.pageImages)) {
-      console.log(`Updating ${body.pageImages.length} page images...`);
-      // Delete old pages first (optional but cleaner)
-      const oldPages = await db.collection("materialPages").where("materialId", "==", id).get();
-      const batch = db.batch();
-      oldPages.docs.forEach(doc => batch.delete(doc.ref));
-      await batch.commit();
-
+      await supabase.from('material_pages').delete().eq('material_id', existing.id);
       for (let i = 0; i < body.pageImages.length; i++) {
-        await db.collection("materialPages").doc(`${id}_page_${i}`).set({
-          materialId: id,
-          pageIndex: i,
-          data: body.pageImages[i]
+        await supabase.from('material_pages').insert({
+          material_id: existing.id, page_index: i, data: body.pageImages[i]
         });
       }
-      updateData.hasPageImages = true;
-      updateData.pageCount = body.pageImages.length;
-      delete (updateData as any).pageImages;
+      updateData.has_page_images = true;
+      updateData.page_count = body.pageImages.length;
     }
 
-    await docRef.update(updateData);
-    await logAudit({ action: "UPDATE_MATERIAL", entityType: "material", entityId: id, userId: user.userId, userName: user.name, details: `Updated material: ${m.title}` });
-    const updated = await docRef.get();
-    res.json(formatMaterial({ id, ...updated.data() }));
-  } catch {
-    const updated = jsonStoreUpdateMaterial(id, body, { userId: user.userId, name: user.name });
-    if (!updated) { res.status(404).json({ error: "Material not found" }); return; }
-    res.json(updated);
-  }
-});
+    const { error } = await supabase.from('materials').update(updateData).eq('id', existing.id);
+    if (error) throw error;
 
-// PATCH alias for partial updates
-router.patch("/materials/:id", requireAuth, async (req, res) => {
-  const user = req.user!;
-  const id = String(req.params.id);
-  const body = req.body;
-  try {
-    const db = getFirestoreDb();
-    if (!db) throw new Error("Firebase unavailable");
-    let docRef = db.collection("materials").doc(id);
-    let snap = await docRef.get();
-    
-    if (!snap.exists) {
-      const byMaterialId = await db.collection("materials").where("materialId", "==", id).limit(1).get();
-      if (!byMaterialId.empty) {
-        snap = byMaterialId.docs[0];
-        docRef = snap.ref;
-      }
-    }
-
-    if (!snap.exists) { res.status(404).json({ error: "Material not found" }); return; }
-    const m = snap.data() as any;
-    const updateData: any = {
-      title: body.title ?? m.title,
-      altTitle: body.altTitle ?? m.altTitle ?? null,
-      creator: body.creator ?? m.creator ?? null,
-      description: body.description ?? m.description ?? null,
-      date: body.date ?? m.date ?? null,
-      categoryId: body.categoryId !== undefined ? body.categoryId : m.categoryId,
-      access: body.access ?? m.access,
-      format: body.format ?? m.format ?? null,
-      fileSize: body.fileSize ?? m.fileSize ?? null,
-      pages: body.pages ?? m.pages ?? null,
-      language: body.language ?? m.language ?? null,
-      publisher: body.publisher ?? m.publisher ?? null,
-      fileUrl: body.fileUrl !== undefined ? body.fileUrl : m.fileUrl ?? null,
-      thumbnailUrl: body.thumbnailUrl !== undefined ? body.thumbnailUrl : m.thumbnailUrl ?? null,
-      levelOfDescription: body.levelOfDescription ?? m.levelOfDescription ?? "Item",
-      extentAndMedium: body.extentAndMedium ?? m.extentAndMedium ?? null,
-      referenceCode: body.referenceCode ?? m.referenceCode ?? null,
-      dateOfDescription: body.dateOfDescription ?? m.dateOfDescription ?? null,
-      accessConditions: body.accessConditions ?? m.accessConditions ?? null,
-      reproductionConditions: body.reproductionConditions ?? m.reproductionConditions ?? null,
-      termsOfUse: body.termsOfUse ?? m.termsOfUse ?? null,
-      notes: body.notes ?? m.notes ?? null,
-      pointsOfAccess: body.pointsOfAccess ?? m.pointsOfAccess ?? null,
-      locationOfOriginals: body.locationOfOriginals ?? m.locationOfOriginals ?? null,
-      locationOfCopies: body.locationOfCopies ?? m.locationOfCopies ?? null,
-      relatedUnits: body.relatedUnits ?? m.relatedUnits ?? null,
-      publicationNote: body.publicationNote ?? m.publicationNote ?? null,
-      findingAids: body.findingAids ?? m.findingAids ?? null,
-      rulesOrConventions: body.rulesOrConventions ?? m.rulesOrConventions ?? null,
-      archivistNote: body.archivistNote ?? m.archivistNote ?? null,
-      status: body.status ?? m.status,
-      updatedAt: new Date().toISOString(),
-    };
-
-    if (updateData.fileUrl && updateData.fileUrl.length > 800000 && updateData.fileUrl !== "CHUNKED") {
-      const fullStr = updateData.fileUrl;
-      const chunkSize = 800000;
-      let chunksCount = 0;
-      for (let i = 0; i < fullStr.length; i += chunkSize) {
-        await db.collection("materialChunks").doc(`${id}_chunk_${chunksCount}`).set({
-          materialId: id, chunkIndex: chunksCount, data: fullStr.substring(i, i + chunkSize)
-        });
-        chunksCount++;
-      }
-      updateData.isFileChunked = true;
-      updateData.chunksCount = chunksCount;
-      updateData.fileUrl = "CHUNKED";
-    }
-
-    await docRef.update(updateData);
-    await logAudit({ action: "UPDATE_MATERIAL", entityType: "material", entityId: id, userId: user.userId, userName: user.name, details: `Updated material: ${m.title}` });
-    const updated = await docRef.get();
-    res.json(formatMaterial({ id, ...updated.data() }));
-  } catch {
-    const updated = jsonStoreUpdateMaterial(id, body, { userId: user.userId, name: user.name });
-    if (!updated) { res.status(404).json({ error: "Material not found" }); return; }
-    res.json(updated);
+    await logAudit({ action: "UPDATE_MATERIAL", entityType: "material", entityId: existing.id, userId: user.userId, userName: user.name, details: `Updated material: ${existing.title}` });
+    res.json({ message: "Material updated successfully" });
+  } catch (err: any) {
+    console.error("Supabase material update failed:", err.message);
+    res.status(500).json({ error: "Failed to update material" });
   }
 });
 
@@ -512,126 +345,15 @@ router.delete("/materials/:id", requireAuth, async (req, res) => {
   const user = req.user!;
   const id = String(req.params.id);
   try {
-    const db = getFirestoreDb();
-    if (!db) throw new Error("Firebase unavailable");
-    let docRef = db.collection("materials").doc(id);
-    let snap = await docRef.get();
-    
-    if (!snap.exists) {
-      const byMaterialId = await db.collection("materials").where("materialId", "==", id).limit(1).get();
-      if (!byMaterialId.empty) {
-        snap = byMaterialId.docs[0];
-        docRef = snap.ref;
-      }
-    }
+    const { data: existing } = await supabase.from('materials').select('id, title').or(`id.eq.${id},material_id.eq.${id}`).single();
+    if (!existing) { res.json({ message: "Material already deleted" }); return; }
 
-    // Idempotent delete: if it's already gone, treat it as success to avoid noisy 404s in UI.
-    if (!snap.exists) {
-      res.json({ message: "Material already deleted" });
-      return;
-    }
-    const m = snap.data() as any;
-
-    // Clean up chunks if material was chunked
-    if (m.isFileChunked) {
-      try {
-        const chunksCount = m.chunksCount || 0;
-        for (let i = 0; i < chunksCount; i++) {
-          await db.collection("materialChunks").doc(`${id}_chunk_${i}`).delete();
-        }
-      } catch (e) {
-        console.error("Failed to clean up chunks during deletion:", e);
-      }
-    }
-
-    // Clean up pages if material has them
-    if (m.hasPageImages) {
-      try {
-        const pagesSnap = await db.collection("materialPages").where("materialId", "==", id).get();
-        const batch = db.batch();
-        pagesSnap.docs.forEach(doc => batch.delete(doc.ref));
-        await batch.commit();
-      } catch (e) {
-        console.error("Failed to clean up pages during deletion:", e);
-      }
-    }
-
-    await docRef.delete();
-    await logAudit({ action: "DELETE_MATERIAL", entityType: "material", entityId: id, userId: user.userId, userName: user.name, details: `Deleted material: ${m.title}` });
-    res.json({ message: "Material deleted" });
+    await supabase.from('materials').delete().eq('id', existing.id);
+    await logAudit({ action: "DELETE_MATERIAL", entityType: "material", entityId: existing.id, userId: user.userId, userName: user.name, details: `Deleted material: ${existing.title}` });
+    res.json({ message: "Material deleted successfully" });
   } catch (err: any) {
-    console.error("Firestore DELETE failed:", err);
-    const ok = jsonStoreDeleteMaterial(id);
-    // Also idempotent for local/mock store.
-    res.json({ message: ok ? "Material deleted" : "Material already deleted" });
-  }
-});
-
-router.post("/materials/:id/pages", requireAuth, async (req, res) => {
-  const id = String(req.params.id);
-  const { pageIndex, data } = req.body;
-  if (pageIndex === undefined || !data) {
-    return res.status(400).json({ error: "pageIndex and data are required" });
-  }
-  try {
-    const db = getFirestoreDb();
-    if (!db) throw new Error("Firebase unavailable");
-    await db.collection("materialPages").doc(`${id}_page_${pageIndex}`).set({
-      materialId: id,
-      pageIndex,
-      data
-    });
-    // Avoid one extra material write per page; stamp metadata only on first page.
-    if (Number(pageIndex) === 0) {
-      try {
-        await db.collection("materials").doc(id).set(
-          { hasPageImages: true, updatedAt: new Date().toISOString() },
-          { merge: true }
-        );
-      } catch {
-        // Keep page write successful even if material doc update fails.
-      }
-    }
-    res.json({ success: true });
-  } catch (err) {
-    console.error("Failed to save page:", err);
-    res.status(500).json({ error: "Failed to save page" });
-  }
-});
-
-router.post("/materials/:id/file/chunks", requireAuth, async (req, res) => {
-  const id = String(req.params.id);
-  const { chunkIndex, totalChunks, data } = req.body;
-  
-  if (chunkIndex === undefined || !data) {
-    return res.status(400).json({ error: "chunkIndex and data are required" });
-  }
-
-  try {
-    const db = getFirestoreDb();
-    if (!db) throw new Error("Firebase unavailable");
-
-    // Save chunk to materialChunks collection
-    await db.collection("materialChunks").doc(`${id}_chunk_${chunkIndex}`).set({
-      materialId: id,
-      chunkIndex,
-      data
-    });
-
-    // If this is the last chunk, update the material document
-    if (chunkIndex === totalChunks - 1) {
-      await db.collection("materials").doc(id).update({
-        isFileChunked: true,
-        chunksCount: totalChunks,
-        fileUrl: "CHUNKED", // Placeholder to indicate data is in chunks
-        updatedAt: new Date().toISOString()
-      });
-    }
-
-    res.json({ success: true });
-  } catch (err) {
-    console.error("Failed to save file chunk:", err);
-    res.status(500).json({ error: "Failed to save file chunk" });
+    console.error("Supabase material delete failed:", err.message);
+    res.status(500).json({ error: "Failed to delete material" });
   }
 });
 
@@ -664,6 +386,29 @@ router.get("/stats", async (_req, res) => {
   } catch (err: any) {
     console.error("Supabase stats failed:", err.message);
     res.status(500).json({ error: "Failed to fetch stats from Supabase" });
+  }
+});
+
+// Added chunking and paging helpers for direct use from frontend if needed
+router.post("/materials/:id/pages", requireAuth, async (req, res) => {
+  const id = String(req.params.id);
+  const { pageIndex, data } = req.body;
+  try {
+    await supabase.from('material_pages').insert({ material_id: id, page_index: pageIndex, data });
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post("/materials/:id/file/chunks", requireAuth, async (req, res) => {
+  const id = String(req.params.id);
+  const { chunkIndex, data } = req.body;
+  try {
+    await supabase.from('material_chunks').insert({ material_id: id, chunk_index: chunkIndex, data });
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 

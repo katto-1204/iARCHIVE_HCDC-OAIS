@@ -145,7 +145,7 @@ export async function compressFile(file: File | Blob, targetSizeMB = 0.6): Promi
 
   // For PDFs or other files, we can't easily compress on frontend.
   const fileName = (file as File).name || 'Upload';
-  console.warn(`File ${fileName} is ${formatBytes(file.size)} and cannot be compressed. Firestore 1MB limit may be exceeded.`);
+  console.warn(`File ${fileName} is ${formatBytes(file.size)} and exceeds recommended API limits (4.5MB). Using chunked upload for Supabase.`);
   return file;
 }
 

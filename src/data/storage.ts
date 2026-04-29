@@ -178,9 +178,9 @@ export async function loadMaterial(id: string): Promise<ArchivalMaterial | undef
 
 /** Save/Update Material - DISALBED LOCAL STORAGE VERSION */
 export async function saveMaterial(material: ArchivalMaterial) {
-  // ═══ FIRESTORE ENFORCEMENT ═══
+  // ═══ SUPABASE ENFORCEMENT ═══
   // Browser LocalStorage ingestion is now disabled per user request.
-  // All saves must go through the API/Firestore.
+  // All saves must go through the API/Supabase.
   console.log("Local storage saveMaterial disabled. Use API instead.");
   return getMaterials(); 
 }

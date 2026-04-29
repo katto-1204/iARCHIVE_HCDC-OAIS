@@ -2356,11 +2356,12 @@ export default function AdminMaterials() {
                     mainFileBase64 = apiData.fileUrl;
                   }
 
-                  // If main file is large (> 200KB base64), use chunked upload
+                  // If main file is large (> 200KB base64), use chunked upload to bypass payload limits
                   if (mainFileBase64.length > 200000) {
                     console.log(`File is large (${mainFileBase64.length} chars). Using chunked upload.`);
-                    apiData.fileUrl = "PENDING_UPLOAD";
-                    apiData.compressedFileBase64 = mainFileBase64; // Keep compressed payload in the main Firestore doc
+                    apiData.fileUrl = "CHUNKED"; // Marker for backend
+                    // DO NOT include the huge base64 in the main metadata payload
+                    delete apiData.compressedFileBase64; 
                   } else if (mainFileBase64.length > 0) {
                     apiData.fileUrl = mainFileBase64;
                     mainFileBase64 = ""; // Clear so we don't double-upload
@@ -2392,7 +2393,7 @@ export default function AdminMaterials() {
                     if (cat) apiData.categoryId = cat.id;
                   }
 
-                  let firestoreSaved = false;
+                  let supabaseSaved = false;
 
                   let finalId = editingMaterialId;
 
@@ -2412,7 +2413,7 @@ export default function AdminMaterials() {
                       setIngestStage(`Uploading ${pagesToUpload.length} page image(s)...`);
                       const pageToast = toast({
                         title: "Uploading Pages",
-                        description: `Saving ${pagesToUpload.length} pages to Firestore...`,
+                        description: `Saving ${pagesToUpload.length} pages to Supabase...`,
                       });
 
                       let failedPages = 0;
@@ -2438,7 +2439,7 @@ export default function AdminMaterials() {
                         title: failedPages > 0 ? "Upload Partially Complete" : "Upload Complete",
                         description: failedPages > 0
                           ? `${pagesToUpload.length - failedPages}/${pagesToUpload.length} pages saved.`
-                          : `All ${pagesToUpload.length} pages saved to Firestore.`,
+                          : `All ${pagesToUpload.length} pages saved to Supabase.`,
                       });
                     }
 
@@ -2466,17 +2467,17 @@ export default function AdminMaterials() {
                       chunkToast.update({
                         id: chunkToast.id,
                         title: "Document Uploaded",
-                        description: "Large document successfully saved to Firestore.",
+                        description: "Large document successfully saved to Supabase.",
                       });
                     }
 
-                    firestoreSaved = true;
+                    supabaseSaved = true;
                     toast({
                       title: editingMaterialId ? "Material Updated" : "Ingestion Successful",
-                      description: editingMaterialId ? "Changes saved to Firestore." : "Material and all pages saved to Firestore.",
+                      description: editingMaterialId ? "Changes saved to Supabase." : "Material and all pages saved to Supabase.",
                     });
                   } catch (apiErr: any) {
-                    console.error("Firestore Save Failed:", apiErr);
+                    console.error("Supabase Save Failed:", apiErr);
                     const errorMsg = apiErr?.message || "Cloud sync failed";
                     toast({
                       variant: "destructive",
@@ -2536,16 +2537,16 @@ export default function AdminMaterials() {
                   const toastTitle = editingMaterialId
                     ? "Updated"
                     : (approvalStatus === "pending" ? "Submitted for Approval" : "Ingestion Confirmed");
-                  const toastDesc = firestoreSaved
+                  const toastDesc = supabaseSaved
                     ? (approvalStatus === "pending"
-                      ? "Material saved to Firestore and pending admin approval."
-                      : "Material saved to Firestore and published successfully.")
-                    : "Saved locally. Firestore sync will retry on next refresh.";
+                      ? "Material saved to Supabase and pending admin approval."
+                      : "Material saved to Supabase and published successfully.")
+                    : "Saved locally. Supabase sync will retry on next refresh.";
 
                   toast({
                     title: toastTitle,
                     description: toastDesc,
-                    variant: firestoreSaved ? "default" : "destructive"
+                    variant: supabaseSaved ? "default" : "destructive"
                   });
 
                   if (!editingMaterialId) {

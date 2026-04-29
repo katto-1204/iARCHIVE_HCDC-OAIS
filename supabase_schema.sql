@@ -159,6 +159,25 @@ CREATE TABLE IF NOT EXISTS ingest_requests (
   status TEXT DEFAULT 'pending'
 );
 
+-- 9. Material Chunks (for large files)
+CREATE TABLE IF NOT EXISTS material_chunks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  material_id TEXT NOT NULL,
+  chunk_index INTEGER NOT NULL,
+  data TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 10. Material Pages (for multi-page previews)
+CREATE TABLE IF NOT EXISTS material_pages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  material_id TEXT NOT NULL,
+  page_index INTEGER NOT NULL,
+  data TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+
 -- Trigger Function
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$

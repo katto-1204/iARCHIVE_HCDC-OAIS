@@ -23,19 +23,20 @@ export default function StudentDashboard() {
   const { data: materialsData, isLoading: isMaterialsLoading } = useGetMaterials({ access: "public", limit: 6 });
   const { data: approvedRequests } = useGetAccessRequests({ status: "approved" });
   
-  const { mutate: likeAnnouncement } = useLikeAnnouncement();
-  const { mutate: commentAnnouncement } = useCommentAnnouncement();
+  const { mutate: likeAnnouncement, isPending: isLiking } = useLikeAnnouncement();
+  const { mutate: commentAnnouncement, isPending: isCommenting } = useCommentAnnouncement();
   
   const [selectedAnnouncement, setSelectedAnnouncement] = React.useState<any>(null);
   const [commentText, setCommentText] = React.useState("");
 
   const handleLike = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
+    if (isLiking) return;
     likeAnnouncement(id);
   };
 
   const handleComment = (id: string) => {
-    if (!commentText.trim()) return;
+    if (!commentText.trim() || isCommenting) return;
     commentAnnouncement({ id, data: { content: commentText } });
     setCommentText("");
   };
@@ -260,15 +261,17 @@ export default function StudentDashboard() {
                 <div className="flex items-center gap-6 pt-6 border-t border-border/30">
                   <button 
                     onClick={(e) => handleLike(e, selectedAnnouncement.id)}
+                    disabled={isLiking}
                     className={cn(
                       "flex items-center gap-3 px-6 py-3 rounded-2xl font-black text-sm transition-all active:scale-95",
                       selectedAnnouncement.likes?.includes(user?.userId)
                         ? "bg-red-50 text-red-600 shadow-sm"
-                        : "bg-muted text-muted-foreground hover:bg-muted/80"
+                        : "bg-muted text-muted-foreground hover:bg-muted/80",
+                      isLiking && "opacity-50 cursor-not-allowed"
                     )}
                   >
-                    <Heart className={cn("w-5 h-5", selectedAnnouncement.likes?.includes(user?.userId) && "fill-current")} />
-                    {selectedAnnouncement.likes?.length || 0} Likes
+                    <Heart className={cn("w-5 h-5", (selectedAnnouncement.likes?.includes(user?.userId) || isLiking) && "fill-current", isLiking && "animate-pulse")} />
+                    {isLiking ? "Liking..." : `${selectedAnnouncement.likes?.length || 0} Likes`}
                   </button>
                   <div className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-muted text-muted-foreground font-black text-sm">
                     <MessageCircle className="w-5 h-5" />
@@ -313,17 +316,23 @@ export default function StudentDashboard() {
                 <div className="flex gap-3">
                   <input 
                     type="text" 
-                    placeholder="Write a public comment..." 
-                    className="flex-1 bg-muted/50 border border-border/50 rounded-2xl px-6 py-4 text-sm outline-none focus:ring-4 focus:ring-red-500/10 focus:border-red-500/20 transition-all"
+                    placeholder={isCommenting ? "Posting comment..." : "Write a public comment..."}
+                    className="flex-1 bg-muted/50 border border-border/50 rounded-2xl px-6 py-4 text-sm outline-none focus:ring-4 focus:ring-red-500/10 focus:border-red-500/20 transition-all disabled:opacity-50"
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleComment(selectedAnnouncement.id)}
+                    onKeyDown={(e) => e.key === 'Enter' && !isCommenting && handleComment(selectedAnnouncement.id)}
+                    disabled={isCommenting}
                   />
                   <button 
                     onClick={() => handleComment(selectedAnnouncement.id)}
-                    className="bg-[#0a1628] text-white px-8 rounded-2xl flex items-center justify-center shadow-xl shadow-black/10 hover:bg-[#960000] active:scale-95 transition-all"
+                    disabled={isCommenting || !commentText.trim()}
+                    className="bg-[#0a1628] text-white px-8 rounded-2xl flex items-center justify-center shadow-xl shadow-black/10 hover:bg-[#960000] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Send className="w-5 h-5" />
+                    {isCommenting ? (
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <Send className="w-5 h-5" />
+                    )}
                   </button>
                 </div>
               </div>
