@@ -12,6 +12,7 @@ type JsonCategory = {
   category_no: number;
   level: string;
   parent_id?: string | null;
+  is_featured?: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -198,6 +199,7 @@ function toCategoryResponse(cat: JsonCategory & { materialCount?: number }) {
     categoryNo: Number(cat.category_no),
     level: getCategoryLevelName(cat.level),
     parentId: cat.parent_id ?? null,
+    isFeatured: !!cat.is_featured,
     materialCount: Number(cat.materialCount ?? 0),
     createdAt: cat.created_at,
   } as const;
@@ -304,6 +306,7 @@ export function jsonStoreCreateCategory(input: {
   description?: string | null;
   level: string;
   parentId?: string | null;
+  isFeatured?: boolean;
 }) {
   const now = new Date().toISOString();
   const categories = safeReadJson<JsonCategory[]>(CATEGORIES_PATH, []);
@@ -317,6 +320,7 @@ export function jsonStoreCreateCategory(input: {
     category_no,
     level: input.level,
     parent_id: input.parentId ?? null,
+    is_featured: !!input.isFeatured,
     created_at: now,
     updated_at: now,
   };
@@ -331,6 +335,7 @@ export function jsonStoreUpdateCategory(input: {
   description?: string | null;
   level?: string;
   parentId?: string | null;
+  isFeatured?: boolean;
 }) {
   const categories = safeReadJson<JsonCategory[]>(CATEGORIES_PATH, []);
   const idx = categories.findIndex((c) => c.id === input.id);
@@ -343,6 +348,7 @@ export function jsonStoreUpdateCategory(input: {
     description: input.description ?? current.description ?? null,
     level: input.level ?? current.level,
     parent_id: input.parentId ?? current.parent_id ?? null,
+    is_featured: input.isFeatured !== undefined ? input.isFeatured : (current.is_featured ?? false),
     updated_at: now,
   };
   categories[idx] = updated;

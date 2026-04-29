@@ -108,35 +108,27 @@ export default function Home() {
   ];
 
   const featuredCollections = React.useMemo(() => {
-    if (!Array.isArray(categories) || categories.length === 0) return [];
-    const materialRows = Array.isArray(materials) ? materials : [];
+    const cats = Array.isArray(categories) ? categories : [];
+    // Only consider subfonds for featured collections on the landing page
+    const subfonds = cats.filter((c: any) => c.level === "subfonds");
 
-    const counts = new Map<string, number>();
-    for (const cat of categories as any[]) counts.set(cat.id, 0);
-
-    for (const mat of materialRows as any[]) {
-      let matched = false;
-      if (mat?.categoryId && counts.has(mat.categoryId)) {
-        counts.set(mat.categoryId, (counts.get(mat.categoryId) || 0) + 1);
-        matched = true;
-      }
-      if (!matched && mat?.hierarchyPath) {
-        const path = String(mat.hierarchyPath).toLowerCase();
-        for (const cat of categories as any[]) {
-          if (path.includes(String(cat?.name || "").toLowerCase())) {
-            counts.set(cat.id, (counts.get(cat.id) || 0) + 1);
-            break;
-          }
-        }
-      }
-    }
-
-    return [...(categories as any[])]
-      .filter((cat) => (counts.get(cat.id) || 0) > 0)
-      .sort((a, b) => (counts.get(b.id) || 0) - (counts.get(a.id) || 0))
-      .slice(0, 3)
-      .map((cat) => ({ ...cat, materialCount: counts.get(cat.id) || 0 }));
-  }, [categories, materials]);
+    return subfonds
+      .sort((a: any, b: any) => {
+        // Primary sort: isFeatured flag
+        if (a.isFeatured && !b.isFeatured) return -1;
+        if (!a.isFeatured && b.isFeatured) return 1;
+        // Secondary sort: material count
+        return (b.materialCount || 0) - (a.materialCount || 0);
+      })
+      .slice(0, 3) // Show top 3
+      .map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        description: item.description || `Collection of ${item.name}`,
+        materialCount: item.materialCount,
+        href: `/collections?subfonds=${encodeURIComponent(item.name)}`,
+      }));
+  }, [categories]);
 
   return (
     <div className="min-h-screen bg-white font-sans">
@@ -232,7 +224,7 @@ export default function Home() {
                 { id: "3", name: "Digital Materials", description: "Born-digital institutional records" },
               ]
             ).map((cat, i) => (
-              <Link key={cat.id} href={`/collections?category=${cat.id}`}>
+              <Link key={cat.id} href={(cat as any).href || `/collections?category=${cat.id}`}>
                 <div data-stagger className={`reveal-up ${catColors[i % catColors.length]} rounded-2xl overflow-hidden group cursor-pointer hover:scale-[1.03] transition-all duration-500 shadow-lg hover:shadow-2xl h-[340px] flex flex-col`}>
                   <div className="h-40 flex items-center justify-center relative overflow-hidden shrink-0">
                     <div className="absolute inset-0 opacity-10">

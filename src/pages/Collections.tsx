@@ -74,12 +74,16 @@ export default function Collections() {
   const [location] = useLocation();
 
   React.useEffect(() => {
-    // Sync search from URL
+    // Sync filters/navigation from URL
     const params = new URLSearchParams(window.location.search);
     const s = params.get("search");
+    const cat = params.get("category");
     if (s !== null) {
       setSearch(s);
       setDebouncedSearch(s);
+    }
+    if (cat !== null) {
+      setCategory(cat);
     }
   }, [location]);
 
@@ -106,17 +110,17 @@ export default function Collections() {
     if (!isPrivileged && approvalStatus !== "approved") return false;
     if (showOaisOnly && !checkOAISCompliance(mat)) return false;
     if (access && mat.access !== access) return false;
-    if (subfondsFilter && !(mat.hierarchyPath || "").includes(subfondsFilter)) return false;
+    if (subfondsFilter && !(mat.hierarchyPath || "").toLowerCase().includes(subfondsFilter.toLowerCase())) return false;
     if (category) {
        const catObj = categories?.find((c: any) => c.id === category);
-       if (catObj && !(mat.hierarchyPath || "").includes(catObj.name)) return false;
+       if (catObj && !(mat.hierarchyPath || "").toLowerCase().includes(catObj.name.toLowerCase())) return false;
     }
     if (!isPrivileged && !mat.fileUrl && !mat.thumbnailUrl) return false;
     return true; // Search is handled by the API now
   });
 
   // Calculate Folders based on displayMaterials (so they reflect search & access filters too)
-  const foldersMap = new Map<string, { category: string; subfonds: string; series: string; count: number; coverImages: string[] }>();
+  const foldersMap = new Map<string, { category: string; subfonds: string; subfondsDisplayName?: string; series: string; count: number; coverImages: string[] }>();
   displayMaterials.forEach((mat: any) => {
     const parts = (mat.hierarchyPath || "").split(" > ").filter((p: string) => p.trim() !== "");
     
@@ -152,9 +156,21 @@ export default function Collections() {
       topCategory = "Research Output";
     }
 
-    const key = `${finalSubfonds}::${finalSer}`;
+    const key = `${finalSubfonds.toLowerCase()}::${finalSer.toLowerCase()}`;
     if (!foldersMap.has(key)) {
-      foldersMap.set(key, { category: topCategory, subfonds: finalSubfonds, series: finalSer, count: 0, coverImages: [] });
+      const fullCat = (categories || []).find((c: any) => 
+        c.name === finalSubfonds || 
+        (typeof c.name === 'string' && c.name.includes(`(${finalSubfonds})`)) ||
+        (typeof c.name === 'string' && c.name.split(' ').some((word: string) => word.toLowerCase() === finalSubfonds.toLowerCase()))
+      );
+      foldersMap.set(key, { 
+        category: topCategory, 
+        subfonds: finalSubfonds, 
+        subfondsDisplayName: fullCat ? fullCat.name : finalSubfonds,
+        series: finalSer, 
+        count: 0, 
+        coverImages: [] 
+      });
     }
     const f = foldersMap.get(key)!;
     f.count++;
@@ -178,6 +194,7 @@ export default function Collections() {
         .sort()
         .map(sf => ({
           subfonds: sf,
+          displayName: catFolders.find(f => f.subfonds === sf)?.subfondsDisplayName || sf,
           folders: catFolders.filter(f => f.subfonds === sf).sort((a,b) => a.series.localeCompare(b.series))
         }));
       
@@ -189,6 +206,33 @@ export default function Collections() {
       };
     })
     .filter(Boolean) as { category: string; subfondGroups: { subfonds: string; folders: typeof folders }[]; folders: typeof folders; totalCount: number }[];
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const subfondsParam = params.get("subfonds");
+    const seriesParam = params.get("series");
+    if (!subfondsParam || groupedFolders.length === 0) return;
+
+    const matchedGroup = groupedFolders.find((group) =>
+      group.subfondGroups.some((sf) => sf.subfonds === subfondsParam)
+    );
+    if (!matchedGroup) return;
+
+    const path: Array<{ level: "fonds" | "subfonds" | "series"; name: string }> = [
+      { level: "fonds", name: matchedGroup.category },
+      { level: "subfonds", name: subfondsParam },
+    ];
+
+    if (seriesParam) {
+      const targetSubfonds = matchedGroup.subfondGroups.find((sf) => sf.subfonds === subfondsParam);
+      const hasSeries = !!targetSubfonds?.folders.some((f) => f.series === seriesParam);
+      if (hasSeries) {
+        path.push({ level: "series", name: seriesParam });
+      }
+    }
+
+    setNavigationPath(path);
+  }, [location, groupedFolders]);
 
   const selectedFonds = navigationPath.find((p) => p.level === "fonds")?.name;
   const selectedSubfonds = navigationPath.find((p) => p.level === "subfonds")?.name;
@@ -204,7 +248,7 @@ export default function Collections() {
         const ser = parts.length > depth + 1 ? parts[parts.length - 1] : "General Series";
         const finalSubfonds = parts.length < depth ? "HCDC Collections" : subfonds;
         const finalSer = parts.length === depth && parts[0] === "HCDC" ? "General Series" : ser;
-        return finalSubfonds === selectedSubfonds && finalSer === selectedSeries;
+        return finalSubfonds.toLowerCase() === selectedSubfonds.toLowerCase() && finalSer.toLowerCase() === selectedSeries.toLowerCase();
       })
     : [];
 
@@ -472,6 +516,7 @@ export default function Collections() {
                   group.subfondGroups.map((sfGroup) => ({
                     fonds: group.category,
                     subfonds: sfGroup.subfonds,
+                    displayName: sfGroup.displayName,
                     folders: sfGroup.folders,
                   }))
                 )
@@ -484,6 +529,7 @@ export default function Collections() {
                       .map((sfGroup) => ({
                         fonds: group.category,
                         subfonds: sfGroup.subfonds,
+                        displayName: sfGroup.displayName,
                         folders: sfGroup.folders,
                       }))
                   )
@@ -495,6 +541,7 @@ export default function Collections() {
                       .map((sfGroup) => ({
                         fonds: group.category,
                         subfonds: sfGroup.subfonds,
+                        displayName: sfGroup.displayName,
                         folders: sfGroup.folders.filter((f) => f.series === selectedSeries),
                       }))
                   )
@@ -513,7 +560,7 @@ export default function Collections() {
                     <Layers className="w-5 h-5" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-black text-[#0a1628] tracking-tight">{section.subfonds}</h2>
+                    <h2 className="text-2xl font-black text-[#0a1628] tracking-tight">{section.displayName || section.subfonds}</h2>
                     <p className="text-xs text-muted-foreground font-medium mt-0.5">
                       {section.folders.reduce((s, f) => s + f.count, 0)} materials across {section.folders.length} series
                     </p>
@@ -573,7 +620,7 @@ export default function Collections() {
                                 </div>
                                 <div className="mt-2">
                                   <h3 className="text-white text-xl font-bold leading-tight line-clamp-2 mb-2 group-hover:text-[#4169E1] transition-colors">{folder.series}</h3>
-                                  <p className="text-white/40 text-xs font-medium">{folder.subfonds}</p>
+                                  <p className="text-white/40 text-xs font-medium">{folder.subfondsDisplayName || folder.subfonds}</p>
                                 </div>
                                 <div className="mt-auto flex items-center justify-between">
                                   <div className="flex items-center gap-2.5">

@@ -34622,6 +34622,7 @@ function toCategoryResponse(cat) {
     categoryNo: Number(cat.category_no),
     level: getCategoryLevelName(cat.level),
     parentId: cat.parent_id ?? null,
+    isFeatured: !!cat.is_featured,
     materialCount: Number(cat.materialCount ?? 0),
     createdAt: cat.created_at
   };
@@ -34727,6 +34728,7 @@ function jsonStoreCreateCategory(input) {
     category_no,
     level: input.level,
     parent_id: input.parentId ?? null,
+    is_featured: !!input.isFeatured,
     created_at: now,
     updated_at: now
   };
@@ -34746,6 +34748,7 @@ function jsonStoreUpdateCategory(input) {
     description: input.description ?? current.description ?? null,
     level: input.level ?? current.level,
     parent_id: input.parentId ?? current.parent_id ?? null,
+    is_featured: input.isFeatured !== void 0 ? input.isFeatured : current.is_featured ?? false,
     updated_at: now
   };
   categories[idx] = updated;
@@ -36357,7 +36360,7 @@ router5.get("/categories", async (_req, res) => {
 });
 router5.post("/categories", requireAuth, requireRole("admin", "archivist"), async (req, res) => {
   const user = req.user;
-  const { name, description, level, parentId } = req.body;
+  const { name, description, level, parentId, isFeatured } = req.body;
   if (!name || !level) {
     res.status(400).json({ error: "Name and level required" });
     return;
@@ -36374,6 +36377,7 @@ router5.post("/categories", requireAuth, requireRole("admin", "archivist"), asyn
       description: description ?? null,
       level,
       parentId: parentId ?? null,
+      isFeatured: !!isFeatured,
       categoryNo,
       createdAt: now,
       updatedAt: now
@@ -36381,14 +36385,14 @@ router5.post("/categories", requireAuth, requireRole("admin", "archivist"), asyn
     await logAudit({ action: "CREATE_CATEGORY", entityType: "category", entityId: id, userId: user.userId, userName: user.name, details: `Created category: ${name}` });
     res.status(201).json({ id, name, description: description ?? null, level, parentId: parentId ?? null, categoryNo, createdAt: now, updatedAt: now, materialCount: 0 });
   } catch {
-    const created = jsonStoreCreateCategory({ name, description, level, parentId });
+    const created = jsonStoreCreateCategory({ name, description, level, parentId, isFeatured });
     res.status(201).json(created);
   }
 });
 router5.put("/categories/:id", requireAuth, requireRole("admin", "archivist"), async (req, res) => {
   const user = req.user;
   const id = String(req.params.id);
-  const { name, description, level, parentId } = req.body;
+  const { name, description, level, parentId, isFeatured } = req.body;
   try {
     const db = getFirestoreDb();
     const snap = await db.collection("categories").doc(id).get();
@@ -36402,6 +36406,7 @@ router5.put("/categories/:id", requireAuth, requireRole("admin", "archivist"), a
       description: description ?? cat.description ?? null,
       level: level ?? cat.level,
       parentId: parentId ?? cat.parentId ?? null,
+      isFeatured: isFeatured !== void 0 ? isFeatured : cat.isFeatured ?? false,
       updatedAt: (/* @__PURE__ */ new Date()).toISOString()
     });
     await logAudit({ action: "UPDATE_CATEGORY", entityType: "category", entityId: id, userId: user.userId, userName: user.name, details: `Updated category: ${name}` });
@@ -36409,7 +36414,7 @@ router5.put("/categories/:id", requireAuth, requireRole("admin", "archivist"), a
     const updated = await db.collection("categories").doc(id).get();
     res.json({ id, ...updated.data(), materialCount: Number(countSnap.data().count) });
   } catch {
-    const updated = jsonStoreUpdateCategory({ id, name, description, level, parentId });
+    const updated = jsonStoreUpdateCategory({ id, name, description, level, parentId, isFeatured });
     if (!updated) {
       res.status(404).json({ error: "Category not found" });
       return;
@@ -36420,7 +36425,7 @@ router5.put("/categories/:id", requireAuth, requireRole("admin", "archivist"), a
 router5.patch("/categories/:id", requireAuth, requireRole("admin", "archivist"), async (req, res) => {
   const user = req.user;
   const id = String(req.params.id);
-  const { name, description, level, parentId } = req.body;
+  const { name, description, level, parentId, isFeatured } = req.body;
   try {
     const db = getFirestoreDb();
     const snap = await db.collection("categories").doc(id).get();
@@ -36434,6 +36439,7 @@ router5.patch("/categories/:id", requireAuth, requireRole("admin", "archivist"),
       description: description ?? cat.description ?? null,
       level: level ?? cat.level,
       parentId: parentId ?? cat.parentId ?? null,
+      isFeatured: isFeatured !== void 0 ? isFeatured : cat.isFeatured ?? false,
       updatedAt: (/* @__PURE__ */ new Date()).toISOString()
     });
     await logAudit({ action: "UPDATE_CATEGORY", entityType: "category", entityId: id, userId: user.userId, userName: user.name, details: `Updated category: ${name}` });
@@ -36441,7 +36447,7 @@ router5.patch("/categories/:id", requireAuth, requireRole("admin", "archivist"),
     const updated = await db.collection("categories").doc(id).get();
     res.json({ id, ...updated.data(), materialCount: Number(countSnap.data().count) });
   } catch {
-    const updated = jsonStoreUpdateCategory({ id, name, description, level, parentId });
+    const updated = jsonStoreUpdateCategory({ id, name, description, level, parentId, isFeatured });
     if (!updated) {
       res.status(404).json({ error: "Category not found" });
       return;
