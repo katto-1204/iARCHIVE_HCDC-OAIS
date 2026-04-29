@@ -14,6 +14,8 @@ type JsonCategory = {
   category_no: number;
   level: string;
   parent_id?: string | null;
+  is_featured?: boolean;
+  isFeatured?: boolean;
   created_at: string;
   updated_at: string;
 };

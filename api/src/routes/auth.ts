@@ -1,9 +1,7 @@
 import { Router } from "express";
-import bcrypt from "bcryptjs";
 import { signToken } from "../lib/auth.js";
 import { requireAuth } from "../middlewares/auth.js";
-import { jsonStoreGetUserByEmail, jsonStoreGetUserById, jsonStoreRegisterUser } from "../lib/jsonStore.js";
-import { getFirebaseAuth, getFirestoreDb } from "../lib/firebase.js";
+import { supabase } from "../lib/supabase.js";
 
 const router = Router();
 
@@ -18,86 +16,14 @@ function getDemoUserByEmail(email?: string) {
   return DEMO_USERS.find((u) => u.email.toLowerCase() === (email || "").toLowerCase());
 }
 
-async function resolveUserProfile(db: FirebaseFirestore.Firestore, uid: string, email?: string) {
-  const byUid = await db.collection("users").doc(uid).get();
-  if (byUid.exists) return { snap: byUid, linked: false };
-
-  const normalizedEmail = String(email || "").trim().toLowerCase();
-  if (!normalizedEmail) return { snap: byUid, linked: false };
-
-  const byEmail = await db.collection("users").where("email", "==", normalizedEmail).limit(1).get();
-  if (byEmail.empty) return { snap: byUid, linked: false };
-
-  const existingDoc = byEmail.docs[0];
-  const existingData = existingDoc.data() as any;
-  await db.collection("users").doc(uid).set(
-    {
-      ...existingData,
-      id: uid,
-      email: existingData?.email || normalizedEmail,
-      updatedAt: new Date().toISOString(),
-    },
-    { merge: true }
-  );
-
-  const linkedSnap = await db.collection("users").doc(uid).get();
-  return { snap: linkedSnap, linked: true };
-}
-
-async function signInWithPassword(email: string, password: string) {
-  const apiKey = process.env["FIREBASE_API_KEY"] || process.env["VITE_FIREBASE_API_KEY"];
-  if (!apiKey) {
-    throw new Error("Missing FIREBASE_API_KEY (or VITE_FIREBASE_API_KEY)");
-  }
-  const res = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, returnSecureToken: true }),
-    },
-  );
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    const msg = (err && err.error && err.error.message) || "INVALID_LOGIN";
-    if (msg === "EMAIL_NOT_FOUND") throw new Error("USER_NOT_FOUND");
-    if (msg === "INVALID_PASSWORD") throw new Error("INVALID_PASSWORD");
-    throw new Error("INVALID_LOGIN");
-  }
-  return (await res.json()) as { idToken: string };
-}
-
-async function verifyIdTokenRestFallback(idToken: string) {
-  const apiKey = process.env["FIREBASE_API_KEY"] || process.env["VITE_FIREBASE_API_KEY"];
-  if (!apiKey) {
-    throw new Error("Missing FIREBASE_API_KEY for token lookup");
-  }
-  const res = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ idToken }),
-    },
-  );
-  if (!res.ok) {
-    throw new Error("Invalid idToken via REST");
-  }
-  const data = await res.json();
-  const user = data.users?.[0];
-  if (!user) throw new Error("No user found for idToken");
-  return { uid: user.localId, email: user.email, name: user.displayName };
-}
-
 router.post("/auth/login", async (req, res) => {
-  const { email, password, idToken } = req.body;
-  if ((!email || !password) && !idToken) {
-    res.status(400).json({ error: "Email and password or idToken required" });
+  const { email, password } = req.body;
+  if (!email || !password) {
+    res.status(400).json({ error: "Email and password required" });
     return;
   }
 
-  // Demo accounts should always work, even if the DB is unreachable
-  // or the demo users are not present in Postgres.
+  // Demo accounts should always work
   const demoUser = getDemoUserByEmail(email);
   if (demoUser && password === DEMO_PASSWORD) {
     const token = signToken({ userId: demoUser.id, email: demoUser.email, role: demoUser.role, name: demoUser.name });
@@ -118,263 +44,107 @@ router.post("/auth/login", async (req, res) => {
   }
 
   try {
-    let firebaseToken = idToken as string | undefined;
-    if (!firebaseToken && email && password) {
-      const result = await signInWithPassword(email, password);
-      firebaseToken = result.idToken;
-    }
-    if (!firebaseToken) {
-      res.status(401).json({ error: "Invalid credentials" });
-      return;
-    }
-    
-    let decoded: { uid: string, email?: string, name?: string } | null;
-    try {
-      const auth = getFirebaseAuth();
-      decoded = await auth.verifyIdToken(firebaseToken);
-    } catch {
-      decoded = await verifyIdTokenRestFallback(firebaseToken);
-    }
-    
-    if (!decoded) {
-      res.status(401).json({ error: "Invalid Firebase token" });
-      return;
-    }
-    
-    let profile: any = null;
-    try {
-      const db = getFirestoreDb();
-      const { snap: profileSnap } = await resolveUserProfile(db, decoded.uid, decoded.email);
-      if (!profileSnap.exists) {
-        const now = new Date().toISOString();
-        profile = {
-          id: decoded.uid,
-          name: decoded.name || decoded.email || "User",
-          email: decoded.email || "",
-          role: "student",
-          userCategory: "student",
-          institution: null,
-          purpose: null,
-          status: "pending", // Fixed: Default to pending for admin approval
-          createdAt: now,
-          updatedAt: now,
-        };
-        await db.collection("users").doc(decoded.uid).set(profile, { merge: true });
-        res.status(403).json({ error: "Account is not active. Please wait for approval." });
-        return;
-      } else {
-        profile = profileSnap.data() as any;
-        if (profile.status === "rejected") {
-          const reason = profile.rejectionReason || "";
-          res.status(403).json({ error: "Your account has been rejected.", rejectionReason: reason });
-          return;
-        }
-        if (profile.status !== "active") {
-          res.status(403).json({ error: "Account is not active. Please wait for approval." });
-          return;
-        }
-        
-        // Track first login for welcome modal
-        if (!profile.lastLogin) {
-          profile.isFirstLogin = true;
-        }
-        await db.collection("users").doc(decoded.uid).update({ lastLogin: new Date().toISOString() });
-      }
-    } catch (dbErr: any) {
-      console.warn("Auth me/login Firestore warning:", dbErr.message);
-      // If DB is unreachable, we still allow the token if we can verify it via REST
-      // or if it was recently cached. We proceed to local check if DB fails.
-    }
-
-    res.json({
-      token: firebaseToken,
-      user: {
-        id: decoded.uid,
-        name: profile?.name || decoded.name || decoded.email || "User",
-        email: profile?.email || decoded.email,
-        role: profile?.role || "student",
-        userCategory: profile?.userCategory || profile?.role || "student",
-        institution: profile?.institution || null,
-        status: profile?.status || "active",
-        createdAt: profile?.createdAt || new Date().toISOString(),
-        isFirstLogin: profile?.isFirstLogin || false,
-      },
+    // Sign in with Supabase Auth
+    const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
+      email,
+      password,
     });
-  } catch (outerErr: any) {
-    if (outerErr.message === "USER_NOT_FOUND") {
-      res.status(404).json({ error: "Account not found" });
-      return;
+
+    if (authErr) {
+      if (/invalid login/i.test(authErr.message) || /invalid credentials/i.test(authErr.message)) {
+        res.status(401).json({ error: "Invalid credentials" });
+        return;
+      }
+      throw authErr;
     }
-    if (outerErr.message === "INVALID_PASSWORD") {
-      res.status(401).json({ error: "Invalid credentials" });
+
+    const supabaseUser = authData.user;
+    const session = authData.session;
+
+    // Fetch profile from profiles table
+    const { data: profile } = await supabase.from('profiles').select('*').eq('id', supabaseUser.id).single();
+
+    if (!profile) {
+      res.status(404).json({ error: "Account not found in system. Please contact admin." });
       return;
     }
 
-    console.error("Auth Login outer error:", outerErr.message, outerErr.stack);
-    // If it's one of the demo accounts, never attempt bcrypt compare
-    // with an absent/blank DB password hash.
-    const demoUser = getDemoUserByEmail(email);
-    if (demoUser) {
-      res.status(401).json({ error: "Invalid credentials" });
+    if (profile.status === "rejected") {
+      res.status(403).json({ error: "Your account has been rejected." });
       return;
     }
 
-    const jsonUser = jsonStoreGetUserByEmail(email);
-    if (!jsonUser || !jsonUser.passwordHash) {
-      res.status(401).json({ error: "Invalid credentials" });
-      return;
-    }
-    const valid = await bcrypt.compare(password, jsonUser.passwordHash);
-    if (!valid) {
-      res.status(401).json({ error: "Invalid credentials" });
-      return;
-    }
-    if (jsonUser.status === "rejected") {
-      res.status(403).json({ error: "Your account has been rejected.", rejectionReason: (jsonUser as any).rejectionReason || "" });
-      return;
-    }
-    if (jsonUser.status !== "active") {
+    if (profile.status !== "active") {
       res.status(403).json({ error: "Account is not active. Please wait for approval." });
       return;
     }
 
-    const token = signToken({ userId: jsonUser.id, email: jsonUser.email, role: jsonUser.role, name: jsonUser.name });
+    // Generate our own JWT for the API middleware
+    const token = signToken({
+      userId: supabaseUser.id,
+      email: profile.email,
+      role: profile.role,
+      name: profile.name,
+    });
+
     res.json({
       token,
+      supabaseToken: session?.access_token,
       user: {
-        id: jsonUser.id,
-        name: jsonUser.name,
-        email: jsonUser.email,
-        role: jsonUser.role,
-        userCategory: jsonUser.userCategory ?? jsonUser.role,
-        institution: jsonUser.institution ?? null,
-        status: jsonUser.status,
-        createdAt: jsonUser.createdAt,
+        id: supabaseUser.id,
+        name: profile.name,
+        email: profile.email,
+        role: profile.role,
+        userCategory: profile.user_category || profile.role,
+        institution: profile.institution || null,
+        status: profile.status,
+        createdAt: profile.created_at,
       },
     });
+  } catch (err: any) {
+    console.error("Auth Login error:", err.message);
+    res.status(500).json({ error: "Login failed. Please try again." });
   }
 });
 
 router.post("/auth/register", async (req, res) => {
-  const { name, email, password, role, institution, purpose, idToken } = req.body;
-  if (!name || !role || (!idToken && (!email || !password))) {
-    res.status(400).json({ error: "Name, role, and credentials are required" });
+  const { name, email, password, role, institution, purpose } = req.body;
+  if (!name || !email || !password || !role) {
+    res.status(400).json({ error: "Name, email, password, and role are required" });
     return;
   }
   try {
-    let uid = "";
-    let resolvedEmail = email as string | undefined;
-    
-    if (idToken) {
-      let decoded: { uid: string, email?: string, name?: string } | null;
-      try {
-        const auth = getFirebaseAuth();
-        decoded = await auth.verifyIdToken(idToken);
-      } catch {
-        decoded = await verifyIdTokenRestFallback(idToken);
-      }
-      
-      if (!decoded) {
-        res.status(401).json({ error: "Invalid Firebase token" });
+    const { data: authData, error: authErr } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: name,
+          role,
+          institution: institution || "HCDC",
+          purpose: purpose || "",
+        },
+      },
+    });
+
+    if (authErr) {
+      if (/already registered/i.test(authErr.message) || /already been registered/i.test(authErr.message)) {
+        res.status(400).json({ error: "Email already registered" });
         return;
       }
-      
-      uid = decoded.uid;
-      resolvedEmail = decoded.email || resolvedEmail;
-    } else {
-      const auth = getFirebaseAuth();
-      const created = await auth.createUser({
-        email,
-        password,
-        displayName: name,
-      });
-      uid = created.uid;
-      resolvedEmail = created.email || resolvedEmail;
+      throw authErr;
     }
 
-    let db;
-    try {
-      db = getFirestoreDb();
-    } catch {
-      throw new Error("No Firestore DB");
-    }
-    const existing = await db.collection("users").doc(uid).get();
-    if (existing.exists) {
-      res.status(400).json({ error: "User already registered" });
-      return;
-    }
-    const now = new Date().toISOString();
-    await db.collection("users").doc(uid).set({
-      id: uid,
-      name,
-      email: resolvedEmail || email,
-      role,
-      userCategory: role,
-      institution: institution ?? null,
-      purpose: purpose ?? null,
-      status: "pending",
-      createdAt: now,
-      updatedAt: now,
-    });
     res.status(201).json({ message: "Registration submitted. Awaiting admin approval." });
   } catch (err: any) {
-    console.error("Registration error:", err.message, err.stack);
-    if (/email already/i.test(err.message)) {
-      res.status(400).json({ error: "Email already registered" });
-      return;
-    }
-    res.status(500).json({ error: "Failed to register user to database" });
+    console.error("Registration error:", err.message);
+    res.status(500).json({ error: "Failed to register user" });
   }
 });
 
 router.get("/auth/me", requireAuth, async (req, res) => {
   try {
-    const db = getFirestoreDb();
-    const snap = await resolveUserProfile(db, req.user!.userId, req.user!.email).then((r) => r.snap);
-    if (!snap.exists) {
-      const demoUser = DEMO_USERS.find((u) => u.id === req.user!.userId || u.email === req.user!.email);
-      if (demoUser) {
-        res.json({
-          id: demoUser.id,
-          name: demoUser.name,
-          email: demoUser.email,
-          role: demoUser.role,
-          userCategory: demoUser.userCategory,
-          institution: demoUser.institution,
-          status: demoUser.status,
-          createdAt: new Date().toISOString(),
-        });
-        return;
-      }
-      const jsonUser = jsonStoreGetUserById(req.user!.userId);
-      if (!jsonUser) {
-        res.status(404).json({ error: "User not found" });
-        return;
-      }
-      res.json({
-        id: jsonUser.id,
-        name: jsonUser.name,
-        email: jsonUser.email,
-        role: jsonUser.role,
-        userCategory: jsonUser.userCategory ?? jsonUser.role,
-        institution: jsonUser.institution ?? null,
-        status: jsonUser.status,
-        createdAt: jsonUser.createdAt,
-      });
-      return;
-    }
-    const user = snap.data() as any;
-    res.json({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      userCategory: user.userCategory ?? user.role,
-      institution: user.institution ?? null,
-      status: user.status,
-      createdAt: user.createdAt,
-    });
-  } catch {
+    // Check demo users first
     const demoUser = DEMO_USERS.find((u) => u.id === req.user!.userId || u.email === req.user!.email);
     if (demoUser) {
       res.json({
@@ -389,21 +159,27 @@ router.get("/auth/me", requireAuth, async (req, res) => {
       });
       return;
     }
-    const jsonUser = jsonStoreGetUserById(req.user!.userId);
-    if (!jsonUser) {
+
+    const { data: profile, error } = await supabase.from('profiles').select('*').eq('id', req.user!.userId).single();
+    
+    if (error || !profile) {
       res.status(404).json({ error: "User not found" });
       return;
     }
+
     res.json({
-      id: jsonUser.id,
-      name: jsonUser.name,
-      email: jsonUser.email,
-      role: jsonUser.role,
-      userCategory: jsonUser.userCategory ?? jsonUser.role,
-      institution: jsonUser.institution ?? null,
-      status: jsonUser.status,
-      createdAt: jsonUser.createdAt,
+      id: profile.id,
+      name: profile.name,
+      email: profile.email,
+      role: profile.role,
+      userCategory: profile.user_category || profile.role,
+      institution: profile.institution || null,
+      status: profile.status,
+      createdAt: profile.created_at,
     });
+  } catch (err: any) {
+    console.error("Auth /me error:", err.message);
+    res.status(500).json({ error: "Failed to fetch profile" });
   }
 });
 
@@ -411,22 +187,27 @@ router.patch("/auth/profile", requireAuth, async (req, res) => {
   const { name, institution, purpose } = req.body;
   const userId = req.user!.userId;
   try {
-    const db = getFirestoreDb();
-    const snap = await db.collection("users").doc(userId).get();
-    if (!snap.exists) {
-      res.status(404).json({ error: "Profile not found" });
-      return;
-    }
-    const update: any = { updatedAt: new Date().toISOString() };
+    const update: any = { updated_at: new Date().toISOString() };
     if (name) update.name = name;
     if (institution !== undefined) update.institution = institution;
     if (purpose !== undefined) update.purpose = purpose;
-    
-    await db.collection("users").doc(userId).update(update);
-    const updated = await db.collection("users").doc(userId).get();
-    res.json({ id: updated.id, ...updated.data() });
-  } catch (error: any) {
-    console.error("Profile Update Error:", error.message);
+
+    const { data, error } = await supabase.from('profiles').update(update).eq('id', userId).select().single();
+    if (error) throw error;
+    if (!data) { res.status(404).json({ error: "Profile not found" }); return; }
+
+    res.json({
+      id: data.id,
+      name: data.name,
+      email: data.email,
+      role: data.role,
+      userCategory: data.user_category || data.role,
+      institution: data.institution || null,
+      status: data.status,
+      createdAt: data.created_at,
+    });
+  } catch (err: any) {
+    console.error("Profile Update Error:", err.message);
     res.status(500).json({ error: "Failed to update profile" });
   }
 });

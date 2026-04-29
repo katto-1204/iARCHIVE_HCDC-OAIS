@@ -2,15 +2,14 @@ import { Router } from "express";
 import { requireAuth } from "../middlewares/auth.js";
 import { generateId, generateMaterialId } from "../lib/id.js";
 import { logAudit } from "./audit.js";
+import { supabase } from "../lib/supabase.js";
+import { getFirestoreDb } from "../lib/firebase.js";
 import {
   jsonStoreCreateMaterial,
   jsonStoreDeleteMaterial,
   jsonStoreGetMaterial,
-  jsonStoreGetMaterials,
-  jsonStoreGetStats,
   jsonStoreUpdateMaterial,
 } from "../lib/jsonStore.js";
-import { getFirestoreDb } from "../lib/firebase.js";
 
 const router = Router();
 
@@ -51,55 +50,47 @@ router.get("/materials", async (req, res) => {
   const access = req.query.access as string;
   const categoryId = req.query.category as string;
   try {
-    // EMERGENCY BYPASS: Use JSON store while Firebase quota is exceeded
-    throw new Error("Firebase Quota Exceeded - Falling back to local store");
-    
-    const db = getFirestoreDb();
-    if (!db) throw new Error("Firebase unavailable");
-    let query: FirebaseFirestore.Query = db.collection("materials");
+    let query = supabase.from('materials').select('*', { count: 'exact' });
+
     const userRole = (req as any).user?.role;
     const isPrivileged = userRole === "admin" || userRole === "archivist";
 
     if (!isPrivileged) {
-      query = query.where("status", "==", "published");
+      query = query.eq('status', 'published');
     }
 
     if (access && ["public", "restricted", "confidential"].includes(access)) {
-      query = query.where("access", "==", access);
+      query = query.eq('access', access);
     }
-    if (categoryId) {
-      query = query.where("categoryId", "==", categoryId);
-    }
-    const snapshot = await query.get();
-    let rows = snapshot.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) })) as any[];
     
-    // Sort in memory to avoid requiring composite Firestore indexes
-    rows.sort((a, b) => {
-      const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const db2 = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return db2 - da;
-    });
-    const filtered = search ? rows.filter((m) => matchesSearch(m, search)) : rows;
-    const total = filtered.length;
-    const totalPages = Math.ceil(total / limit);
-    const offset = (page - 1) * limit;
-    const pageItems = filtered.slice(offset, offset + limit);
+    if (categoryId) {
+      query = query.eq('category_id', categoryId);
+    }
 
-    const catsSnap = await db.collection("categories").get();
-    const catMap = Object.fromEntries(catsSnap.docs.map((c) => [c.id, (c.data() as any).name]));
-    const materials = pageItems.map((m) => formatMaterial(m, m.categoryId ? catMap[m.categoryId] : undefined));
+    if (search) {
+      query = query.or(`title.ilike.%${search}%,material_id.ilike.%${search}%,creator.ilike.%${search}%,description.ilike.%${search}%`);
+    }
+
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+    
+    const { data: rows, count, error } = await query
+      .order('created_at', { ascending: false })
+      .range(from, to);
+
+    if (error) throw error;
+
+    const { data: categories } = await supabase.from('categories').select('id, name');
+    const catMap = Object.fromEntries((categories || []).map(c => [c.id, c.name]));
+
+    const materials = (rows || []).map((m) => formatMaterial(m, m.category_id ? catMap[m.category_id] : undefined));
+    const total = count || 0;
+    const totalPages = Math.ceil(total / limit);
+
     res.json({ materials, total, page, limit, totalPages });
-  } catch (err) {
-    console.error("Firestore materials fetch failed, using JSON store fallback:", err);
-    res.json(
-      jsonStoreGetMaterials({
-        search,
-        access,
-        category: categoryId,
-        page,
-        limit,
-      }),
-    );
+  } catch (err: any) {
+    console.error("Supabase materials fetch failed:", err.message);
+    res.status(500).json({ error: "Failed to fetch materials from Supabase" });
   }
 });
 
@@ -646,26 +637,33 @@ router.post("/materials/:id/file/chunks", requireAuth, async (req, res) => {
 
 router.get("/stats", async (_req, res) => {
   try {
-    throw new Error("Bypassing Firebase");
-    const db = getFirestoreDb();
-    if (!db) throw new Error("Firebase unavailable");
-    const matCount = await db.collection("materials").where("status", "==", "published").count().get();
-    const catCount = await db.collection("categories").count().get();
-    const userCount = await db.collection("users").where("status", "==", "active").count().get();
-    const pendingReqs = await db.collection("accessRequests").where("status", "==", "pending").count().get();
-    const pendingUsers = await db.collection("users").where("status", "==", "pending").count().get();
-    const recentActivitySnap = await db.collection("auditLogs").orderBy("createdAt", "desc").limit(10).get();
-    const recentActivity = recentActivitySnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const [
+      { count: matCount },
+      { count: catCount },
+      { count: userCount },
+      { count: pendingReqs },
+      { count: pendingUsers },
+      { data: recentActivity }
+    ] = await Promise.all([
+      supabase.from('materials').select('*', { count: 'exact', head: true }).eq('status', 'published'),
+      supabase.from('categories').select('*', { count: 'exact', head: true }),
+      supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+      supabase.from('access_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+      supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+      supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(10)
+    ]);
+
     res.json({
-      totalMaterials: Number(matCount.data().count),
-      totalCategories: Number(catCount.data().count),
-      totalUsers: Number(userCount.data().count),
-      pendingRequests: Number(pendingReqs.data().count),
-      pendingUsers: Number(pendingUsers.data().count),
-      recentActivity,
+      totalMaterials: matCount || 0,
+      totalCategories: catCount || 0,
+      totalUsers: userCount || 0,
+      pendingRequests: pendingReqs || 0,
+      pendingUsers: pendingUsers || 0,
+      recentActivity: recentActivity || [],
     });
-  } catch {
-    res.json(jsonStoreGetStats());
+  } catch (err: any) {
+    console.error("Supabase stats failed:", err.message);
+    res.status(500).json({ error: "Failed to fetch stats from Supabase" });
   }
 });
 

@@ -7,7 +7,7 @@ import {
 
 const router = Router();
 
-router.post("/migrate-to-supabase", async (req, res) => {
+router.get("/migrate-to-supabase", async (req, res) => {
   try {
     const results: any = { categories: 0, materials: 0 };
     
