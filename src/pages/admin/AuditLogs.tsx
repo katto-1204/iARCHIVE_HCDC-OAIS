@@ -35,7 +35,12 @@ export default function AdminAuditLogs() {
             ) : (
               data?.logs.map(log => (
                 <TableRow key={log.id}>
-                  <TableCell className="whitespace-nowrap font-mono text-xs">{format(new Date(log.createdAt), 'yyyy-MM-dd HH:mm:ss')}</TableCell>
+                  <TableCell className="whitespace-nowrap font-mono text-xs">
+                    {log.createdAt ? (() => {
+                      const d = new Date(log.createdAt);
+                      return isNaN(d.getTime()) ? "Invalid Date" : format(d, 'yyyy-MM-dd HH:mm:ss');
+                    })() : "N/A"}
+                  </TableCell>
                   <TableCell className="font-medium text-primary">{log.userName || 'System'}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className="capitalize text-[10px] tracking-widest">{log.action.replace('_', ' ')}</Badge>

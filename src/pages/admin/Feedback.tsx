@@ -253,7 +253,10 @@ export default function AdminFeedback() {
                   <div className="text-right">
                     <div className="flex items-center gap-2 text-[10px] font-black text-muted-foreground/40 uppercase tracking-widest">
                       <Clock className="w-3.5 h-3.5" /> 
-                      {f.createdAt ? format(new Date(f.createdAt), "MMM d, yyyy") : (f.date || 'Jan 1, 2026')}
+                      {f.createdAt ? (() => {
+                        const d = new Date(f.createdAt);
+                        return isNaN(d.getTime()) ? (f.date || 'Jan 1, 2026') : format(d, "MMM d, yyyy");
+                      })() : (f.date || 'Jan 1, 2026')}
                     </div>
                   </div>
                 </div>
@@ -333,7 +336,10 @@ export default function AdminFeedback() {
                 </div>
                 <DialogDescription className="text-muted-foreground text-sm flex items-center gap-2">
                   <Clock className="w-3.5 h-3.5" /> 
-                  Submitted on {selectedFeedback.createdAt ? format(new Date(selectedFeedback.createdAt), "MMMM d, yyyy 'at' h:mm a") : 'January 1, 2026'}
+                  Submitted on {selectedFeedback.createdAt ? (() => {
+                    const d = new Date(selectedFeedback.createdAt);
+                    return isNaN(d.getTime()) ? 'January 1, 2026' : format(d, "MMMM d, yyyy 'at' h:mm a");
+                  })() : 'January 1, 2026'}
                 </DialogDescription>
               </DialogHeader>
 

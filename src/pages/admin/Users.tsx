@@ -549,12 +549,15 @@ export default function AdminUsers() {
                       <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
                         <Clock className="w-4 h-4 text-muted-foreground" />
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-[10px] text-muted-foreground font-bold uppercase">Submission Date</p>
-                        <p className="text-sm font-bold text-[#0a1628]">
-                          {editingUser?.createdAt ? format(new Date(editingUser.createdAt), 'MMMM d, yyyy HH:mm') : "N/A"}
-                        </p>
-                      </div>
+                        <div className="bg-muted/30 p-4 rounded-xl border border-border/50">
+                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Registration Date</p>
+                          <p className="text-sm font-semibold text-[#0a1628]">
+                            {editingUser?.createdAt ? (() => {
+                              const d = new Date(editingUser.createdAt);
+                              return isNaN(d.getTime()) ? "N/A" : format(d, 'MMMM d, yyyy HH:mm');
+                            })() : "N/A"}
+                          </p>
+                        </div>
                     </div>
                   </div>
                 </div>

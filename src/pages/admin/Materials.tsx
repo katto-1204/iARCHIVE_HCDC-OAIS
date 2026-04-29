@@ -386,16 +386,20 @@ export default function AdminMaterials() {
   React.useEffect(() => {
     if (materials.length > 0) {
       const matNumbers = materials.map(m => {
-        // Extract the last 7 digits from the material ID if it follows the 26iA010000001 pattern
-        // Or if it has a separate matNo field
-        const match = m.uniqueId?.match(/\d{7}$/);
+        // Look for the last numeric sequence (7 digits) in the uniqueId/materialId
+        const idToScan = m.uniqueId || m.materialId || "";
+        const match = idToScan.match(/\d{7}$/);
         return match ? parseInt(match[0], 10) : 0;
       });
-      const nextNum = Math.max(...matNumbers, 0) + 1;
+      const maxNo = Math.max(...matNumbers, 0);
+      const nextNum = maxNo + 1;
       const formattedNum = String(nextNum).padStart(7, '0');
       setUploadForm(prev => ({ ...prev, matNo: formattedNum }));
+    } else {
+      // Start at 0000001 if empty
+      setUploadForm(prev => ({ ...prev, matNo: "0000001" }));
     }
-  }, [materials.length]);
+  }, [materials.length, uploadForm.catNo]); // Also recalc if category changes? Maybe not.
 
   const movePdfImage = (idx: number, dir: 'left' | 'right') => {
     setPdfPreviewImages(prev => {
@@ -2394,12 +2398,17 @@ export default function AdminMaterials() {
 
                   // Ensure category mapping for API
                   if (uploadForm.series) {
-                    const cat = categories.find(c => c.name === uploadForm.series);
+                    const cat = categories.find(c => c.name === uploadForm.series || c.id === uploadForm.series);
                     if (cat) apiData.categoryId = cat.id;
                   }
                   // Also try subfonds as category fallback
                   if (!apiData.categoryId && uploadForm.subfonds) {
-                    const cat = categories.find(c => c.name === uploadForm.subfonds);
+                    const cat = categories.find(c => 
+                      c.name === uploadForm.subfonds || 
+                      c.id === uploadForm.subfonds || 
+                      (c as any).code === uploadForm.subfonds ||
+                      (c.name.includes('(' + uploadForm.subfonds + ')') )
+                    );
                     if (cat) apiData.categoryId = cat.id;
                   }
 
@@ -2488,12 +2497,20 @@ export default function AdminMaterials() {
                     });
                   } catch (apiErr: any) {
                     console.error("Supabase Save Failed:", apiErr);
-                    const errorMsg = apiErr?.message || "Cloud sync failed";
+                    
+                    // Extract rich error info from backend hint
+                    const errorMsg = (apiErr as any)?.response?.data?.message || apiErr?.message || "Cloud sync failed";
+                    const errorHint = (apiErr as any)?.response?.data?.hint || "";
+                    const errorCode = (apiErr as any)?.response?.data?.code || (apiErr as any)?.code;
+
                     toast({
                       variant: "destructive",
-                      title: "Firestore Error",
-                      description: `Critical: ${errorMsg}. Material NOT saved.`,
+                      title: errorCode === "23505" ? "ID Conflict" : "Ingestion Failed",
+                      description: errorCode === "23505" 
+                        ? `A material with this Reference Code already exists. Please change the Material No. and try again.`
+                        : `Error: ${errorMsg}. ${errorHint ? '\nHint: ' + errorHint : ''}`,
                     });
+                    setIngestBusy(false);
                     return; // Stop here — do NOT save to local storage
                   }
 

@@ -216,7 +216,14 @@ export default function AdminRequests() {
             ) : (
               requestRows.map((req: any) => (
                 <TableRow key={req.id}>
-                  <TableCell className="whitespace-nowrap">{format(new Date(mode === "access" ? req.createdAt : req.requestedAt), 'MMM d, yyyy')}</TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {(() => {
+                      const dateStr = mode === "access" ? req.createdAt : req.requestedAt;
+                      if (!dateStr) return "N/A";
+                      const date = new Date(dateStr);
+                      return isNaN(date.getTime()) ? "N/A" : format(date, 'MMM d, yyyy');
+                    })()}
+                  </TableCell>
                   <TableCell>
                     <p className="font-medium text-primary">{mode === "access" ? req.userName : req.requestedBy}</p>
                     <p className="text-xs text-muted-foreground">{mode === "access" ? req.userEmail : "Archivist"}</p>

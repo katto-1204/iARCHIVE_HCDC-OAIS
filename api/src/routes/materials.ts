@@ -192,28 +192,42 @@ router.post("/materials", requireAuth, async (req, res) => {
     }
 
     // 3. FIRST: Insert the main material record
+    console.log("Inserting material record into Supabase:", JSON.stringify(newMat, null, 2));
     const { error: mainError } = await supabase.from('materials').insert(newMat);
-    if (mainError) throw mainError;
+    if (mainError) {
+      console.error("Supabase insert error details:", mainError);
+      throw mainError;
+    }
 
     // 4. SECOND: Insert chunks (now that the parent ID exists)
     if (chunks.length > 0) {
+      console.log(`Inserting ${chunks.length} chunks...`);
       for (let i = 0; i < chunks.length; i++) {
-        await supabase.from('material_chunks').insert({
+        const { error: chunkErr } = await supabase.from('material_chunks').insert({
           material_id: id,
           chunk_index: i,
           data: chunks[i]
         });
+        if (chunkErr) {
+           console.error(`Chunk ${i} failed:`, chunkErr);
+           throw chunkErr;
+        }
       }
     }
 
     // 5. THIRD: Insert page images
     if (pageImages.length > 0) {
+      console.log(`Inserting ${pageImages.length} pages...`);
       for (let i = 0; i < pageImages.length; i++) {
-        await supabase.from('material_pages').insert({
+        const { error: pageErr } = await supabase.from('material_pages').insert({
           material_id: id,
           page_index: i,
           data: pageImages[i]
         });
+        if (pageErr) {
+           console.error(`Page ${i} failed:`, pageErr);
+           throw pageErr;
+        }
       }
     }
 
@@ -223,18 +237,25 @@ router.post("/materials", requireAuth, async (req, res) => {
   } catch (err: any) {
     console.error("Supabase material creation failed!");
     console.error("Error Message:", err.message);
+    console.error("Error Details:", err);
     
     let userHint = "Please check your Supabase server logs.";
     if (err.message?.includes("column") && err.message?.includes("does not exist")) {
       userHint = "DATABASE SCHEMA MISMATCH: Your Supabase 'materials' table is missing new columns (is_file_chunked, chunks_count, etc.). Please run the updated supabase_schema.sql in your Supabase SQL Editor.";
     } else if (err.message?.includes("relation") && err.message?.includes("does not exist")) {
       userHint = "DATABASE TABLE MISSING: One of the required tables (materials, material_chunks, material_pages) was not found. Please run the full supabase_schema.sql script.";
+    } else if (err.code === '23503') {
+      userHint = "FOREIGN KEY VIOLATION: A referenced record (like category or profile) does not exist.";
+    } else if (err.code === '23505') {
+      userHint = "UNIQUE CONSTRAINT VIOLATION: A material with this ID or Reference Code already exists. Please refresh and try a different code.";
     }
 
     res.status(500).json({ 
       error: "Failed to create material in Supabase", 
-      details: err.message,
-      hint: userHint
+      message: err.message,
+      details: err.details,
+      hint: userHint,
+      code: err.code
     });
   }
 });

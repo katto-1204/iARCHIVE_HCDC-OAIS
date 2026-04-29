@@ -508,7 +508,10 @@ export default function UserAccounts() {
                       <div className="min-w-0">
                         <p className="text-[10px] text-muted-foreground font-bold uppercase">Registration Date</p>
                         <p className="text-sm font-bold text-[#0a1628]">
-                          {viewingUser?.createdAt ? format(new Date(viewingUser.createdAt), 'MMMM d, yyyy HH:mm') : "N/A"}
+                          {viewingUser?.createdAt ? (() => {
+                            const d = new Date(viewingUser.createdAt);
+                            return isNaN(d.getTime()) ? "N/A" : format(d, 'MMMM d, yyyy HH:mm');
+                          })() : "N/A"}
                         </p>
                       </div>
                     </div>

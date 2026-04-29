@@ -231,7 +231,12 @@ export default function AdminDashboard() {
                            <div key={f.id} className="p-8 hover:bg-muted/5 transition-colors">
                               <div className="flex items-center justify-between mb-2">
                                  <span className="text-[10px] font-black text-[#0a1628] uppercase tracking-widest">{f.name || 'Anonymous'}</span>
-                                 <span className="text-[9px] text-muted-foreground/40 font-bold uppercase">{format(new Date(f.createdAt || 0), "MMM d")}</span>
+                                 <span className="text-[9px] text-muted-foreground/40 font-bold uppercase">
+                                     {f.createdAt ? (() => {
+                                        const d = new Date(f.createdAt);
+                                        return isNaN(d.getTime()) ? "N/A" : format(d, "MMM d");
+                                     })() : "N/A"}
+                                  </span>
                               </div>
                               <p className="text-xs text-muted-foreground font-medium line-clamp-2 leading-relaxed">{f.message}</p>
                            </div>
