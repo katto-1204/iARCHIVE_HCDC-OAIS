@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useGetMe } from "@workspace/api-client-react";
-import { Database } from "lucide-react";
+import { Database, Shield, Zap, Lock, Globe } from "lucide-react";
 
 import Home from "@/pages/Home";
 
@@ -111,76 +111,116 @@ function Router() {
 
 const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
   const [progress, setProgress] = React.useState(0);
+  const [phase, setPhase] = React.useState(0);
 
   React.useEffect(() => {
     const timer = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 100) {
           clearInterval(timer);
-          setTimeout(onFinish, 600);
+          setTimeout(onFinish, 800);
           return 100;
         }
-        return prev + 2;
+        return prev + 1;
       });
-    }, 25);
-    return () => clearInterval(timer);
+    }, 20);
+
+    const phaseTimer = setInterval(() => {
+       setPhase(p => (p + 1) % 4);
+    }, 1500);
+
+    return () => {
+      clearInterval(timer);
+      clearInterval(phaseTimer);
+    };
   }, [onFinish]);
 
-  return (
-    <div className="fixed inset-0 z-[9999] bg-[#960000] flex flex-col items-center justify-center overflow-hidden">
-      {/* Premium Red Background Layers */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[#7a0000] via-[#960000] to-[#5a0000] animate-gradient-xy opacity-80" />
-      <div className="absolute inset-0 bg-grid-white animate-grid-flow opacity-[0.05]" />
-      
-      {/* Dynamic Light Effects */}
-      <div className="absolute top-0 left-0 w-full h-[50vh] bg-gradient-to-b from-white/10 to-transparent pointer-events-none" />
-      <div className="absolute -top-40 -left-40 w-[600px] h-[600px] bg-red-400/20 rounded-full blur-[120px] animate-float-slow" />
-      <div className="absolute -bottom-40 -right-40 w-[600px] h-[600px] bg-black/40 rounded-full blur-[120px] animate-float-slower" />
+  const phases = ["Encrypting Handshake", "Synchronizing Archive", "Verified Authority", "System Ready"];
 
-      <div className="relative z-10 flex flex-col items-center">
-        {/* Logo without box, just floating with high-end glow */}
-        <div className="relative mb-12 group animate-fade-in-up">
-          <div className="absolute inset-0 bg-white/20 blur-3xl rounded-full scale-150 animate-pulse-glow" />
-          <img 
-             src={`${import.meta.env.BASE_URL}logos/iarchive%20icon.png`} 
-             alt="iArchive Logo" 
-             className="w-40 h-40 object-contain relative z-10 drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
-          />
+  return (
+    <div className="fixed inset-0 z-[9999] bg-[#0a1628] flex flex-col items-center justify-center overflow-hidden">
+      {/* Premium Background Layers */}
+      <div className="absolute inset-0 bg-gradient-to-br from-[#0a1628] via-[#0a1628] to-black opacity-100" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-red-600/5 via-transparent to-transparent opacity-60" />
+      
+      {/* Moving Particles/Grid Effect */}
+      <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:60px_60px] animate-grid-flow" />
+      
+      {/* Dynamic Light Blurs */}
+      <div className="absolute -top-40 -left-40 w-[600px] h-[600px] bg-red-600/10 rounded-full blur-[120px] animate-pulse" />
+      <div className="absolute -bottom-40 -right-40 w-[600px] h-[600px] bg-blue-600/5 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: "1s" }} />
+
+      <div className="relative z-10 flex flex-col items-center max-w-lg w-full px-12">
+        {/* White Logo with Premium Glow */}
+        <div className="relative mb-16 group">
+          <div className="absolute inset-0 bg-white/20 blur-[100px] rounded-full scale-150 animate-pulse-glow" />
+          <div className="relative z-10 transition-transform duration-1000 hover:scale-105">
+            <img 
+               src={`${import.meta.env.BASE_URL}logos/iarchive%20white%20logo.png`} 
+               alt="iArchive Logo" 
+               className="w-48 h-48 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.3)] animate-fade-in"
+            />
+          </div>
         </div>
         
-        <div className="text-center space-y-4 animate-fade-in-up" style={{ animationDelay: "200ms" }}>
-          <h1 className="text-6xl font-display font-black text-white tracking-[0.2em] uppercase drop-shadow-lg">
+        {/* System Title */}
+        <div className="text-center space-y-6 mb-20 animate-fade-in-up">
+          <h1 className="text-5xl font-black text-white tracking-[0.25em] uppercase leading-none">
             iArchive
           </h1>
-          <div className="flex items-center justify-center gap-4">
-            <div className="h-px w-8 bg-white/30" />
-            <p className="text-white/80 font-bold text-[10px] uppercase tracking-[0.5em]">
-              HCDC Digital Collections
+          <div className="flex items-center justify-center gap-6">
+            <div className="h-[2px] w-12 bg-gradient-to-r from-transparent via-red-600 to-transparent" />
+            <p className="text-white/40 font-black text-[9px] uppercase tracking-[0.5em] whitespace-nowrap">
+              Institutional Digital Memory
             </p>
-            <div className="h-px w-8 bg-white/30" />
+            <div className="h-[2px] w-12 bg-gradient-to-r from-transparent via-red-600 to-transparent" />
           </div>
         </div>
 
-        {/* Improved Loading Bar - Slim and Premium */}
-        <div className="mt-20 w-72 group">
-          <div className="flex justify-between items-end mb-2 px-1">
-            <span className="text-[9px] font-black text-white/40 uppercase tracking-widest animate-pulse">Initializing System</span>
-            <span className="text-xs font-mono text-white/60">{progress}%</span>
+        {/* Elite Progress Indicator */}
+        <div className="w-full space-y-4">
+          <div className="flex items-center justify-between px-1">
+             <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
+                <span className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">{phases[phase]}</span>
+             </div>
+             <span className="text-xs font-black text-white/60 tracking-widest">{progress}%</span>
           </div>
-          <div className="h-[2px] w-full bg-white/10 rounded-full overflow-hidden relative">
+          
+          <div className="relative h-1 w-full bg-white/5 rounded-full overflow-hidden">
             <div 
-              className="absolute inset-y-0 left-0 bg-white transition-all duration-300 ease-out shadow-[0_0_15px_rgba(255,255,255,0.8)]"
+              className="absolute inset-y-0 left-0 bg-gradient-to-r from-red-600 to-red-400 transition-all duration-300 ease-out shadow-[0_0_20px_rgba(220,38,38,0.5)]"
               style={{ width: `${progress}%` }}
             />
           </div>
         </div>
+        
+        {/* Loading Metrics Row */}
+        <div className="mt-8 grid grid-cols-3 gap-8 w-full">
+           <div className="flex flex-col items-center gap-1 opacity-20">
+              <Shield className="w-3.5 h-3.5 text-white" />
+              <span className="text-[7px] font-black text-white uppercase tracking-widest text-center">Encrypted</span>
+           </div>
+           <div className="flex flex-col items-center gap-1 opacity-20">
+              <Globe className="w-3.5 h-3.5 text-white" />
+              <span className="text-[7px] font-black text-white uppercase tracking-widest text-center">Global Node</span>
+           </div>
+           <div className="flex flex-col items-center gap-1 opacity-20">
+              <Lock className="w-3.5 h-3.5 text-white" />
+              <span className="text-[7px] font-black text-white uppercase tracking-widest text-center">Secure</span>
+           </div>
+        </div>
       </div>
       
-      <div className="absolute bottom-12 flex flex-col items-center gap-3 animate-fade-in opacity-40">
-        <div className="text-white text-[10px] uppercase tracking-[0.3em] font-bold">
-          Preservation · Integrity · Access
+      {/* Institutional Footer */}
+      <div className="absolute bottom-16 flex flex-col items-center gap-4 animate-fade-in opacity-30">
+        <div className="flex items-center gap-6">
+           <span className="text-[9px] font-black text-white uppercase tracking-[0.4em]">Preservation</span>
+           <div className="w-1.5 h-1.5 rounded-full bg-red-600" />
+           <span className="text-[9px] font-black text-white uppercase tracking-[0.4em]">Integrity</span>
+           <div className="w-1.5 h-1.5 rounded-full bg-red-600" />
+           <span className="text-[9px] font-black text-white uppercase tracking-[0.4em]">Access</span>
         </div>
-        <div className="h-4 w-px bg-gradient-to-b from-white to-transparent" />
       </div>
     </div>
   );

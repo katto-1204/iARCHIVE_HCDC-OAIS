@@ -31,7 +31,30 @@ app.get("/api/test", (req, res) => {
   res.json({ message: "API is working", cwd: process.cwd(), node_env: process.env.NODE_ENV });
 });
 
-app.get("/api/debug", (req, res) => {
+app.get("/api/debug", async (req, res) => {
+  let firestoreCounts = {};
+  let firestoreError = null;
+  try {
+    const { getFirestoreDb } = await import("./lib/firebase.js");
+    const db = getFirestoreDb();
+    if (db) {
+      const [m, c, u] = await Promise.all([
+        db.collection("materials").count().get(),
+        db.collection("categories").count().get(),
+        db.collection("users").count().get()
+      ]);
+      firestoreCounts = {
+        materials: m.data().count,
+        categories: c.data().count,
+        users: u.data().count
+      };
+    } else {
+      firestoreError = "Firestore DB not initialized (check credentials)";
+    }
+  } catch (err: any) {
+    firestoreError = err.message;
+  }
+
   res.json({
     env: {
       NODE_ENV: process.env.NODE_ENV,
@@ -39,6 +62,10 @@ app.get("/api/debug", (req, res) => {
       HAS_SERVICE_ACCOUNT_JSON: !!process.env.FIREBASE_SERVICE_ACCOUNT_JSON,
       HAS_SERVICE_ACCOUNT_FILE: fs.existsSync(path.join(process.cwd(), "service-account.json")),
       VERCEL: process.env.VERCEL,
+    },
+    firestore: {
+      counts: firestoreCounts,
+      error: firestoreError
     },
     cwd: process.cwd(),
     time: new Date().toISOString()
