@@ -3,9 +3,11 @@ import { format } from "date-fns";
 import { AdminLayout } from "@/components/layout";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Badge, Button, Input, Card, CardContent, CardHeader, CardTitle } from "@/components/ui-components";
 import { Search, UserCheck, UserX, Trash2, Users, Clock, ShieldCheck, Shield, Eye, Upload, Edit, Settings, UserPlus, FileText, Loader2 } from "lucide-react";
-import { useGetUsers, useApproveUser, useRejectUser, useDeleteUser } from "@workspace/api-client-react";
+import { useGetUsers, useApproveUser, useRejectUser, useDeleteUser, useCreateUser } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 
 interface AdminPermissions {
@@ -37,7 +39,38 @@ export default function AdminUsers() {
   const { mutate: approve, isPending: isApproving } = useApproveUser();
   const { mutate: reject, isPending: isRejecting } = useRejectUser();
   const { mutate: remove, isPending: isDeleting } = useDeleteUser();
+  const { mutate: createUser, isPending: isCreating } = useCreateUser();
   const { toast } = useToast();
+
+  // Create User State
+  const [newUserOpen, setNewUserOpen] = React.useState(false);
+  const [newUser, setNewUser] = React.useState({
+    name: "",
+    email: "",
+    password: "",
+    role: "archivist",
+    institution: "HCDC",
+    purpose: ""
+  });
+
+  const handleCreateUser = () => {
+    if (!newUser.name || !newUser.email || !newUser.password) {
+      toast({ title: "Validation Error", description: "Please fill in all required fields.", variant: "destructive" });
+      return;
+    }
+
+    createUser({ data: newUser }, {
+      onSuccess: () => {
+        toast({ title: "Account Created", description: `Successfully created ${newUser.role} account for ${newUser.name}.` });
+        setNewUserOpen(false);
+        setNewUser({ name: "", email: "", password: "", role: "archivist", institution: "HCDC", purpose: "" });
+        refetch();
+      },
+      onError: (err: any) => {
+        toast({ title: "Creation Failed", description: err.message || "Failed to create user account.", variant: "destructive" });
+      }
+    });
+  };
 
   // Permissions management
   const [permissionsOpen, setPermissionsOpen] = React.useState(false);
@@ -186,11 +219,20 @@ export default function AdminUsers() {
           <h1 className="text-3xl font-display font-bold text-[#0a1628]">Admin Accounts</h1>
           <p className="text-muted-foreground">Manage Archivist and Administrator accounts with role-based permissions.</p>
         </div>
-        <div className="flex items-center gap-2 bg-primary/5 border border-primary/10 rounded-xl px-4 py-2">
-          <Users className="w-5 h-5 text-primary" />
-          <span className="text-sm font-semibold text-primary">
-            {filtered.length} {tab} users
-          </span>
+        <div className="flex items-center gap-3">
+          <Button 
+            className="bg-primary hover:bg-primary/90 text-white gap-2 shadow-lg shadow-primary/20"
+            onClick={() => setNewUserOpen(true)}
+          >
+            <UserPlus className="w-4 h-4" />
+            New Account
+          </Button>
+          <div className="flex items-center gap-2 bg-primary/5 border border-primary/10 rounded-xl px-4 py-2">
+            <Users className="w-5 h-5 text-primary" />
+            <span className="text-sm font-semibold text-primary">
+              {filtered.length} {tab} users
+            </span>
+          </div>
         </div>
       </div>
 
@@ -679,6 +721,100 @@ export default function AdminUsers() {
               </Button>
             </DialogFooter>
           </div>
+        </DialogContent>
+      </Dialog>
+      {/* ═══ Create New Account Modal ═══ */}
+      <Dialog open={newUserOpen} onOpenChange={setNewUserOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-2xl">
+              <UserPlus className="w-6 h-6 text-primary" /> Create New Admin/Archivist
+            </DialogTitle>
+            <DialogDescription>
+              Manually add a new internal account. These accounts will be automatically activated.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Full Name *</Label>
+              <Input 
+                id="name" 
+                placeholder="Juan Dela Cruz" 
+                value={newUser.name}
+                onChange={e => setNewUser({...newUser, name: e.target.value})}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email Address *</Label>
+              <Input 
+                id="email" 
+                type="email" 
+                placeholder="name@hcdc.edu.ph" 
+                value={newUser.email}
+                onChange={e => setNewUser({...newUser, email: e.target.value})}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password *</Label>
+              <Input 
+                id="password" 
+                type="password" 
+                placeholder="••••••••" 
+                value={newUser.password}
+                onChange={e => setNewUser({...newUser, password: e.target.value})}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Account Role *</Label>
+              <Select value={newUser.role} onValueChange={(v) => setNewUser({...newUser, role: v})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="archivist">Archivist (Internal)</SelectItem>
+                  <SelectItem value="admin">Administrator (System)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="institution">Institution / Department</Label>
+              <Input 
+                id="institution" 
+                placeholder="HCDC - BLIS Department" 
+                value={newUser.institution}
+                onChange={e => setNewUser({...newUser, institution: e.target.value})}
+              />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="purpose">Responsibility / Notes</Label>
+              <textarea
+                id="purpose"
+                className="w-full min-h-[80px] rounded-xl border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                placeholder="Briefly describe their duty or responsibility..."
+                value={newUser.purpose}
+                onChange={e => setNewUser({...newUser, purpose: e.target.value})}
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="ghost" onClick={() => setNewUserOpen(false)} disabled={isCreating}>Cancel</Button>
+            <Button 
+              className="bg-primary text-white font-bold px-8 shadow-lg shadow-primary/20"
+              onClick={handleCreateUser}
+              disabled={isCreating}
+            >
+              {isCreating ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                "Create Account"
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </AdminLayout>

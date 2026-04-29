@@ -119,4 +119,64 @@ router.delete("/users/:id", requireAuth, requireRole("admin"), async (req, res) 
   }
 });
 
+router.post("/users", requireAuth, requireRole("admin"), async (req, res) => {
+  const admin = req.user!;
+  const { name, email, password, role, userCategory, institution, purpose } = req.body;
+
+  if (!name || !email || !password || !role) {
+    res.status(400).json({ error: "Name, email, password, and role are required" });
+    return;
+  }
+
+  try {
+    const auth = getFirebaseAuth();
+    const db = getFirestoreDb();
+
+    // 1. Create in Firebase Auth
+    const userRecord = await auth.createUser({
+      email,
+      password,
+      displayName: name,
+    });
+
+    const uid = userRecord.uid;
+    const now = new Date().toISOString();
+
+    // 2. Create in Firestore
+    const userData = {
+      id: uid,
+      name,
+      email,
+      role: role || "archivist",
+      userCategory: userCategory || role || "staff",
+      institution: institution || "HCDC",
+      purpose: purpose || null,
+      status: "active", // Created by admin = auto-active
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await db.collection("users").doc(uid).set(userData);
+
+    // 3. Audit Log
+    await logAudit({
+      action: "CREATE_USER",
+      entityType: "user",
+      entityId: uid,
+      userId: admin.userId,
+      userName: admin.name,
+      details: `Created new ${role} account: ${name} (${email})`,
+    });
+
+    res.status(201).json(formatUser(userData));
+  } catch (err: any) {
+    console.error("Admin Create User Error:", err.message);
+    if (/email already/i.test(err.message)) {
+      res.status(400).json({ error: "Email already exists" });
+      return;
+    }
+    res.status(500).json({ error: "Failed to create user account" });
+  }
+});
+
 export default router;

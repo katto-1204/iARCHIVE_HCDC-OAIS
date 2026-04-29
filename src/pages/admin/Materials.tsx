@@ -1189,15 +1189,21 @@ export default function AdminMaterials() {
     const fromCategories = seriesOptions.map((s: any) => String(s.name || "").trim()).filter(Boolean);
     const fromFallback = uploadForm.subfonds ? (PROGRAMS_BY_SUBFOND[uploadForm.subfonds] || []) : [];
     const merged = [...fromCategories, ...fromFallback];
-    const byLower = new Map<string, string>();
+    const byNormalized = new Map<string, string>();
+    
     merged.forEach((name) => {
-      const key = name.toLowerCase();
-      // Prefer fallback display casing over category casing when duplicates differ only by case.
-      const already = byLower.get(key);
-      const isFallback = fromFallback.includes(name);
-      if (!already || isFallback) byLower.set(key, name);
+      // Normalization: Extract abbreviation if it exists (e.g., "BSIT (BACHELOR OF SCIENCE IN TECHNOLOGY)" -> "BSIT")
+      // Or just take the first part if it's an abbreviation
+      const abbreviationMatch = name.match(/^([A-Z]{2,})/);
+      const key = abbreviationMatch ? abbreviationMatch[1].toLowerCase() : name.toLowerCase();
+      
+      // Prefer the display name that contains both or the more descriptive one if they share the same abbreviation key
+      const already = byNormalized.get(key);
+      if (!already || name.length > already.length) {
+        byNormalized.set(key, name);
+      }
     });
-    return Array.from(byLower.values());
+    return Array.from(byNormalized.values());
   }, [seriesOptions, uploadForm.subfonds]);
   const primaryFondsCategory = React.useMemo(
     () => normalizedCategories.find((c: any) => c.normalizedLevel === "fonds" && /hcdc/i.test(String(c.name || ""))),
@@ -1379,7 +1385,7 @@ export default function AdminMaterials() {
 
                     return (
                       <React.Fragment key={mat.id || `${mat.uniqueId}-${(mat as any).createdAt || "row"}`}>
-                        <div className={cn("grid grid-cols-[140px_70px_1fr_120px_70px_90px_120px_60px] gap-2 px-4 py-3 items-center hover:bg-muted/10 transition-colors group cursor-pointer", isExpanded && "bg-muted/5")} onClick={() => toggleMaterialDetail(mat)}>
+                        <div className={cn("grid grid-cols-[140px_70px_1fr_120px_70px_90px_120px_60px] gap-2 px-4 py-4 items-center hover:bg-muted/10 transition-colors group cursor-pointer", isExpanded && "bg-muted/5")} onClick={() => toggleMaterialDetail(mat)}>
                           <div className="flex items-center gap-1.5">
                             <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
                             <span className="font-mono text-[11px] font-bold text-[#0a1628]">{mat.uniqueId}</span>
@@ -2573,10 +2579,13 @@ export default function AdminMaterials() {
               </motion.div>
             </div>
 
-            <h2 className="text-2xl font-bold text-[#0a1628] mb-2 font-display">Ingestion Successful</h2>
+            <h2 className="text-2xl font-bold text-[#0a1628] mb-2 font-display">
+              {currentRole === "archivist" ? "Submission Received" : "Ingestion Successful"}
+            </h2>
             <p className="text-muted-foreground mb-8 text-sm leading-relaxed px-4">
-              Your archival material has been successfully processed and secured in the repository.
-              The record is now indexed and available for management.
+              {currentRole === "archivist" 
+                ? "Your archival material has been uploaded successfully and is currently pending administrator review. It will be published once approved."
+                : "Your archival material has been successfully processed and secured in the repository. The record is now indexed and available for management."}
             </p>
 
             <div className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 mb-8 flex items-center gap-4 text-left">
@@ -2739,7 +2748,7 @@ function MaterialDetailView({ material, onBack }: { material: ArchivalMaterial, 
   const [editMap, setEditMap] = React.useState<Record<string, string>>({});
 
   return (
-    <div className="animate-in fade-in slide-in-from-right-4 duration-300 bg-white p-6 rounded-xl border shadow-sm col-span-3 min-h-screen">
+    <div className="animate-in fade-in slide-in-from-right-4 duration-300 bg-white p-6 pb-24 rounded-xl border shadow-sm col-span-3 min-h-screen">
       <button onClick={onBack} className="text-primary hover:underline text-xs flex items-center gap-1 font-semibold mb-3">
         <ChevronRight className="w-3 h-3 rotate-180" /> Back to Materials
       </button>

@@ -499,6 +499,20 @@ export function useDeleteUser() {
   });
 }
 
+export function useCreateUser() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (args: MutationArgs<any>) =>
+      apiRequest("/api/users", {
+        method: "POST",
+        body: JSON.stringify(args.data || {}),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+    },
+  });
+}
+
 export function useGetAuditLogs(params?: { limit?: number }) {
   return useQuery({
     queryKey: ["/api/audit", params || {}],

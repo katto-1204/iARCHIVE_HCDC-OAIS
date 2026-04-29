@@ -261,7 +261,7 @@ export default function Home() {
               ]
             ).map((cat: any, i) => (
               <Link key={cat.id} href={cat.href || `/collections?category=${cat.id}`}>
-                <div data-stagger className={`reveal-up bg-[#0a1628] rounded-2xl overflow-hidden group cursor-pointer hover:scale-[1.03] transition-all duration-500 shadow-lg hover:shadow-2xl h-[420px] flex flex-col border border-white/5`}>
+                <div data-stagger className={`reveal-up bg-[#0a1628] rounded-2xl overflow-hidden group cursor-pointer hover:scale-[1.03] transition-all duration-500 shadow-lg hover:shadow-2xl min-h-[450px] pb-4 flex flex-col border border-white/5`}>
                   <div className="h-44 flex items-center justify-center relative overflow-hidden shrink-0 bg-gradient-to-br from-white/5 to-transparent">
                     <div className="absolute inset-0 opacity-5">
                       <div className="grid grid-cols-6 gap-2 p-4">

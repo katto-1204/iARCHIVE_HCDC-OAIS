@@ -12,7 +12,7 @@ const registerSchema = z.object({
   name: z.string().min(2, "Name is required"),
   email: z.string().email("Valid email is required"),
   password: z.string().min(8, "Password must be at least 8 characters"),
-  role: z.enum(["student", "researcher", "alumni", "public"]),
+  role: z.enum(["student", "researcher", "alumni", "public", "archivist"]),
   institution: z.string().min(1, "Institution/Affiliation is required"),
   purpose: z.string().optional(),
 });
@@ -162,6 +162,7 @@ export default function Register() {
                 <Label className="text-sm font-bold text-[#050a14]">User Category</Label>
                 <select {...form.register("role")} className="flex h-12 w-full rounded-xl border border-muted-foreground/20 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4169E1]/10 focus:border-[#4169E1] disabled:cursor-not-allowed disabled:opacity-50 appearance-none">
                   <option value="student">HCDC User</option>
+                  <option value="archivist">Archivist (Internal)</option>
                   <option value="researcher">External Researcher</option>
                   <option value="alumni">HCDC Alumni</option>
                   <option value="public">General Public</option>
