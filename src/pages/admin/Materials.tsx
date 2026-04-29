@@ -1188,7 +1188,16 @@ export default function AdminMaterials() {
   const seriesSuggestionValues = React.useMemo(() => {
     const fromCategories = seriesOptions.map((s: any) => String(s.name || "").trim()).filter(Boolean);
     const fromFallback = uploadForm.subfonds ? (PROGRAMS_BY_SUBFOND[uploadForm.subfonds] || []) : [];
-    return Array.from(new Set([...fromCategories, ...fromFallback]));
+    const merged = [...fromCategories, ...fromFallback];
+    const byLower = new Map<string, string>();
+    merged.forEach((name) => {
+      const key = name.toLowerCase();
+      // Prefer fallback display casing over category casing when duplicates differ only by case.
+      const already = byLower.get(key);
+      const isFallback = fromFallback.includes(name);
+      if (!already || isFallback) byLower.set(key, name);
+    });
+    return Array.from(byLower.values());
   }, [seriesOptions, uploadForm.subfonds]);
   const primaryFondsCategory = React.useMemo(
     () => normalizedCategories.find((c: any) => c.normalizedLevel === "fonds" && /hcdc/i.test(String(c.name || ""))),
