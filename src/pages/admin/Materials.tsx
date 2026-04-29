@@ -312,7 +312,7 @@ export default function AdminMaterials() {
     fileType: "",
 
     // Auto Reference Code Gen fields
-    year: "26", catNo: "01", matNo: "0000001",
+    year: "26", catNo: "01", matNo: "AUTO",
 
     // Cascade Selection
     fonds: "",
@@ -321,7 +321,7 @@ export default function AdminMaterials() {
     series: ""
   });
 
-  const generatedRefCode = `${uploadForm.year}iA${uploadForm.catNo}${uploadForm.matNo}`;
+  const generatedRefCode = (!uploadForm.matNo || uploadForm.matNo === "AUTO") ? "" : `${uploadForm.year}iA${uploadForm.catNo}${uploadForm.matNo}`;
 
   // ══ Feature 1: Auto-sync uploadForm → checklistValues ══
   // When the user types title, creator, etc. in the ingestion form,
@@ -1910,7 +1910,7 @@ export default function AdminMaterials() {
             <div className="bg-slate-50 rounded-xl p-6 border shadow-sm flex flex-col justify-between">
               <div className="mb-4">
                 <span className="text-muted-foreground text-xs font-bold mb-1 block">Unique material identifier</span>
-                <div className="text-3xl font-mono text-[#0a1628] font-bold tracking-widest">{generatedRefCode}</div>
+                <div className="text-3xl font-mono text-[#0a1628] font-bold tracking-widest">{generatedRefCode || "AUTO-GENERATED"}</div>
               </div>
               <div className="flex flex-wrap gap-2 mb-6">
                 <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] w-fit font-mono font-bold">{uploadForm.year} = year</Badge>
