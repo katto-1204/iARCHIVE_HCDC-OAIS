@@ -167,10 +167,89 @@ export async function compressFile(file: File | Blob, targetSizeMB = 0.6): Promi
     }
   }
 
-  // Fallback for non-compressible formats (PDFs, etc.)
+  // Enhanced PDF Compression via Rasterization
   const fileName = (file as File).name || 'Upload';
+  const isPdf = file.type === "application/pdf" || fileName.toLowerCase().endsWith(".pdf");
+  
+  if (isPdf) {
+    console.log(`Compressing PDF: ${formatBytes(file.size)} target: ${targetSizeMB}MB`);
+    try {
+      const pdfjsLib = (window as any).pdfjsLib;
+      if (!pdfjsLib) {
+        console.warn("pdfjsLib not available. Cannot compress PDF.");
+        return file;
+      }
+      
+      // Load jsPDF dynamically if not present
+      if (!(window as any).jspdf) {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+          script.onload = resolve;
+          script.onerror = reject;
+          document.body.appendChild(script);
+        });
+      }
+      const jsPDF = (window as any).jspdf.jsPDF;
+
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      
+      let newPdf: any = null;
+      
+      // To prevent memory crashes, limit to 200 pages max for compression
+      const pageLimit = Math.min(pdf.numPages, 200);
+      
+      for (let i = 1; i <= pageLimit; i++) {
+         const page = await pdf.getPage(i);
+         const viewport = page.getViewport({ scale: 1.5 });
+         
+         const maxDim = targetSizeMB < 0.5 ? 900 : 1400;
+         const scale = Math.min(1, maxDim / Math.max(viewport.width, viewport.height));
+         const scaledViewport = page.getViewport({ scale: viewport.scale * scale });
+         
+         const canvas = document.createElement("canvas");
+         canvas.width = scaledViewport.width;
+         canvas.height = scaledViewport.height;
+         const ctx = canvas.getContext("2d");
+         if (!ctx) continue;
+         
+         // White background for PDFs with transparent background
+         ctx.fillStyle = "white";
+         ctx.fillRect(0, 0, canvas.width, canvas.height);
+         
+         await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise;
+         
+         const quality = targetSizeMB < 0.5 ? 0.5 : 0.7;
+         const imgData = canvas.toDataURL("image/jpeg", quality);
+         
+         const orientation = scaledViewport.width > scaledViewport.height ? "l" : "p";
+         if (!newPdf) {
+           newPdf = new jsPDF({ orientation, unit: "px", format: [scaledViewport.width, scaledViewport.height] });
+           newPdf.addImage(imgData, "JPEG", 0, 0, scaledViewport.width, scaledViewport.height);
+         } else {
+           newPdf.addPage([scaledViewport.width, scaledViewport.height], orientation);
+           newPdf.addImage(imgData, "JPEG", 0, 0, scaledViewport.width, scaledViewport.height);
+         }
+      }
+      
+      if (newPdf) {
+        const outBlob = newPdf.output("blob");
+        console.log(`PDF compression finished: ${formatBytes(outBlob.size)}`);
+        if (outBlob.size < file.size) {
+          return new File([outBlob], fileName, { type: "application/pdf" });
+        }
+      }
+      return file;
+    } catch (err) {
+      console.error("PDF compression failed:", err);
+      return file;
+    }
+  }
+
+  // Fallback for non-compressible formats
   if (file.size > targetSizeBytes) {
-    console.warn(`File ${fileName} (${formatBytes(file.size)}) exceeds recommended size. Documents like PDFs cannot be natively compressed in-browser; consider a smaller version.`);
+    console.warn(`File ${fileName} (${formatBytes(file.size)}) exceeds recommended size and cannot be natively compressed.`);
   }
   return file;
 }

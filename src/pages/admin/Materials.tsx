@@ -698,10 +698,8 @@ export default function AdminMaterials() {
     const ogSize = file.size;
     let fileToProcess = file as File | Blob;
 
-    if (ogSize > 1024 * 1024) {
-      setProcessingState("compressing");
-      fileToProcess = await compressFile(file, 1);
-    }
+    setProcessingState("compressing");
+    fileToProcess = await compressFile(file, 1);
 
     if (fileToProcess.type.startsWith("image/")) {
       setUploadForm(prev => ({ ...prev, fileData: fileToProcess as Blob, fileType: fileToProcess.type }));
@@ -712,7 +710,7 @@ export default function AdminMaterials() {
     const newSize = fileToProcess.size;
     setFileDetails({ name: file.name, ogSize, newSize });
 
-    await extractMainFile(fileToProcess as File);
+    await extractMainFile(file);
   };
 
   const handleMetadataScanUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
