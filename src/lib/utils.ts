@@ -66,8 +66,84 @@ export async function compressFile(file: File | Blob, targetSizeMB = 0.6): Promi
     });
   }
   
-  // For PDFs or other files, we can't easily compress on frontend
-  // We'll just return the original and hope for the best, or log a warning
+  // Basic browser-side video re-encode to reduce payload for Firestore uploads.
+  if (file.type.startsWith("video/")) {
+    try {
+      const videoBlob = await new Promise<Blob>((resolve, reject) => {
+        const video = document.createElement("video");
+        video.muted = true;
+        video.preload = "auto";
+        const objectUrl = URL.createObjectURL(file);
+        video.src = objectUrl;
+        video.onloadedmetadata = () => {
+          const duration = Math.max(video.duration || 1, 1);
+          const targetBits = targetSizeBytes * 8;
+          const bitsPerSecond = Math.max(120000, Math.floor(targetBits / duration));
+
+          const maxW = 640;
+          const scale = Math.min(1, maxW / (video.videoWidth || maxW));
+          const width = Math.max(160, Math.floor((video.videoWidth || maxW) * scale));
+          const height = Math.max(90, Math.floor((video.videoHeight || (maxW * 9) / 16) * scale));
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx || !canvas.captureStream) {
+            URL.revokeObjectURL(objectUrl);
+            resolve(file);
+            return;
+          }
+
+          const stream = canvas.captureStream(15);
+          const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp8")
+            ? "video/webm;codecs=vp8"
+            : "video/webm";
+          const chunks: BlobPart[] = [];
+          const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: bitsPerSecond });
+
+          let raf = 0;
+          const draw = () => {
+            if (!video.paused && !video.ended) {
+              ctx.drawImage(video, 0, 0, width, height);
+              raf = requestAnimationFrame(draw);
+            }
+          };
+
+          recorder.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0) chunks.push(e.data);
+          };
+          recorder.onstop = () => {
+            cancelAnimationFrame(raf);
+            URL.revokeObjectURL(objectUrl);
+            const out = new Blob(chunks, { type: mimeType });
+            resolve(out.size > 0 ? out : file);
+          };
+          recorder.onerror = () => {
+            cancelAnimationFrame(raf);
+            URL.revokeObjectURL(objectUrl);
+            resolve(file);
+          };
+
+          video.onended = () => recorder.stop();
+          recorder.start(250);
+          video.play().then(() => {
+            draw();
+          }).catch(() => {
+            recorder.stop();
+          });
+        };
+        video.onerror = () => {
+          URL.revokeObjectURL(objectUrl);
+          resolve(file);
+        };
+      });
+      return videoBlob.size <= targetSizeBytes ? videoBlob : videoBlob;
+    } catch {
+      return file;
+    }
+  }
+
+  // For PDFs or other files, we can't easily compress on frontend.
   const fileName = (file as File).name || 'Upload';
   console.warn(`File ${fileName} is ${formatBytes(file.size)} and cannot be compressed. Firestore 1MB limit may be exceeded.`);
   return file;

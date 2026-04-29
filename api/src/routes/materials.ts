@@ -63,18 +63,6 @@ router.get("/materials", async (req, res) => {
     const snapshot = await query.get();
     let rows = snapshot.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) })) as any[];
     
-    // Merge mock data from JSON store
-    try {
-      const mockData = jsonStoreGetMaterials({ limit: 10000, access, category: categoryId });
-      if (mockData && mockData.materials) {
-        const firestoreIds = new Set(rows.map(r => r.id));
-        const mockRows = mockData.materials.filter((m: any) => !firestoreIds.has(m.id));
-        rows = [...rows, ...mockRows];
-      }
-    } catch (e) {
-        console.warn("Failed to merge mock materials", e);
-    }
-
     // Sort in memory to avoid requiring composite Firestore indexes
     rows.sort((a, b) => {
       const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -586,16 +574,23 @@ router.post("/materials/:id/pages", requireAuth, async (req, res) => {
   }
   try {
     const db = getFirestoreDb();
+    if (!db) throw new Error("Firebase unavailable");
     await db.collection("materialPages").doc(`${id}_page_${pageIndex}`).set({
       materialId: id,
       pageIndex,
       data
     });
-    // Ensure the material document reflects that it has pages
-    await db.collection("materials").doc(id).update({
-      hasPageImages: true,
-      updatedAt: new Date().toISOString()
-    });
+    // Avoid one extra material write per page; stamp metadata only on first page.
+    if (Number(pageIndex) === 0) {
+      try {
+        await db.collection("materials").doc(id).set(
+          { hasPageImages: true, updatedAt: new Date().toISOString() },
+          { merge: true }
+        );
+      } catch {
+        // Keep page write successful even if material doc update fails.
+      }
+    }
     res.json({ success: true });
   } catch (err) {
     console.error("Failed to save page:", err);

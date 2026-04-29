@@ -40,6 +40,14 @@ function loadJson(filePath, fallback) {
   }
 }
 
+function loadFirstExistingJson(paths, fallback) {
+  for (const p of paths) {
+    const data = loadJson(p, null);
+    if (data !== null) return data;
+  }
+  return fallback;
+}
+
 function toIso(value) {
   if (!value) return new Date().toISOString();
   return String(value);
@@ -71,17 +79,48 @@ async function main() {
   const dryRun = process.env["DRY_RUN"] === "true";
 
   const baseDir = path.resolve(process.cwd(), "..");
-  const categoriesPath = path.join(baseDir, "categories.json");
-  const materialsPath = path.join(baseDir, "materials.json");
-  const usersPath = path.join(baseDir, "users.json");
-  const usersCopyPath = path.join(baseDir, "users copy.json");
-  const accessRequestsPath = path.join(baseDir, "access_requests.json");
-
-  const categories = loadJson(categoriesPath, []);
-  const materials = loadJson(materialsPath, []);
-  const users = loadJson(usersPath, []);
-  const usersCopy = loadJson(usersCopyPath, []);
-  const accessRequests = loadJson(accessRequestsPath, []);
+  const categories = loadFirstExistingJson(
+    [
+      path.join(baseDir, "categories.json"),
+      path.join(process.cwd(), "categories.json"),
+    ],
+    [],
+  );
+  const materials = loadFirstExistingJson(
+    [
+      path.join(baseDir, "materials.json"),
+      path.join(process.cwd(), "materials.json"),
+    ],
+    [],
+  );
+  const users = loadFirstExistingJson(
+    [
+      path.join(baseDir, "users.json"),
+      path.join(process.cwd(), "users.json"),
+    ],
+    [],
+  );
+  const usersCopy = loadFirstExistingJson(
+    [
+      path.join(baseDir, "users copy.json"),
+      path.join(process.cwd(), "users copy.json"),
+    ],
+    [],
+  );
+  const accessRequests = loadFirstExistingJson(
+    [
+      path.join(baseDir, "access_requests.json"),
+      path.join(process.cwd(), "access_requests.json"),
+    ],
+    [],
+  );
+  const ingestRequests = loadFirstExistingJson(
+    [
+      path.join(baseDir, "ingest_requests.json"),
+      path.join(process.cwd(), "ingest_requests.json"),
+    ],
+    [],
+  );
 
   const mappedCategories = categories.map((c) => {
     const createdAt = toIso(c.created_at || c.createdAt);
@@ -189,23 +228,39 @@ async function main() {
     };
   });
 
+  const mappedIngestRequests = ingestRequests.map((r) => {
+    const requestedAt = toIso(r.requestedAt || r.requested_at || r.createdAt || r.created_at);
+    return {
+      id: r.id,
+      materialId: r.materialId ?? r.material_id ?? "",
+      materialTitle: r.materialTitle ?? r.material_title ?? "",
+      hierarchyPath: r.hierarchyPath ?? r.hierarchy_path ?? "",
+      requestedBy: r.requestedBy ?? r.requested_by ?? "Unknown",
+      requestedAt,
+      status: r.status ?? "pending",
+    };
+  });
+
   console.log("Preparing Firestore migration...");
   console.log(`Categories: ${mappedCategories.length}`);
   console.log(`Materials: ${mappedMaterials.length}`);
   console.log(`Users: ${mappedUsers.length}`);
   console.log(`Access Requests: ${mappedRequests.length}`);
+  console.log(`Ingest Requests: ${mappedIngestRequests.length}`);
   console.log(dryRun ? "DRY_RUN enabled. No writes will be performed." : "Writing to Firestore...");
 
   await writeBatch("categories", mappedCategories, dryRun);
   await writeBatch("materials", mappedMaterials, dryRun);
   await writeBatch("users", mappedUsers, dryRun);
   await writeBatch("accessRequests", mappedRequests, dryRun);
+  await writeBatch("ingestRequests", mappedIngestRequests, dryRun);
 
   const stats = await Promise.all([
     db.collection("categories").count().get(),
     db.collection("materials").count().get(),
     db.collection("users").count().get(),
     db.collection("accessRequests").count().get(),
+    db.collection("ingestRequests").count().get(),
   ]);
   console.log("Firestore counts:");
   console.log({
@@ -213,6 +268,7 @@ async function main() {
     materials: stats[1].data().count,
     users: stats[2].data().count,
     accessRequests: stats[3].data().count,
+    ingestRequests: stats[4].data().count,
   });
 }
 

@@ -38,6 +38,7 @@ const ACTION_ICONS: Record<string, any> = {
 };
 
 const getApprovalStatus = (material: ArchivalMaterial) => material.approvalStatus || "approved";
+const getMaterialDisplayId = (material: any) => material.uniqueId || material.materialId || material.id || "N/A";
 
 const buildIngestionSeries = (materials: ArchivalMaterial[]) => {
   const now = new Date();
@@ -500,7 +501,7 @@ export default function AdminDashboard() {
                   >
                     <div className="flex items-center justify-center">
                       <input
-                        aria-label={`Select material ${mat.uniqueId}`}
+                        aria-label={`Select material ${getMaterialDisplayId(mat)}`}
                         type="checkbox"
                         className="h-3.5 w-3.5 accent-[#4169E1]"
                         checked={!!selectedMaterialIds[mat.id]}
@@ -510,9 +511,9 @@ export default function AdminDashboard() {
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                      <span className="font-mono text-xs font-bold text-[#0a1628]">{mat.uniqueId}</span>
+                      <span className="font-mono text-xs font-bold text-[#0a1628]">{getMaterialDisplayId(mat)}</span>
                     </div>
-                    <Barcode value={mat.uniqueId} width={70} height={20} />
+                    <Barcode value={getMaterialDisplayId(mat)} width={70} height={20} />
                     <div className="min-w-0">
                       <span className="text-sm font-semibold text-[#0a1628] truncate block">{mat.title}</span>
                       <div className="flex items-center gap-2 mt-0.5">

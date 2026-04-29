@@ -60,7 +60,31 @@ const normalizeCategoryLevel = (level?: string | null) => {
   return normalized;
 };
 
-const REQUIRED_SUBFONDS = ["CET", "CHATME", "STE", "SBME", "COME", "CCJE", "HUSOCOM", "CSAA"] as const;
+const REQUIRED_SUBFONDS = ["CET", "CHATME", "STE", "SBME", "COME", "CCJE", "HUSOCOM", "CSCAA"] as const;
+const SUBFOND_DISPLAY: Record<string, string> = {
+  CET: "College of Engineering and Technology (CET)",
+  CHATME: "College of Hospitality & Tourism Management (CHATME)",
+  STE: "School of Teacher Education (STE)",
+  SBME: "School of Business & Management (SBME)",
+  COME: "College of Maritime Education (COME)",
+  CCJE: "College of Criminal Justice Education (CCJE)",
+  HUSOCOM: "College of Arts & Sciences (HUSOCOM)",
+  CSCAA: "Center for Social Communication and Alumni Affairs (CSCAA)",
+};
+const PROGRAMS_BY_SUBFOND: Record<string, string[]> = {
+  CET: ["BSCpE", "BSECE", "BSIT", "BLIS"],
+  CHATME: ["BSHM", "BSTM"],
+  STE: ["BECEd", "BEEd", "BPEd", "BSEd", "BSNEd"],
+  SBME: ["BSA", "BSBA-FM", "BSBA-HRM", "BSBA-MM", "BSCA", "BSMA", "BSREM"],
+  COME: ["BSMT"],
+  CCJE: ["BS Criminology"],
+  HUSOCOM: ["AB PolSci", "AB Econ", "AB History", "AB Philosophy", "BA Comm", "BA ELS", "BS Psych", "BSSW"],
+  CSCAA: [
+    "HCDC SOCIAL MEDIA VIDEO COLLECTION",
+    "YEARBOOKS",
+    "HCDC SOCIAL MEDIA PHOTO COLLECTION",
+  ],
+};
 
 const extractDepartmentCode = (name?: string | null) => {
   const text = String(name || "");
@@ -74,8 +98,20 @@ const extractDepartmentCode = (name?: string | null) => {
   if (upper.includes("MARITIME")) return "COME";
   if (upper.includes("CRIMINAL JUSTICE")) return "CCJE";
   if (upper.includes("ARTS") || upper.includes("HUSOCOM")) return "HUSOCOM";
-  if (upper.includes("CSAA")) return "CSAA";
+  if (upper.includes("CSCAA")) return "CSCAA";
+  if (upper.includes("CSAA")) return "CSCAA";
   return "";
+};
+
+const hasMetadataValue = (value: unknown) =>
+  value !== undefined && value !== null && String(value).trim() !== "";
+
+const deriveSelectedFieldsFromValues = (values: Record<string, any>, allowedFieldIds?: string[]) => {
+  const allowed = allowedFieldIds ? new Set(allowedFieldIds) : null;
+  const selectableKeys = COMBINED_FIELDS.map((f) => f.fieldKey);
+  return new Set(
+    selectableKeys.filter((key) => hasMetadataValue(values[key]) && (!allowed || allowed.has(key)))
+  );
 };
 
 const buildHierarchyWithMaterials = (base: HierarchyNode, mats: ArchivalMaterial[]): HierarchyNode => {
@@ -621,6 +657,7 @@ export default function AdminMaterials() {
   const handleMediaUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    setSelectedChecklistFields(new Set());
 
     const ogSize = file.size;
     let fileToProcess = file as File | Blob;
@@ -645,6 +682,7 @@ export default function AdminMaterials() {
   const handleMetadataScanUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
+    setSelectedChecklistFields(new Set());
 
     // Defer heavy processing to next frame to avoid INP blocking
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
@@ -1126,10 +1164,10 @@ export default function AdminMaterials() {
       .forEach((node: any) => {
       const code = extractDepartmentCode(node.name);
       if (!code) return;
-      byCode.set(code, { id: node.id, code, name: node.name, categoryId: node.id });
+      byCode.set(code, { id: node.id, code, name: SUBFOND_DISPLAY[code] || node.name, categoryId: node.id });
       });
     REQUIRED_SUBFONDS.forEach((code) => {
-      if (!byCode.has(code)) byCode.set(code, { id: `required-${code}`, code, name: code });
+      if (!byCode.has(code)) byCode.set(code, { id: `required-${code}`, code, name: SUBFOND_DISPLAY[code] || code });
     });
     customSubfonds.forEach((code) => {
       if (!byCode.has(code)) byCode.set(code, { id: `custom-${code}`, code, name: code });
@@ -1147,6 +1185,11 @@ export default function AdminMaterials() {
       ),
     [normalizedCategories, selectedSubfondsOption]
   );
+  const seriesSuggestionValues = React.useMemo(() => {
+    const fromCategories = seriesOptions.map((s: any) => String(s.name || "").trim()).filter(Boolean);
+    const fromFallback = uploadForm.subfonds ? (PROGRAMS_BY_SUBFOND[uploadForm.subfonds] || []) : [];
+    return Array.from(new Set([...fromCategories, ...fromFallback]));
+  }, [seriesOptions, uploadForm.subfonds]);
   const primaryFondsCategory = React.useMemo(
     () => normalizedCategories.find((c: any) => c.normalizedLevel === "fonds" && /hcdc/i.test(String(c.name || ""))),
     [normalizedCategories]
@@ -1831,13 +1874,13 @@ export default function AdminMaterials() {
                     <SelectTrigger className="h-10 bg-white border-border/60 hover:border-[#4169E1]/50 focus:ring-[#4169E1]/20 transition-all font-semibold text-[#0a1628]"><SelectValue placeholder="Select Department" /></SelectTrigger>
                     <SelectContent className="max-h-[300px] overflow-y-auto">
                       {subfondsOptions.map((subfonds: any) => (
-                        <SelectItem key={subfonds.id} value={subfonds.code}>{subfonds.code}</SelectItem>
+                        <SelectItem key={subfonds.id} value={subfonds.code}>{subfonds.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                   <div className="mt-2 flex gap-2">
                     <Input
-                      placeholder="Add sub-fond code (e.g. CSAA)"
+                      placeholder="Add sub-fond code (e.g. CSCAA)"
                       value={newSubfonds}
                       onChange={(e) => setNewSubfonds(e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ""))}
                       className="h-8 bg-white text-xs"
@@ -1902,8 +1945,9 @@ export default function AdminMaterials() {
                      className="h-10 bg-white"
                    />
                    <datalist id="series-suggestions">
-                     {seriesOptions
-                       .map((c: any) => <option key={c.id} value={c.name} />)}
+                    {seriesSuggestionValues.map((name: string) => (
+                      <option key={name} value={name} />
+                    ))}
                    </datalist>
                 </div>
               </div>
@@ -2136,7 +2180,11 @@ export default function AdminMaterials() {
       {/* ═══ Metadata Checklist Dialog ═══ */}
       <Dialog open={checklistOpen} onOpenChange={(open) => {
         setChecklistOpen(open);
-        if (!open) setChecklistMode("select");
+        if (open) {
+          setSelectedChecklistFields(deriveSelectedFieldsFromValues(checklistValues, activeSchema));
+        } else {
+          setChecklistMode("select");
+        }
       }}>
         <DialogContent className="max-w-3xl w-[95vw] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -2241,7 +2289,8 @@ export default function AdminMaterials() {
                 if (uploadForm.fileData instanceof Blob) {
                   try {
                     // Compress toward 10% of original size before Base64 encoding.
-                    const targetSizeMB = Math.max((uploadForm.fileData.size / (1024 * 1024)) * 0.1, 0.1);
+                    const isVideoFile = String(uploadForm.fileData.type || "").startsWith("video/");
+                    const targetSizeMB = isVideoFile ? 1 : Math.max((uploadForm.fileData.size / (1024 * 1024)) * 0.1, 0.1);
                     const compressed = await compressFile(uploadForm.fileData, targetSizeMB);
                     mainFileBase64 = await fileToBase64(compressed);
                   } catch (err) {
@@ -2311,22 +2360,30 @@ export default function AdminMaterials() {
                       description: `Saving ${pagesToUpload.length} pages to Firestore...`,
                     });
                     
+                    let failedPages = 0;
                     for (let i = 0; i < pagesToUpload.length; i++) {
                       let pageData = pagesToUpload[i];
                       if (pageData instanceof Blob) {
-                        pageData = await fileToBase64(pageData);
+                        const compressedPage = await compressFile(pageData, 0.55);
+                        pageData = await fileToBase64(compressedPage);
                       }
-                      await uploadPageMutation.mutateAsync({
-                        materialId: finalId,
-                        pageIndex: i,
-                        data: pageData
-                      });
+                      try {
+                        await uploadPageMutation.mutateAsync({
+                          materialId: finalId,
+                          pageIndex: i,
+                          data: pageData
+                        });
+                      } catch {
+                        failedPages += 1;
+                      }
                     }
                     
                     pageToast.update({
                       id: pageToast.id,
-                      title: "Upload Complete",
-                      description: `All ${pagesToUpload.length} pages saved to Firestore.`,
+                      title: failedPages > 0 ? "Upload Partially Complete" : "Upload Complete",
+                      description: failedPages > 0
+                        ? `${pagesToUpload.length - failedPages}/${pagesToUpload.length} pages saved.`
+                        : `All ${pagesToUpload.length} pages saved to Firestore.`,
                     });
                   }
 

@@ -35740,16 +35740,6 @@ router4.get("/materials", async (req, res) => {
     }
     const snapshot = await query.get();
     let rows = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    try {
-      const mockData = jsonStoreGetMaterials({ limit: 1e4, access, category: categoryId });
-      if (mockData && mockData.materials) {
-        const firestoreIds = new Set(rows.map((r) => r.id));
-        const mockRows = mockData.materials.filter((m) => !firestoreIds.has(m.id));
-        rows = [...rows, ...mockRows];
-      }
-    } catch (e) {
-      console.warn("Failed to merge mock materials", e);
-    }
     rows.sort((a, b) => {
       const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
       const db2 = b.createdAt ? new Date(b.createdAt).getTime() : 0;
@@ -36247,15 +36237,21 @@ router4.post("/materials/:id/pages", requireAuth, async (req, res) => {
   }
   try {
     const db = getFirestoreDb();
+    if (!db) throw new Error("Firebase unavailable");
     await db.collection("materialPages").doc(`${id}_page_${pageIndex}`).set({
       materialId: id,
       pageIndex,
       data
     });
-    await db.collection("materials").doc(id).update({
-      hasPageImages: true,
-      updatedAt: (/* @__PURE__ */ new Date()).toISOString()
-    });
+    if (Number(pageIndex) === 0) {
+      try {
+        await db.collection("materials").doc(id).set(
+          { hasPageImages: true, updatedAt: (/* @__PURE__ */ new Date()).toISOString() },
+          { merge: true }
+        );
+      } catch {
+      }
+    }
     res.json({ success: true });
   } catch (err) {
     console.error("Failed to save page:", err);
@@ -36331,6 +36327,7 @@ function normalizeCategoryLevel(level) {
 router5.get("/categories", async (_req, res) => {
   try {
     const db = getFirestoreDb();
+    if (!db) throw new Error("Firebase unavailable");
     const catsSnap = await db.collection("categories").orderBy("categoryNo", "asc").get();
     const cats = catsSnap.docs.map((doc) => {
       const data = doc.data();
@@ -36342,6 +36339,10 @@ router5.get("/categories", async (_req, res) => {
         categoryNo: Number(data.categoryNo ?? data.category_no ?? 0)
       };
     });
+    if (!cats.length || !cats.some((c) => c.level === "fonds")) {
+      res.json(jsonStoreGetCategories());
+      return;
+    }
     const counts = await Promise.all(
       cats.map(async (c) => {
         const countSnap = await db.collection("materials").where("categoryId", "==", c.id).count().get();
