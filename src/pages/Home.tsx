@@ -2,7 +2,7 @@ import * as React from "react";
 import { Link, useLocation } from "wouter";
 import {
   Search, Database, Lock, Users, ChevronRight, ArrowRight, LayoutDashboard,
-  FolderOpen, Eye, ClipboardList, Settings, LogIn, Sparkles, Menu, X, CheckCircle
+  FolderOpen, Eye, ClipboardList, Settings, LogIn, Sparkles, Menu, X, CheckCircle, Layers
 } from "lucide-react";
 import { PublicLayout } from "@/components/layout";
 import { PublicNavbar } from "@/components/PublicNavbar";
@@ -243,12 +243,12 @@ export default function Home() {
             {(featuredCollections.length > 0
               ? featuredCollections
               : [
-                { id: "1", name: "Yearbooks", description: "Annual yearbook collection" },
-                { id: "2", name: "Faculty Publications", description: "Academic research and publications" },
-                { id: "3", name: "Digital Materials", description: "Born-digital institutional records" },
+                { id: "1", name: "Yearbooks", description: "Annual yearbook collection", materialCount: 0, href: "/collections" },
+                { id: "2", name: "Faculty Publications", description: "Academic research and publications", materialCount: 0, href: "/collections" },
+                { id: "3", name: "Digital Materials", description: "Born-digital institutional records", materialCount: 0, href: "/collections" },
               ]
-            ).map((cat, i) => (
-              <Link key={cat.id} href={(cat as any).href || `/collections?category=${cat.id}`}>
+            ).map((cat: any, i) => (
+              <Link key={cat.id} href={cat.href || `/collections?category=${cat.id}`}>
                 <div data-stagger className={`reveal-up ${catColors[i % catColors.length]} rounded-2xl overflow-hidden group cursor-pointer hover:scale-[1.03] transition-all duration-500 shadow-lg hover:shadow-2xl h-[340px] flex flex-col`}>
                   <div className="h-40 flex items-center justify-center relative overflow-hidden shrink-0">
                     <div className="absolute inset-0 opacity-10">
