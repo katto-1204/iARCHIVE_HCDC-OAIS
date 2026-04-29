@@ -205,7 +205,7 @@ export default function Collections() {
         totalCount: catFolders.reduce((sum, f) => sum + f.count, 0)
       };
     })
-    .filter(Boolean) as { category: string; subfondGroups: { subfonds: string; folders: typeof folders }[]; folders: typeof folders; totalCount: number }[];
+    .filter(Boolean) as { category: string; subfondGroups: { subfonds: string; displayName: string; folders: typeof folders }[]; folders: typeof folders; totalCount: number }[];
 
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
