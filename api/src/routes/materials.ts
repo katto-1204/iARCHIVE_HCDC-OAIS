@@ -180,7 +180,11 @@ router.post("/materials", requireAuth, async (req, res) => {
     };
 
     let chunks: string[] = [];
-    if (newMat.file_url && newMat.file_url.length > 800000) {
+    if (newMat.file_url === "CHUNKED") {
+      newMat.is_file_chunked = true;
+      // We don't know the exact count yet if frontend is handling it, but we set it true
+      newMat.chunks_count = body.chunksCount || 0; 
+    } else if (newMat.file_url && newMat.file_url.length > 800000) {
       const fullStr = newMat.file_url;
       const chunkSize = 800000;
       for (let i = 0; i < fullStr.length; i += chunkSize) {
@@ -195,6 +199,9 @@ router.post("/materials", requireAuth, async (req, res) => {
     if (pageImages.length > 0) {
       newMat.has_page_images = true;
       newMat.page_count = pageImages.length;
+    } else if (body.hasPageImages) {
+      newMat.has_page_images = true;
+      newMat.page_count = body.pageCount || 0;
     }
 
     const { data: newMatResult, error: mainError } = await supabase.from('materials').insert(newMat).select().single();
@@ -251,7 +258,7 @@ router.post("/materials", requireAuth, async (req, res) => {
     }
 
     res.status(500).json({ 
-      error: "Failed to create material in Supabase", 
+      error: `Failed to create material in Supabase: ${err.message}`, 
       message: err.message,
       details: err.details,
       hint: userHint,
@@ -348,7 +355,10 @@ router.put("/materials/:id", requireAuth, async (req, res) => {
       updated_at: new Date().toISOString(),
     };
 
-    if (body.fileUrl && body.fileUrl.length > 800000 && body.fileUrl !== "CHUNKED") {
+    if (body.fileUrl === "CHUNKED") {
+      updateData.is_file_chunked = true;
+      updateData.chunks_count = body.chunksCount || 0;
+    } else if (body.fileUrl && body.fileUrl.length > 800000 && body.fileUrl !== "CHUNKED") {
       await supabase.from('material_chunks').delete().eq('material_id', existing.id);
       const fullStr = body.fileUrl;
       const chunkSize = 800000;
@@ -373,6 +383,11 @@ router.put("/materials/:id", requireAuth, async (req, res) => {
       }
       updateData.has_page_images = true;
       updateData.page_count = body.pageImages.length;
+    } else if (body.hasPageImages !== undefined) {
+      updateData.has_page_images = body.hasPageImages;
+      if (body.pageCount !== undefined) {
+        updateData.page_count = body.pageCount;
+      }
     }
 
     const { error } = await supabase.from('materials').update(updateData).eq('id', existing.id);
