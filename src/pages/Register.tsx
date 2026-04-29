@@ -7,12 +7,13 @@ import { Lock, UserPlus, ArrowLeft, ChevronRight, CheckCircle2, X, AlertTriangle
 import { Button, Input, Label, Badge } from "@/components/ui-components";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import { useRegister } from "@workspace/api-client-react";
 
 const registerSchema = z.object({
   name: z.string().min(2, "Name is required"),
   email: z.string().email("Valid email is required"),
   password: z.string().min(8, "Password must be at least 8 characters"),
-  role: z.enum(["student", "researcher", "alumni", "public", "archivist"]),
+  role: z.enum(["student", "researcher", "alumni", "public", "archivist", "admin"]),
   institution: z.string().min(1, "Institution/Affiliation is required"),
   purpose: z.string().optional(),
 });
@@ -36,53 +37,51 @@ export default function Register() {
     defaultValues: { role: "student" },
   });
 
+  const { mutateAsync: registerUser } = useRegister();
+
   const onSubmit = async (values: z.infer<typeof registerSchema>) => {
     setIsPending(true);
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email: values.email,
-        password: values.password,
-        options: {
-          data: {
-            full_name: values.name,
-            role: values.role,
-            institution: values.institution,
-            purpose: values.purpose || '',
-          }
-        }
+      const result = await registerUser({
+        data: values
       });
 
-      if (error) {
-        if (error.message.includes("already registered")) {
-          setModal({
-            type: "duplicate",
-            title: "Email Already Registered",
-            message: "An account with this email address already exists in our system.",
-            suggestion: "Please sign in with your existing account, or use a different email address."
-          });
-        } else {
-          setModal({
-            type: "error",
-            title: "Registration Failed",
-            message: error.message,
-            suggestion: "Please check your information and try again."
-          });
-        }
-        return;
+      if (values.role === "admin") {
+        // If it was auto-approved (first admin), the message will be different
+        // We can check if result contains a success flag or message if we updated the hook
+        // For now, we'll assume the backend handles it and we show a generic success
+        // or check for status in the result if we want to be specific.
+        
+        setModal({
+          type: "success",
+          title: "Registration Successful!",
+          message: "Your administrator account request has been processed.",
+          suggestion: "If this is the first administrator account, it has been automatically activated. Otherwise, please wait for another administrator to approve your request."
+        });
+      } else {
+        setModal({
+          type: "success",
+          title: "Registration Submitted!",
+          message: "Your account application has been received successfully.",
+          suggestion: "An administrator will review your application and activate your account. You will be able to log in once approved."
+        });
       }
-
-      setModal({
-        type: "success",
-        title: "Registration Submitted!",
-        message: "Your account application has been received successfully.",
-        suggestion: "An administrator will review your application and activate your account. You will be able to log in once approved."
-      });
     } catch (err: any) {
-      setModal({
-        type: "error",
-        title: "System Error",
-        message: "An unexpected error occurred. Please try again later.",
-      });
+      if (err.message.includes("already registered")) {
+        setModal({
+          type: "duplicate",
+          title: "Email Already Registered",
+          message: "An account with this email address already exists in our system.",
+          suggestion: "Please sign in with your existing account, or use a different email address."
+        });
+      } else {
+        setModal({
+          type: "error",
+          title: "Registration Failed",
+          message: err.message || "An unexpected error occurred. Please try again later.",
+          suggestion: "Please check your information and try again."
+        });
+      }
     } finally {
       setIsPending(false);
     }
@@ -184,6 +183,7 @@ export default function Register() {
                 <select {...form.register("role")} className="flex h-12 w-full rounded-xl border border-muted-foreground/20 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4169E1]/10 focus:border-[#4169E1] disabled:cursor-not-allowed disabled:opacity-50 appearance-none">
                   <option value="student">HCDC User</option>
                   <option value="archivist">Archivist (Internal)</option>
+                  <option value="admin">Administrator (System)</option>
                   <option value="researcher">External Researcher</option>
                   <option value="alumni">HCDC Alumni</option>
                   <option value="public">General Public</option>

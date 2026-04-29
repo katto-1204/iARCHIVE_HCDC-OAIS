@@ -83,6 +83,19 @@ router.post("/auth/register", async (req, res) => {
     return;
   }
   try {
+    // Check if this is the first admin
+    let status = "pending";
+    if (role === "admin") {
+      const { count, error: countErr } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('role', 'admin');
+      
+      if (!countErr && (count === 0 || count === null)) {
+        status = "active";
+      }
+    }
+
     const { data: authData, error: authErr } = await supabase.auth.signUp({
       email,
       password,
@@ -92,6 +105,7 @@ router.post("/auth/register", async (req, res) => {
           role,
           institution: institution || "HCDC",
           purpose: purpose || "",
+          status: status, // Pass status to metadata so trigger can use it
         },
       },
     });
@@ -104,7 +118,28 @@ router.post("/auth/register", async (req, res) => {
       throw authErr;
     }
 
-    res.status(201).json({ message: "Registration submitted. Awaiting admin approval." });
+    // If we set status to active, we might need to manually update the profile 
+    // because the trigger might default to 'pending'.
+    if (status === "active" && authData.user) {
+      const uid = authData.user.id;
+      // Wait a bit for the trigger to finish or just upsert
+      await supabase.from('profiles').upsert({
+        id: uid,
+        name,
+        email,
+        role,
+        status: "active",
+        institution: institution || "HCDC",
+        purpose: purpose || "",
+        updated_at: new Date().toISOString()
+      });
+    }
+
+    const message = status === "active" 
+      ? "Registration successful! Your account is the first administrator account and has been automatically activated."
+      : "Registration submitted. Awaiting admin approval.";
+
+    res.status(201).json({ message, status });
   } catch (err: any) {
     console.error("Registration error:", err.message);
     res.status(500).json({ error: "Failed to register user" });
