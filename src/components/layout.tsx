@@ -146,7 +146,6 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         { icon: LayoutDashboard, label: "Dashboard", href: "/archivist" },
         { icon: Database, label: "Archival Materials", href: "/archivist/collections" },
         { icon: FileText, label: "Categories", href: "/archivist/categories" },
-        { icon: GitPullRequest, label: "Requests", href: "/archivist/requests", badge: (pendingReqCount + pendingIngestCount) || undefined },
         { icon: User, label: "My Profile", href: "/archivist/profile" },
       ]
       : [

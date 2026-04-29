@@ -193,7 +193,7 @@ router.post("/materials", requireAuth, async (req, res) => {
       preferred_citation: body.preferredCitation || null,
       file_url: body.fileUrl ?? null,
       thumbnail_url: body.thumbnailUrl ?? null,
-      status: (user.role === "admin" || user.role === "archivist") ? "published" : "pending",
+      status: user.role === "admin" ? "published" : "pending",
       created_by: user.userId,
       created_at: now,
       updated_at: now,

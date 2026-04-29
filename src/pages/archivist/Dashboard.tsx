@@ -36,14 +36,6 @@ export default function ArchivistDashboard() {
       trend: "5 active research tiers",
       desc: "Authorized researchers"
     },
-    { 
-      title: "Pending Approval", 
-      value: pendingRequests?.total || 0, 
-      icon: GitPullRequest, 
-      color: "bg-amber-500", 
-      trend: "Action required",
-      desc: "Material access requests"
-    },
   ];
 
   return (
@@ -203,7 +195,6 @@ export default function ArchivistDashboard() {
           <div className="space-y-4">
             <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] px-4">Cataloging Shortcuts</h3>
             {[
-              { label: "Review Requests", icon: GitPullRequest, href: "/archivist/requests", color: "text-amber-500" },
               { label: "Manage Materials", icon: Database, href: "/archivist/collections", color: "text-blue-500" },
               { label: "Structure Editor", icon: LayoutDashboard, href: "/archivist/categories", color: "text-emerald-500" },
             ].map((s, i) => (
