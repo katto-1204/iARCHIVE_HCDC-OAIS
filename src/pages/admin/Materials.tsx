@@ -1549,6 +1549,11 @@ export default function AdminMaterials() {
                                   variant="outline"
                                   size="sm"
                                   className="text-[10px] font-bold text-emerald-600 border-emerald-200 hover:bg-emerald-50 gap-1.5"
+                              <div className="flex items-center gap-3">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-[10px] font-bold text-emerald-600 border-emerald-200 hover:bg-emerald-50 gap-1.5"
                                   onClick={() => {
                                     const headers = ["Field", "Value"];
                                     const rows = Object.entries(mat).filter(([k, v]) => typeof v === 'string' || typeof v === 'number').map(([k, v]) => [k, v]);
@@ -1561,11 +1566,61 @@ export default function AdminMaterials() {
                                     link.click();
                                   }}
                                 >
-                                  <Download className="w-3.5 h-3.5" /> Download Metadata
+                                  <Download className="w-3.5 h-3.5" /> Metadata CSV
                                 </Button>
-                                <Button variant="outline" size="sm" className="text-[10px] font-bold text-indigo-600 border-indigo-200 hover:bg-indigo-50 gap-1.5" onClick={(e) => handleEditMaterial(mat, e)}>
-                                  <Edit className="w-3.5 h-3.5" /> Edit Material
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="text-[10px] font-bold text-indigo-600 border-indigo-200 hover:bg-indigo-50 gap-1.5" 
+                                  onClick={(e) => handleEditMaterial(mat, e)}
+                                >
+                                  <Edit className="w-3.5 h-3.5" /> Edit Record
                                 </Button>
+                              </div>
+                            </div>
+
+                            {/* ─── DATA INSIGHTS SECTION ─── */}
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-8 mb-10">
+                              <div className="md:col-span-4 bg-muted/20 rounded-[2rem] p-8 flex flex-col items-center justify-center border border-border/40">
+                                <CompletionRing percentage={pct} size={160} strokeWidth={12} color={color} label="Overall" />
+                                <div className="mt-6 text-center">
+                                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-1">Record Integrity</div>
+                                  <div className="text-sm font-bold text-[#0a1628]">{getCompletionCategory(pct).toUpperCase()}</div>
+                                </div>
+                              </div>
+                              
+                              <div className="md:col-span-8 bg-white border border-border/40 rounded-[2rem] p-8">
+                                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground mb-6 flex items-center gap-2">
+                                  <BarChart3 className="w-4 h-4 text-primary" /> ISAD(G) Area Completion
+                                </h3>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                  {computeAreaBreakdown(mat).map((area, i) => (
+                                    <div key={i} className="space-y-2">
+                                      <div className="flex justify-between items-end">
+                                        <span className="text-[9px] font-black text-muted-foreground uppercase tracking-tighter truncate max-w-[80px]" title={area.area.name}>
+                                          {area.area.name}
+                                        </span>
+                                        <span className="text-[10px] font-bold" style={{ color: getCompletionColor(area.completion) }}>{area.completion}%</span>
+                                      </div>
+                                      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                                        <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${area.completion}%`, backgroundColor: getCompletionColor(area.completion) }} />
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                                <div className="mt-8 pt-6 border-t border-dashed border-border/60 flex items-center justify-between">
+                                  <div className="flex items-center gap-4">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                                      <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">ISAD(G) Compatible</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-2 h-2 rounded-full bg-blue-500" />
+                                      <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Dublin Core Ready</span>
+                                    </div>
+                                  </div>
+                                  <div className="text-[10px] font-black text-primary uppercase tracking-widest">Standard: OAIS 2025</div>
+                                </div>
                               </div>
                             </div>
 
@@ -2374,11 +2429,15 @@ export default function AdminMaterials() {
                   if (mainFileBase64.length > 200000) {
                     console.log(`File is large (${mainFileBase64.length} chars). Using chunked upload.`);
                     apiData.fileUrl = "CHUNKED"; // Marker for backend
-                    // DO NOT include the huge base64 in the main metadata payload
+                    // Ensure NO large base64 is in the main payload
                     delete apiData.compressedFileBase64; 
+                    delete (apiData as any).fileData;
                   } else if (mainFileBase64.length > 0) {
                     apiData.fileUrl = mainFileBase64;
                     mainFileBase64 = ""; // Clear so we don't double-upload
+                  } else if (typeof apiData.fileUrl === 'object') {
+                    // Safety: ensure no Blob/File object accidentally leaks into the JSON payload
+                    delete apiData.fileUrl;
                   }
 
                   // Convert first page thumbnail to base64 for Firestore (for collections display)

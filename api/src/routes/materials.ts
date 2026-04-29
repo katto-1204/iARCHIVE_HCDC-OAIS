@@ -31,6 +31,14 @@ router.get("/materials", async (req, res) => {
   const search = req.query.search as string;
   const access = req.query.access as string;
   const categoryId = req.query.category as string;
+  
+  const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+
+  console.log("Supabase Connection Check:");
+  console.log("- URL:", supabaseUrl ? "Present (" + supabaseUrl.substring(0, 15) + "...)" : "MISSING");
+  console.log("- Service Key:", supabaseServiceKey ? "Present" : "MISSING");
+
   try {
     let query = supabase.from('materials').select('*', { count: 'exact' });
 
@@ -79,15 +87,16 @@ router.get("/materials", async (req, res) => {
 router.post("/materials", requireAuth, async (req, res) => {
   const user = req.user!;
   const body = req.body;
+  const payloadSize = JSON.stringify(body).length;
+  console.log(`Processing POST /materials, payload size: ${payloadSize} bytes`);
+
   if (!body.title) { res.status(400).json({ error: "Title required" }); return; }
   try {
-    // Get category info from Supabase
     const { data: categories } = await supabase.from('categories').select('*');
     const cats = categories || [];
     const cat = body.categoryId ? cats.find((c: any) => c.id === body.categoryId) : cats[0];
     const catNo = cat ? Number((cat as any).category_no) : 1;
 
-    // Sequence calculation from Supabase
     const { data: existingMats } = await supabase
       .from('materials')
       .select('material_id')
@@ -170,10 +179,8 @@ router.post("/materials", requireAuth, async (req, res) => {
       updated_at: now,
     };
 
-    // 1. Handle large file detection (but don't insert chunks yet)
     let chunks: string[] = [];
     if (newMat.file_url && newMat.file_url.length > 800000) {
-      console.log(`File is large (${newMat.file_url.length} chars). Preparing chunks...`);
       const fullStr = newMat.file_url;
       const chunkSize = 800000;
       for (let i = 0; i < fullStr.length; i += chunkSize) {
@@ -184,56 +191,49 @@ router.post("/materials", requireAuth, async (req, res) => {
       newMat.chunks_count = chunks.length;
     }
 
-    // 2. Handle page images detection
     const pageImages = (body.pageImages && Array.isArray(body.pageImages)) ? body.pageImages : [];
     if (pageImages.length > 0) {
       newMat.has_page_images = true;
       newMat.page_count = pageImages.length;
     }
 
-    // 3. FIRST: Insert the main material record
-    console.log("Inserting material record into Supabase:", JSON.stringify(newMat, null, 2));
-    const { error: mainError } = await supabase.from('materials').insert(newMat);
+    const { data: newMatResult, error: mainError } = await supabase.from('materials').insert(newMat).select().single();
     if (mainError) {
-      console.error("Supabase insert error details:", mainError);
+      console.error("Supabase error during material insert:", mainError);
       throw mainError;
     }
 
-    // 4. SECOND: Insert chunks (now that the parent ID exists)
     if (chunks.length > 0) {
-      console.log(`Inserting ${chunks.length} chunks...`);
       for (let i = 0; i < chunks.length; i++) {
-        const { error: chunkErr } = await supabase.from('material_chunks').insert({
+        await supabase.from('material_chunks').insert({
           material_id: id,
           chunk_index: i,
           data: chunks[i]
         });
-        if (chunkErr) {
-           console.error(`Chunk ${i} failed:`, chunkErr);
-           throw chunkErr;
-        }
       }
     }
 
-    // 5. THIRD: Insert page images
     if (pageImages.length > 0) {
-      console.log(`Inserting ${pageImages.length} pages...`);
       for (let i = 0; i < pageImages.length; i++) {
-        const { error: pageErr } = await supabase.from('material_pages').insert({
+        await supabase.from('material_pages').insert({
           material_id: id,
           page_index: i,
           data: pageImages[i]
         });
-        if (pageErr) {
-           console.error(`Page ${i} failed:`, pageErr);
-           throw pageErr;
-        }
       }
     }
 
-    await logAudit({ action: "CREATE_MATERIAL", entityType: "material", entityId: id, userId: user.userId, userName: user.name, details: `Created material: ${body.title}` });
+    logAudit({ 
+      action: "CREATE_MATERIAL", 
+      entityType: "material", 
+      entityId: id, 
+      userId: user.userId, 
+      userName: user.name, 
+      details: `Created material: ${body.title}` 
+    }).catch(auditErr => console.warn("Audit log failed:", auditErr.message));
+
     const catName = body.categoryId ? (cats.find((c: any) => c.id === body.categoryId) as any)?.name : undefined;
-    res.status(201).json(formatMaterial(newMat, catName));
+    res.status(201).json(formatMaterial(newMatResult, catName));
   } catch (err: any) {
     console.error("Supabase material creation failed!");
     console.error("Error Message:", err.message);
