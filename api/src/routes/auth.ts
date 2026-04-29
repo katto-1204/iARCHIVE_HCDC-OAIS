@@ -31,9 +31,10 @@ router.post("/auth/login", async (req, res) => {
     const session = authData.session;
 
     // Fetch profile from profiles table
-    const { data: profile } = await supabase.from('profiles').select('*').eq('id', supabaseUser.id).single();
+    const { data: profile, error: profileErr } = await supabase.from('profiles').select('*').eq('id', supabaseUser.id).single();
 
-    if (!profile) {
+    if (profileErr || !profile) {
+      console.error("Profile fetch error:", profileErr);
       res.status(404).json({ error: "Account not found in system. Please contact admin." });
       return;
     }
