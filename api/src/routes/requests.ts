@@ -76,7 +76,6 @@ router.get("/requests", requireAuth, async (req, res) => {
     if (user.role === "student" || user.role === "researcher" || user.role === "alumni" || user.role === "public") {
       query = query.where("userId", "==", user.userId);
     }
-    // query = query.orderBy("createdAt", "desc"); // memory sort later to avoid missing index problems
     const snapshot = await query.get();
     const rows = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     rows.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
@@ -176,7 +175,6 @@ router.get("/ingest-requests", requireAuth, requireRole("admin", "archivist"), a
     if (status && ["pending", "approved", "rejected"].includes(status)) {
       query = query.where("status", "==", status);
     }
-    // query = query.orderBy("requestedAt", "desc");
     const snapshot = await query.get();
     const rows = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     rows.sort((a: any, b: any) => new Date(b.requestedAt || 0).getTime() - new Date(a.requestedAt || 0).getTime());
@@ -231,12 +229,22 @@ router.post("/ingest-requests/:id/approve", requireAuth, requireRole("admin", "a
     const snap = await db.collection("ingestRequests").doc(id).get();
     if (!snap.exists) { res.status(404).json({ error: "Request not found" }); return; }
     await db.collection("ingestRequests").doc(id).update({ status: "approved" });
-    await logAudit({ action: "APPROVE_INGEST", entityType: "request", entityId: id, userId: user.userId, userName: user.name, details: `Approved ingest request` });
-    res.json({ message: "Ingest request approved" });
+
+    // Also update the actual material status to 'published'
+    const reqData = snap.data() as any;
+    if (reqData.materialId) {
+      await db.collection("materials").doc(reqData.materialId).update({
+        status: "published",
+        updatedAt: new Date().toISOString()
+      });
+    }
+
+    await logAudit({ action: "APPROVE_INGEST", entityType: "request", entityId: id, userId: user.userId, userName: user.name, details: `Approved ingest request and published material: ${reqData.materialId}` });
+    res.json({ message: "Ingest request approved and material published" });
   } catch {
     const ok = jsonStoreApproveIngestRequest(id);
     if (!ok) { res.status(404).json({ error: "Request not found" }); return; }
-    res.json({ message: "Ingest request approved" });
+    res.json({ message: "Ingest request approved and material published" });
   }
 });
 

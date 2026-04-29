@@ -65,6 +65,8 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const pendingReqCount = reqData?.requests?.length || 0;
   const { data: pendingUsersData } = useGetUsers({ status: 'pending' });
   const pendingUsersCount = pendingUsersData?.users?.length || 0;
+  const { data: ingestData } = useGetIngestRequests({ status: 'pending' });
+  const pendingIngestCount = ingestData?.length || 0;
   const { data: auditData } = useGetAuditLogs({ limit: 5 });
   const auditBadge = auditData?.logs?.length ? "New" : undefined;
   const { mutate: logoutMutate } = useLogout();
@@ -74,6 +76,8 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   
   const { data: feedbackData } = useGetFeedbacks();
   const unreadFeedbackCount = feedbackData?.filter((f: any) => f.status === 'unread').length || 0;
+
+  const totalAttentionItems = pendingReqCount + pendingUsersCount + pendingIngestCount + unreadFeedbackCount;
 
   // Auto-open sidebar on desktop, closed on mobile
   React.useEffect(() => {
@@ -123,8 +127,8 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       { icon: LayoutDashboard, label: "Metadata Dashboard", href: "/admin", badge: unreadFeedbackCount || undefined },
       { icon: Database, label: "Archival Materials", href: "/admin/collections" },
       { icon: FileText, label: "Categories", href: "/admin/categories" },
-      { icon: GitPullRequest, label: "Requests", href: "/admin/requests", badge: pendingReqCount },
-      { icon: UserCog, label: "Admin Accounts", href: "/admin/users", badge: pendingUsersCount },
+      { icon: GitPullRequest, label: "Requests", href: "/admin/requests", badge: (pendingReqCount + pendingIngestCount) || undefined },
+      { icon: UserCog, label: "Admin Accounts", href: "/admin/users", badge: pendingUsersCount || undefined },
       { icon: Users, label: "User Accounts", href: "/admin/user-accounts" },
       { icon: Bell, label: "Announcements", href: "/admin/announcements" },
       { icon: Search, label: "Audit Logs", href: "/admin/audit", badge: auditBadge },
@@ -135,7 +139,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         { icon: LayoutDashboard, label: "Dashboard", href: "/archivist" },
         { icon: Database, label: "Archival Materials", href: "/archivist/collections" },
         { icon: FileText, label: "Categories", href: "/archivist/categories" },
-        { icon: GitPullRequest, label: "Requests", href: "/archivist/requests", badge: pendingReqCount },
+        { icon: GitPullRequest, label: "Requests", href: "/archivist/requests", badge: (pendingReqCount + pendingIngestCount) || undefined },
         { icon: User, label: "My Profile", href: "/archivist/profile" },
       ]
       : [
@@ -268,6 +272,14 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
             {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
           <div className="flex items-center gap-4">
+            {totalAttentionItems > 0 && (
+              <div className="relative group cursor-pointer" onClick={() => setLocation(pendingReqCount > 0 ? '/admin/requests' : pendingUsersCount > 0 ? '/admin/users' : '/admin')}>
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center border-2 border-white animate-pulse">
+                  <span className="text-[9px] font-bold text-white leading-none">{totalAttentionItems}</span>
+                </div>
+                <Bell className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+              </div>
+            )}
             <Button variant="outline" size="sm" onClick={() => setLocation('/')}>View Public Site</Button>
           </div>
         </header>

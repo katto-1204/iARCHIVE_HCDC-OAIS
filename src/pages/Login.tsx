@@ -39,6 +39,7 @@ export default function Login() {
   const { toast } = useToast();
   const { mutate, isPending } = useLogin();
   const [errorModal, setErrorModal] = React.useState<ErrorModalData | null>(null);
+  const [welcomeModal, setWelcomeModal] = React.useState<{ name: string; role: string; redirectPath: string } | null>(null);
   const [termsAccepted, setTermsAccepted] = React.useState(false);
   const [termsModalOpen, setTermsModalOpen] = React.useState<"terms" | "privacy" | null>(null);
   const [showPassword, setShowPassword] = React.useState(false);
@@ -47,28 +48,42 @@ export default function Login() {
     resolver: zodResolver(schema),
   });
 
+  const handleRedirect = (role: string) => {
+    if (role === 'admin') setLocation('/admin');
+    else if (role === 'archivist') setLocation('/archivist');
+    else if (role === 'student') setLocation('/student');
+    else setLocation('/collections');
+  };
+
   const onSubmit = (data: z.infer<typeof schema>) => {
     mutate({ data }, {
       onSuccess: (res) => {
         localStorage.setItem("iarchive_token", res.token);
-        toast({ title: "Welcome back!", description: `Signed in as ${res.user.name}` });
-        if (res.user.role === 'admin') setLocation('/admin');
-        else if (res.user.role === 'archivist') setLocation('/archivist');
-        else if (res.user.role === 'student') setLocation('/student');
-        else setLocation('/collections');
+        
+        const path = res.user.role === 'admin' ? '/admin' 
+                   : res.user.role === 'archivist' ? '/archivist'
+                   : res.user.role === 'student' ? '/student' 
+                   : '/collections';
+
+        if (res.user.isFirstLogin) {
+          setWelcomeModal({ name: res.user.name, role: res.user.role, redirectPath: path });
+        } else {
+          toast({ title: "Welcome back!", description: `Signed in as ${res.user.name}` });
+          handleRedirect(res.user.role);
+        }
       },
       onError: (err) => {
-        const message = (err as any)?.message || "Something went wrong. Please try again.";
-        if (/rejected/i.test(message)) {
-          setErrorModal({ type: "rejected", title: "Account Rejected", message, suggestion: "If you believe this was a mistake, please contact the HCDC Archival Administration team." });
-        } else if (/pending|approval|not active|wait/i.test(message)) {
-          setErrorModal({ type: "pending", title: "Account Pending Approval", message, suggestion: "Your registration was received. An administrator will review and activate your account shortly." });
-        } else if (/not found|no account|register first/i.test(message)) {
-          setErrorModal({ type: "not_found", title: "Account Not Found", message, suggestion: "Would you like to create a new account?" });
-        } else if (/incorrect|invalid|wrong|credentials|password/i.test(message)) {
-          setErrorModal({ type: "invalid", title: "Invalid Credentials", message: "Invalid credentials!", suggestion: "Please double-check your email and password." });
+        const message = (err as any)?.message || "";
+        if (message === "ACCOUNT_NOT_FOUND") {
+          setErrorModal({ type: "not_found", title: "Account Not Found", message: "We couldn't find an account with that email address.", suggestion: "Please check your email or register for a new account." });
+        } else if (message === "INVALID_PASSWORD") {
+          setErrorModal({ type: "invalid", title: "Invalid Password", message: "The password you entered is incorrect.", suggestion: "Please try again or reset your password if you've forgotten it." });
+        } else if (message === "PENDING_APPROVAL") {
+          setErrorModal({ type: "pending", title: "Account Pending Approval", message: "Your account is currently being reviewed by our administrators.", suggestion: "You will receive an email once your account has been activated." });
+        } else if (/rejected/i.test(message)) {
+          setErrorModal({ type: "rejected", title: "Account Rejected", message, suggestion: "Please contact the HCDC Archival Administration team for more information." });
         } else {
-          setErrorModal({ type: "error", title: "Login Failed", message });
+          setErrorModal({ type: "error", title: "Login Failed", message: message || "An unexpected error occurred. Please try again." });
         }
       }
     });
@@ -335,6 +350,54 @@ export default function Login() {
           </div>
         );
       })()}
+
+      {/* ─── Premium Welcome Modal ─── */}
+      {welcomeModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-md" />
+          <div className="relative w-full max-w-xl bg-[#0b1220] border border-white/10 rounded-[2.5rem] shadow-2xl shadow-black/80 overflow-hidden animate-fade-in-up">
+            {/* Background effects */}
+            <div className="absolute -top-24 -right-24 w-64 h-64 bg-red-600/20 blur-[80px] rounded-full" />
+            <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-blue-600/10 blur-[80px] rounded-full" />
+            
+            <div className="relative p-10 text-center">
+              <div className="w-20 h-20 bg-gradient-to-br from-red-500 to-red-700 rounded-3xl mx-auto mb-8 flex items-center justify-center shadow-2xl shadow-red-500/20 rotate-3">
+                <Sparkles className="w-10 h-10 text-white animate-pulse" />
+              </div>
+              
+              <h2 className="text-4xl font-black text-white mb-4 tracking-tight">
+                Welcome, {welcomeModal.name.split(' ')[0]}!
+              </h2>
+              
+              <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 mb-6">
+                <ShieldCheck className="w-4 h-4 text-red-500" />
+                <span className="text-white/70 text-xs font-bold uppercase tracking-widest">
+                  Verified {welcomeModal.role}
+                </span>
+              </div>
+              
+              <p className="text-white/50 text-lg leading-relaxed mb-10 max-w-sm mx-auto">
+                Your journey into Holy Cross of Davao College's digital memory begins here. Explore, preserve, and discover.
+              </p>
+              
+              <button 
+                onClick={() => {
+                  setLocation(welcomeModal.redirectPath);
+                  setWelcomeModal(null);
+                }}
+                className="w-full h-14 bg-white text-black font-black rounded-2xl hover:bg-white/90 transition-all flex items-center justify-center gap-3 group shadow-xl shadow-white/5"
+              >
+                Start My Journey
+                <LogIn className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </button>
+              
+              <p className="mt-6 text-white/20 text-[10px] font-bold uppercase tracking-[0.2em]">
+                HCDC iArchive • Institutional Repository
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

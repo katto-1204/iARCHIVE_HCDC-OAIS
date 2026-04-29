@@ -72,13 +72,44 @@ const SUBFOND_DISPLAY: Record<string, string> = {
   CSCAA: "Center for Social Communication and Alumni Affairs (CSCAA)",
 };
 const PROGRAMS_BY_SUBFOND: Record<string, string[]> = {
-  CET: ["BSCpE", "BSECE", "BSIT", "BLIS"],
-  CHATME: ["BSHM", "BSTM"],
-  STE: ["BECEd", "BEEd", "BPEd", "BSEd", "BSNEd"],
-  SBME: ["BSA", "BSBA-FM", "BSBA-HRM", "BSBA-MM", "BSCA", "BSMA", "BSREM"],
-  COME: ["BSMT"],
-  CCJE: ["BS Criminology"],
-  HUSOCOM: ["AB PolSci", "AB Econ", "AB History", "AB Philosophy", "BA Comm", "BA ELS", "BS Psych", "BSSW"],
+  CET: [
+    "Bachelor of Science in Computer Engineering (BSCpE)",
+    "Bachelor of Science in Electronics Engineering (BSECE)",
+    "Bachelor of Science in Information Technology (BSIT)",
+    "Bachelor of Library and Information Science (BLIS)"
+  ],
+  CHATME: [
+    "Bachelor of Science in Hospitality Management (BSHM)",
+    "Bachelor of Science in Tourism Management (BSTM)"
+  ],
+  STE: [
+    "Bachelor of Early Childhood Education (BECEd)",
+    "Bachelor of Elementary Education (BEEd)",
+    "Bachelor of Physical Education (BPEd)",
+    "Bachelor of Secondary Education (BSEd)",
+    "Bachelor of Special Needs Education (BSNEd)"
+  ],
+  SBME: [
+    "Bachelor of Science in Accountancy (BSA)",
+    "Bachelor of Science in Business Administration major in Financial Management (BSBA-FM)",
+    "Bachelor of Science in Business Administration major in Human Resource Management (BSBA-HRM)",
+    "Bachelor of Science in Business Administration major in Marketing Management (BSBA-MM)",
+    "Bachelor of Science in Customs Administration (BSCA)",
+    "Bachelor of Science in Management Accounting (BSMA)",
+    "Bachelor of Science in Real Estate Management (BSREM)"
+  ],
+  COME: ["Bachelor of Science in Marine Transportation (BSMT)"],
+  CCJE: ["Bachelor of Science in Criminology (BS Criminology)"],
+  HUSOCOM: [
+    "Bachelor of Arts in Political Science (AB PolSci)",
+    "Bachelor of Arts in Economics (AB Econ)",
+    "Bachelor of Arts in History (AB History)",
+    "Bachelor of Arts in Philosophy (AB Philosophy)",
+    "Bachelor of Arts in Communication (BA Comm)",
+    "Bachelor of Arts in English Language Studies (BA ELS)",
+    "Bachelor of Science in Psychology (BS Psych)",
+    "Bachelor of Science in Social Work (BSSW)"
+  ],
   CSCAA: [
     "HCDC Social Media Video Collection",
     "Yearbooks",
@@ -1192,18 +1223,19 @@ export default function AdminMaterials() {
     const byNormalized = new Map<string, string>();
     
     merged.forEach((name) => {
-      // Normalization: Extract abbreviation if it exists (e.g., "BSIT (BACHELOR OF SCIENCE IN TECHNOLOGY)" -> "BSIT")
-      // Or just take the first part if it's an abbreviation
-      const abbreviationMatch = name.match(/^([A-Z]{2,})/);
+      // Normalization: Extract abbreviation from parentheses or start of string
+      // e.g., "Bachelor of Science in Hospitality Management (BSHM)" -> key: "BSHM"
+      // e.g., "BSHM" -> key: "BSHM"
+      const abbreviationMatch = name.match(/\(([A-Z0-9-]{2,})\)/) || name.match(/^([A-Z0-9-]{2,})/);
       const key = abbreviationMatch ? abbreviationMatch[1].toLowerCase() : name.toLowerCase();
       
-      // Prefer the display name that contains both or the more descriptive one if they share the same abbreviation key
+      // Prefer the display name that is more descriptive (longer)
       const already = byNormalized.get(key);
       if (!already || name.length > already.length) {
         byNormalized.set(key, name);
       }
     });
-    return Array.from(byNormalized.values());
+    return Array.from(byNormalized.values()).sort();
   }, [seriesOptions, uploadForm.subfonds]);
   const primaryFondsCategory = React.useMemo(
     () => normalizedCategories.find((c: any) => c.normalizedLevel === "fonds" && /hcdc/i.test(String(c.name || ""))),

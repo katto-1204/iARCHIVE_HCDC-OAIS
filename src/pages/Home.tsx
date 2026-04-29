@@ -251,7 +251,7 @@ export default function Home() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
             {(featuredCollections.length > 0
               ? featuredCollections
               : [
@@ -259,38 +259,44 @@ export default function Home() {
                 { id: "2", name: "Faculty Publications", description: "Academic research and publications", materialCount: 0, href: "/collections" },
                 { id: "3", name: "Digital Materials", description: "Born-digital institutional records", materialCount: 0, href: "/collections" },
               ]
-            ).map((cat: any, i) => (
-              <Link key={cat.id} href={cat.href || `/collections?category=${cat.id}`}>
-                <div data-stagger className={`reveal-up bg-[#0a1628] rounded-2xl overflow-hidden group cursor-pointer hover:scale-[1.03] transition-all duration-500 shadow-lg hover:shadow-2xl min-h-[450px] pb-4 flex flex-col border border-white/5`}>
-                  <div className="h-44 flex items-center justify-center relative overflow-hidden shrink-0 bg-gradient-to-br from-white/5 to-transparent">
-                    <div className="absolute inset-0 opacity-5">
-                      <div className="grid grid-cols-6 gap-2 p-4">
-                        {[...Array(24)].map((_, j) => <div key={j} className="h-6 bg-white rounded" />)}
+            ).map((cat: any, i: number) => {
+              const bgClass = i === 0 ? "bg-[#960000]" : i === 1 ? "bg-[#0a1628]" : "bg-[#4169E1]";
+              const accentColor = i === 0 ? "text-white/80" : "text-[#4169E1]";
+              const badgeBg = i === 0 ? "bg-white/20 text-white" : "bg-[#4169E1]/20 text-[#4169E1]";
+              
+              return (
+                <Link key={cat.id} href={cat.href || `/collections?category=${cat.id}`} className="h-full">
+                  <div data-stagger className={`reveal-up ${bgClass} rounded-3xl overflow-hidden group cursor-pointer hover:scale-[1.03] transition-all duration-500 shadow-xl hover:shadow-2xl h-full pb-4 flex flex-col border border-white/10`}>
+                    <div className="h-44 flex items-center justify-center relative overflow-hidden shrink-0 bg-gradient-to-br from-white/10 to-transparent">
+                      <div className="absolute inset-0 opacity-[0.03]">
+                        <div className="grid grid-cols-6 gap-2 p-4">
+                          {[...Array(24)].map((_, j) => <div key={j} className="h-6 bg-white rounded" />)}
+                        </div>
+                      </div>
+                      <FolderOpen className={`w-16 h-16 ${i === 0 ? 'text-white' : 'text-[#4169E1]'} opacity-40 group-hover:scale-110 group-hover:opacity-80 transition-all duration-300`} />
+                    </div>
+                    <div className="p-8 flex flex-col flex-1">
+                      <div className="flex items-center gap-2 mb-4">
+                        <p className={`text-[10px] font-black ${i === 0 ? 'text-white/60' : 'text-[#4169E1]'} uppercase tracking-[0.25em]`}>ARCHIVAL SUB-FONDS</p>
+                        {cat.isFeatured && <Badge className={`${badgeBg} border-none text-[9px] h-4 px-1.5 py-0 font-bold`}>FEATURED</Badge>}
+                      </div>
+                      <h3 className="text-2xl font-black text-white mb-4 line-clamp-2 leading-tight">{cat.name}</h3>
+                      <p className="text-sm text-white/60 line-clamp-3 mb-8 flex-1 leading-relaxed">{cat.description || `Digitized archival materials and institutional records from ${cat.name}.`}</p>
+                      
+                      <div className="flex items-center justify-between mt-auto pt-6 border-t border-white/10">
+                        <p className="text-[11px] text-white/80 font-black bg-white/10 px-3 py-1.5 rounded-lg flex items-center gap-2">
+                          <Layers className={`w-3.5 h-3.5 ${i === 0 ? 'text-white' : 'text-[#4169E1]'}`} />
+                          {cat.materialCount || 0} {Number(cat.materialCount) === 1 ? 'Material' : 'Materials'}
+                        </p>
+                        <div className="flex items-center gap-2 text-white text-xs font-black group-hover:translate-x-2 transition-all">
+                          Explore <ArrowRight className="w-4 h-4" />
+                        </div>
                       </div>
                     </div>
-                    <FolderOpen className="w-16 h-16 text-[#4169E1] opacity-40 group-hover:scale-110 group-hover:opacity-80 transition-all duration-300" />
                   </div>
-                  <div className="p-8 flex flex-col flex-1">
-                    <div className="flex items-center gap-2 mb-3">
-                      <p className="text-[10px] font-bold text-[#4169E1] uppercase tracking-[0.2em]">ARCHIVAL SUB-FONDS</p>
-                      {cat.isFeatured && <Badge className="bg-[#4169E1]/20 text-[#4169E1] border-none text-[9px] h-4 px-1.5 py-0">FEATURED</Badge>}
-                    </div>
-                    <h3 className="text-xl font-bold text-white mb-3 line-clamp-2 leading-tight min-h-[3.5rem]">{cat.name}</h3>
-                    <p className="text-sm text-white/50 line-clamp-2 mb-6 flex-1">{cat.description || `Digitized archival materials and institutional records from ${cat.name}.`}</p>
-                    
-                    <div className="flex items-center justify-between mt-auto pt-6 border-t border-white/10">
-                      <p className="text-[11px] text-white/70 font-bold bg-white/5 px-2.5 py-1.5 rounded flex items-center gap-2">
-                        <Layers className="w-3.5 h-3.5 text-[#4169E1]" />
-                        {cat.materialCount || 0} {Number(cat.materialCount) === 1 ? 'Material' : 'Materials'}
-                      </p>
-                      <div className="flex items-center gap-2 text-[#4169E1] text-xs font-bold group-hover:translate-x-1.5 transition-all">
-                        Explore Collection <ArrowRight className="w-4 h-4" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              );
+            })}
           </div>
         </div>
       </section>

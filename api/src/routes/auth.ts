@@ -60,7 +60,9 @@ async function signInWithPassword(email: string, password: string) {
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     const msg = (err && err.error && err.error.message) || "INVALID_LOGIN";
-    throw new Error(msg);
+    if (msg === "EMAIL_NOT_FOUND") throw new Error("USER_NOT_FOUND");
+    if (msg === "INVALID_PASSWORD") throw new Error("INVALID_PASSWORD");
+    throw new Error("INVALID_LOGIN");
   }
   return (await res.json()) as { idToken: string };
 }
@@ -171,6 +173,12 @@ router.post("/auth/login", async (req, res) => {
           res.status(403).json({ error: "Account is not active. Please wait for approval." });
           return;
         }
+        
+        // Track first login for welcome modal
+        if (!profile.lastLogin) {
+          profile.isFirstLogin = true;
+        }
+        await db.collection("users").doc(decoded.uid).update({ lastLogin: new Date().toISOString() });
       }
     } catch (dbErr: any) {
       console.warn("Auth me/login Firestore warning:", dbErr.message);
@@ -189,9 +197,19 @@ router.post("/auth/login", async (req, res) => {
         institution: profile?.institution || null,
         status: profile?.status || "active",
         createdAt: profile?.createdAt || new Date().toISOString(),
+        isFirstLogin: profile?.isFirstLogin || false,
       },
     });
   } catch (outerErr: any) {
+    if (outerErr.message === "USER_NOT_FOUND") {
+      res.status(404).json({ error: "Account not found" });
+      return;
+    }
+    if (outerErr.message === "INVALID_PASSWORD") {
+      res.status(401).json({ error: "Invalid credentials" });
+      return;
+    }
+
     console.error("Auth Login outer error:", outerErr.message, outerErr.stack);
     // If it's one of the demo accounts, never attempt bcrypt compare
     // with an absent/blank DB password hash.

@@ -54,6 +54,13 @@ router.get("/materials", async (req, res) => {
     const db = getFirestoreDb();
     if (!db) throw new Error("Firebase unavailable");
     let query: FirebaseFirestore.Query = db.collection("materials");
+    const userRole = (req as any).user?.role;
+    const isPrivileged = userRole === "admin" || userRole === "archivist";
+
+    if (!isPrivileged) {
+      query = query.where("status", "==", "published");
+    }
+
     if (access && ["public", "restricted", "confidential"].includes(access)) {
       query = query.where("access", "==", access);
     }
@@ -184,7 +191,7 @@ router.post("/materials", requireAuth, async (req, res) => {
       preferredCitation,
       fileUrl: body.fileUrl ?? null,
       thumbnailUrl: body.thumbnailUrl ?? null,
-      status: "published",
+      status: user.role === "admin" ? "published" : "pending",
       createdBy: user.userId,
       createdAt: now,
       updatedAt: now,

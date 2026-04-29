@@ -65,6 +65,12 @@ export function useLogin() {
         // Parse backend error into user-friendly message
         const raw = err?.data?.error || err?.message || "";
         const rejectionReason = err?.data?.rejectionReason || "";
+        if (/Account not found|USER_NOT_FOUND|no account/i.test(raw)) {
+          throw new Error("ACCOUNT_NOT_FOUND");
+        }
+        if (/invalid credentials|wrong password|INVALID_PASSWORD|Incorrect password/i.test(raw)) {
+          throw new Error("INVALID_PASSWORD");
+        }
         if (/rejected/i.test(raw)) {
           const msg = rejectionReason
             ? `Your account application has been rejected. Reason: "${rejectionReason}"`
@@ -72,22 +78,7 @@ export function useLogin() {
           throw new Error(msg);
         }
         if (/not active|approval|pending/i.test(raw)) {
-          throw new Error("Your account is pending approval. Please wait for an administrator to activate your account.");
-        }
-        if (/not found|no user|invalid login/i.test(raw)) {
-          throw new Error("No account found with that email. Please register first.");
-        }
-        if (/invalid credentials|wrong password|INVALID_PASSWORD/i.test(raw)) {
-          throw new Error("Incorrect password. Please try again.");
-        }
-        if (/INVALID_LOGIN_CREDENTIALS/i.test(raw)) {
-          throw new Error("Invalid email or password. Please check your credentials and try again.");
-        }
-        if (/too many/i.test(raw)) {
-          throw new Error("Too many login attempts. Please wait a few minutes and try again.");
-        }
-        if (/EMAIL_NOT_FOUND/i.test(raw)) {
-          throw new Error("No account found with that email. Please register first.");
+          throw new Error("PENDING_APPROVAL");
         }
         throw new Error(raw || "Login failed. Please try again.");
       }
