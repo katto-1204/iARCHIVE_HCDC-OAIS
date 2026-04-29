@@ -45,6 +45,14 @@ async function seedAccounts() {
         const { data: users } = await supabase.auth.admin.listUsers();
         const existing = users?.users?.find(u => u.email === account.email);
         if (existing) {
+          // Force password update to admin123
+          const { error: passErr } = await supabase.auth.admin.updateUserById(existing.id, {
+            password: account.password
+          });
+          
+          if (passErr) console.error(`  ✗ Password update failed for ${account.email}:`, passErr.message);
+          else console.log(`  ✓ Password reset to ${account.password}.`);
+
           await supabase.from('profiles').upsert({
             id: existing.id,
             name: account.name,
@@ -54,7 +62,7 @@ async function seedAccounts() {
             status: 'active',
             updated_at: new Date().toISOString(),
           });
-          console.log(`  ✓ Profile updated to active.`);
+          console.log(`  ✓ Profile updated to active & role: ${account.role}.`);
         }
       } else {
         console.error(`  ✗ Error: ${error.message}`);
