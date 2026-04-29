@@ -233,6 +233,7 @@ export default function StudentDashboard() {
       {/* ─── Announcement Detail Modal ─── */}
       <Dialog open={!!selectedAnnouncement} onOpenChange={(open) => !open && setSelectedAnnouncement(null)}>
         <DialogContent className="max-w-2xl bg-white rounded-[3rem] p-0 overflow-hidden border-none shadow-2xl">
+          <DialogTitle className="sr-only">Announcement Details</DialogTitle>
           {selectedAnnouncement && (
             <div className="flex flex-col h-[80vh] max-h-[800px]">
               <div className="p-10 bg-[#0a1628] text-white relative">

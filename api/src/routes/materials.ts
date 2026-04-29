@@ -108,8 +108,18 @@ router.post("/materials", requireAuth, async (req, res) => {
     }, 0);
     
     const seqNo = maxSeq + 1;
-    const materialId = body.materialId || body.uniqueId || generateMaterialId(catNo, seqNo);
-    const id = body.id || materialId || generateId();
+    let materialId = body.materialId || body.uniqueId || generateMaterialId(catNo, seqNo);
+    
+    // Safety check: ensure material_id is truly unique to avoid 500 errors
+    const { data: collisionCheck } = await supabase.from('materials').select('id').eq('material_id', materialId).maybeSingle();
+    if (collisionCheck) {
+      // If it collides, force uniqueness by appending a random UUID segment
+      const crypto = await import("crypto");
+      const randomSuffix = crypto.randomUUID().split("-")[0];
+      materialId = `${materialId}-${randomSuffix}`;
+    }
+
+    const id = body.id || materialId || crypto.randomUUID();
     const now = new Date().toISOString();
 
     const newMat: any = {

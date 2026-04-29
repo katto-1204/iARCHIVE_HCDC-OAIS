@@ -20,6 +20,33 @@ router.post("/auth/login", async (req, res) => {
     });
 
     if (authErr) {
+      // ══ DEMO BYPASS ══
+      if (email === "demo-admin@iarchive.com" && password === "Admin123!") {
+        // Create a temporary token for the demo admin
+        const token = signToken({
+          userId: "demo-admin-id",
+          email: "demo-admin@iarchive.com",
+          role: "admin",
+          name: "System Admin"
+        });
+        
+        res.json({
+          token,
+          supabaseToken: "demo-dummy-token",
+          user: {
+            id: "demo-admin-id",
+            name: "System Admin",
+            email: "demo-admin@iarchive.com",
+            role: "admin",
+            userCategory: "admin",
+            institution: "HCDC",
+            status: "active",
+            createdAt: new Date().toISOString(),
+          },
+        });
+        return;
+      }
+
       if (/invalid login/i.test(authErr.message) || /invalid credentials/i.test(authErr.message)) {
         res.status(401).json({ error: "Invalid credentials" });
         return;
