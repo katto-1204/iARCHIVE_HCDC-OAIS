@@ -19,7 +19,7 @@ import {
 import { format } from "date-fns";
 import { useGetMaterials, useGetFeedbacks, useMarkFeedbackRead, useGetAuditLogs, useDeleteMaterial, useDeleteFeedback } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
-import { deleteMaterial as deleteMaterialLocal, getMaterials } from "@/data/storage";
+import { deleteMaterial as deleteMaterialLocal } from "@/data/storage";
 import { cn } from "@/lib/utils";
 
 type FilterTab = "all" | "complete" | "partial" | "incomplete";
@@ -96,7 +96,7 @@ export default function AdminDashboard() {
   const [bulkDeleting, setBulkDeleting] = React.useState(false);
   const [bulkNotFoundCount, setBulkNotFoundCount] = React.useState(0);
 
-  const { data: materialsData, isLoading: isMaterialsLoading, refetch: refetchMaterials } = useGetMaterials({ limit: 1000 });
+  const { data: materialsData } = useGetMaterials({ limit: 1000 });
   const { data: feedbackData } = useGetFeedbacks();
   const { data: auditData } = useGetAuditLogs({ limit: 15 });
   const markRead = useMarkFeedbackRead();
@@ -107,24 +107,9 @@ export default function AdminDashboard() {
 
   React.useEffect(() => {
     if (materialsData?.materials) {
-      const localMats = getMaterials();
-      const apiIdMap = new Set<string>();
-      materialsData.materials.forEach((m: any) => {
-        if (m.id) apiIdMap.add(m.id);
-        if (m.uniqueId) apiIdMap.add(m.uniqueId);
-        if (m.materialId) apiIdMap.add(m.materialId);
-      });
-
-      const localOnlyMats = localMats.filter(m => {
-        const hasId = m.id && apiIdMap.has(m.id);
-        const hasUniqueId = m.uniqueId && apiIdMap.has(m.uniqueId);
-        const hasMaterialId = m.materialId && apiIdMap.has(m.materialId);
-        return !hasId && !hasUniqueId && !hasMaterialId;
-      });
-
-      setMaterials([...materialsData.materials, ...localOnlyMats]);
+      setMaterials(materialsData.materials);
     } else {
-      setMaterials(getMaterials());
+      setMaterials([]);
     }
   }, [materialsData]);
   const feedbacks = feedbackData || [];
