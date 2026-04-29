@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Link, useLocation } from "wouter";
 import { Library, LayoutDashboard, Database, Users, GitPullRequest, Search, FileText, Settings, LogOut, Menu, X, Bell, Loader2, User, UserCog, LogIn, MessageSquare } from "lucide-react";
-import { useGetMe, useLogout, useGetAccessRequests, useGetAuditLogs, useGetUsers, useGetFeedbacks } from "@workspace/api-client-react";
+import { useGetMe, useLogout, useGetAccessRequests, useGetAuditLogs, useGetUsers, useGetFeedbacks, useGetIngestRequests } from "@workspace/api-client-react";
 import { Button } from "./ui-components";
 import { cn } from "@/lib/utils";
 import { PublicNavbar } from "./PublicNavbar";
@@ -144,6 +144,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       ]
       : [
         { icon: LayoutDashboard, label: "Dashboard", href: "/student" },
+        { icon: Library, label: "Accessed Materials", href: "/student/accessed" },
         { icon: Database, label: "Browse Collections", href: "/collections" },
         { icon: User, label: "My Profile", href: "/student/profile" },
       ];

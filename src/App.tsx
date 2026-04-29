@@ -27,6 +27,7 @@ import AdminUserAccounts from "./pages/admin/UserAccounts";
 import AdminFeedback from "./pages/admin/Feedback";
 import ArchivistDashboard from "./pages/archivist/Dashboard";
 import StudentDashboard from "./pages/student/Dashboard";
+import AccessedMaterials from "./pages/student/AccessedMaterials";
 import Profile from "./pages/Profile";
 import RequestAccess from "./pages/RequestAccess";
 import Feedback from "./pages/Feedback";
@@ -99,6 +100,7 @@ function Router() {
       <Route path="/archivist/profile" component={Profile} />
       
       <Route path="/student" component={StudentDashboard} />
+      <Route path="/student/accessed" component={AccessedMaterials} />
       <Route path="/student/profile" component={Profile} />
       <Route path="/request-access" component={RequestAccess} />
       

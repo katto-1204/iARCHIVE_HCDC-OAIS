@@ -504,6 +504,30 @@ export function useCreateUser() {
   });
 }
 
+export function useLikeAnnouncement() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiRequest(`/api/announcements/${id}/like`, { method: "POST" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/announcements"] });
+    },
+  });
+}
+
+export function useCommentAnnouncement() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { id: string; data: { content: string } }) =>
+      apiRequest(`/api/announcements/${args.id}/comment`, {
+        method: "POST",
+        body: JSON.stringify(args.data),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/announcements"] });
+    },
+  });
+}
+
 export function useGetAuditLogs(params?: { limit?: number }) {
   return useQuery({
     queryKey: ["/api/audit", params || {}],

@@ -2,7 +2,7 @@ import * as React from "react";
 import { format } from "date-fns";
 import { AdminLayout } from "@/components/layout";
 import { Card, CardHeader, CardTitle, CardContent, Button, Input } from "@/components/ui-components";
-import { Plus, Megaphone, Trash2, X, Save, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Plus, Megaphone, Trash2, X, Save, Eye, EyeOff, Loader2, Heart, MessageCircle } from "lucide-react";
 import { useGetAnnouncements, useCreateAnnouncement, useDeleteAnnouncement } from "@workspace/api-client-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -161,6 +161,14 @@ export default function AdminAnnouncements() {
                       <h3 className="font-bold text-lg text-foreground">{ann.title}</h3>
                     </div>
                     <p className="text-sm text-muted-foreground leading-relaxed mb-3">{ann.content}</p>
+                    <div className="flex items-center gap-4 mb-3">
+                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest bg-muted/30 px-3 py-1 rounded-full">
+                        <Heart className="w-3 h-3 text-red-500" /> {ann.likes?.length || 0} Likes
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest bg-muted/30 px-3 py-1 rounded-full">
+                        <MessageCircle className="w-3 h-3 text-blue-500" /> {ann.comments?.length || 0} Comments
+                      </div>
+                    </div>
                     <p className="text-xs text-muted-foreground/70">
                       Posted {format(new Date(ann.createdAt), "MMMM d, yyyy 'at' h:mm a")}
                     </p>

@@ -109,11 +109,11 @@ export default function Home() {
 
   const featuredCollections = React.useMemo(() => {
     const cats = Array.isArray(categories) ? categories : [];
-    
+
     // 1. Build a lookup map for children and direct counts
     const childrenMap: Record<string, any[]> = {};
     const directCounts: Record<string, number> = {};
-    
+
     cats.forEach(c => {
       directCounts[c.id] = c.materialCount || 0;
       if (c.parentId) {
@@ -133,8 +133,8 @@ export default function Home() {
     };
 
     // 3. Process subfonds with aggregated counts
-    const subfonds = cats.filter((c: any) => 
-      c.level === "subfonds" && 
+    const subfonds = cats.filter((c: any) =>
+      c.level === "subfonds" &&
       c.name !== "Departmental Sub-fonds" &&
       c.name !== "HCDC Collections"
     ).map(item => ({
@@ -148,11 +148,11 @@ export default function Home() {
         // Primary sort: activity/popularity (material count)
         const countDiff = (b.aggregatedCount || 0) - (a.aggregatedCount || 0);
         if (countDiff !== 0) return countDiff;
-        
+
         // Secondary sort: manually featured
         if (a.isFeatured && !b.isFeatured) return -1;
         if (!a.isFeatured && b.isFeatured) return 1;
-        
+
         return 0;
       })
       .slice(0, 3)
@@ -260,10 +260,10 @@ export default function Home() {
                 { id: "3", name: "Digital Materials", description: "Born-digital institutional records", materialCount: 0, href: "/collections" },
               ]
             ).map((cat: any, i: number) => {
-              const bgClass = i === 0 ? "bg-[#960000]" : i === 1 ? "bg-[#0a1628]" : "bg-[#4169E1]";
+              const bgClass = i === 0 ? "bg-[#960000]" : i === 1 ? "bg-[#0a1628]" : "bg-[#0040ff]";
               const accentColor = i === 0 ? "text-white/80" : "text-[#4169E1]";
               const badgeBg = i === 0 ? "bg-white/20 text-white" : "bg-[#4169E1]/20 text-[#4169E1]";
-              
+
               return (
                 <Link key={cat.id} href={cat.href || `/collections?category=${cat.id}`} className="h-full">
                   <div data-stagger className={`reveal-up ${bgClass} rounded-3xl overflow-hidden group cursor-pointer hover:scale-[1.03] transition-all duration-500 shadow-xl hover:shadow-2xl h-full pb-4 flex flex-col border border-white/10`}>
@@ -282,7 +282,7 @@ export default function Home() {
                       </div>
                       <h3 className="text-2xl font-black text-white mb-4 line-clamp-2 leading-tight">{cat.name}</h3>
                       <p className="text-sm text-white/60 line-clamp-3 mb-8 flex-1 leading-relaxed">{cat.description || `Digitized archival materials and institutional records from ${cat.name}.`}</p>
-                      
+
                       <div className="flex items-center justify-between mt-auto pt-6 border-t border-white/10">
                         <p className="text-[11px] text-white/80 font-black bg-white/10 px-3 py-1.5 rounded-lg flex items-center gap-2">
                           <Layers className={`w-3.5 h-3.5 ${i === 0 ? 'text-white' : 'text-[#4169E1]'}`} />
@@ -466,7 +466,7 @@ export default function Home() {
       <footer className="bg-[#050a14] border-t border-white/5 pt-20 pb-10 relative overflow-hidden">
         {/* Abstract background glow */}
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[800px] h-[300px] bg-[#4169E1]/5 blur-[120px] rounded-full pointer-events-none" />
-        
+
         <div className="max-w-7xl mx-auto px-6 relative z-10">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-12 mb-16">
             <div className="md:col-span-4">
