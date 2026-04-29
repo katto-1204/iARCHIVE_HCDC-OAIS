@@ -157,9 +157,13 @@ router.delete("/categories/:id", requireAuth, requireRole("admin"), async (req, 
     const { data: cat, error: fetchErr } = await supabase.from('categories').select('*').eq('id', id).single();
     if (fetchErr || !cat) { res.status(404).json({ error: "Category not found" }); return; }
 
-    // Unlink materials from this category
+    // 1. Unlink materials from this category
     await supabase.from('materials').update({ category_id: null }).eq('category_id', id);
 
+    // 2. Unlink children categories (set their parent_id to null or point to this one's parent)
+    await supabase.from('categories').update({ parent_id: cat.parent_id }).eq('parent_id', id);
+
+    // 3. Finally delete the category
     const { error } = await supabase.from('categories').delete().eq('id', id);
     if (error) throw error;
 

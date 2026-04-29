@@ -17,12 +17,22 @@ try {
 }
 
 import materialsRouter from "./routes/materials.js";
+import categoriesRouter from "./routes/categories.js";
+import usersRouter from "./routes/users.js";
+import authRouter from "./routes/auth.js";
+import feedbackRouter from "./routes/feedback.js";
+import requestsRouter from "./routes/requests.js";
 import migrationRouter from "./routes/migration.js";
 import announcementsRouter from "./routes/announcements.js";
 import app from "./app.js";
 import { logger } from "./lib/logger.js";
 
 app.use("/api", materialsRouter);
+app.use("/api", categoriesRouter);
+app.use("/api", usersRouter);
+app.use("/api", authRouter);
+app.use("/api", feedbackRouter);
+app.use("/api", requestsRouter);
 app.use("/api", migrationRouter);
 app.use("/api", announcementsRouter);
 

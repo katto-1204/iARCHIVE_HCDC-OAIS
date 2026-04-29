@@ -31,7 +31,8 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       .single();
 
     if (profileError || !profile) {
-      // If profile doesn't exist, we fallback to default student role but check status
+      console.warn(`Auth Warning: No profile found in Supabase for user ${authUser.id} (${authUser.email}). Defaulting to student role.`);
+      // If profile doesn't exist, we fallback to default student role
       req.user = {
         userId: authUser.id,
         email: authUser.email || "",

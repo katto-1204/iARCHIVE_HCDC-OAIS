@@ -221,8 +221,16 @@ router.post("/materials", requireAuth, async (req, res) => {
     const catName = body.categoryId ? (cats.find((c: any) => c.id === body.categoryId) as any)?.name : undefined;
     res.status(201).json(formatMaterial(newMat, catName));
   } catch (err: any) {
-    console.error("Supabase material creation failed:", err.message);
-    res.status(500).json({ error: "Failed to create material in Supabase" });
+    console.error("Supabase material creation failed!");
+    console.error("Error Message:", err.message);
+    console.error("Error Detail:", err.details || "None");
+    console.error("Error Hint:", err.hint || "None");
+    console.error("Full Error:", JSON.stringify(err));
+    res.status(500).json({ 
+      error: "Failed to create material in Supabase", 
+      details: err.message,
+      hint: err.hint 
+    });
   }
 });
 
