@@ -25,7 +25,7 @@ export const supabase = createClient(supabaseUrl, supabaseServiceKey, {
     autoRefreshToken: false,
     persistSession: false
   }
-});
+}) as any;
 
 export async function isSupabaseAvailable() {
   if (!supabaseUrl || !supabaseServiceKey) return false;

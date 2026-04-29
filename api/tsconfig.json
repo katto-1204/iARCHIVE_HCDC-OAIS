@@ -6,10 +6,8 @@
     "strict": false,
     "noImplicitAny": false,
     "skipLibCheck": true,
+    "baseUrl": ".",
     "noEmit": false,
-    "baseUrl": "..",
-    "typeRoots": ["../node_modules/@types"],
-    "types": ["node", "express", "cors", "jsonwebtoken", "express-serve-static-core"],
     "paths": {
       "@/*": ["./src/*"]
     }
