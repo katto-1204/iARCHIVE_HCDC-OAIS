@@ -34458,7 +34458,24 @@ async function requireAuth(req, res, next) {
     const auth = getFirebaseAuth();
     const decoded = await auth.verifyIdToken(token);
     const db = getFirestoreDb();
-    const profileSnap = await db.collection("users").doc(decoded.uid).get();
+    let profileSnap = await db.collection("users").doc(decoded.uid).get();
+    if (!profileSnap.exists && decoded.email) {
+      const normalizedEmail = String(decoded.email).trim().toLowerCase();
+      const byEmail = await db.collection("users").where("email", "==", normalizedEmail).limit(1).get();
+      if (!byEmail.empty) {
+        const existingData = byEmail.docs[0].data();
+        await db.collection("users").doc(decoded.uid).set(
+          {
+            ...existingData,
+            id: decoded.uid,
+            email: existingData?.email || normalizedEmail,
+            updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+          },
+          { merge: true }
+        );
+        profileSnap = await db.collection("users").doc(decoded.uid).get();
+      }
+    }
     if (profileSnap.exists) {
       const profile = profileSnap.data();
       const status = profile?.status || "active";
@@ -34583,8 +34600,14 @@ function mapUserCopyRecordToJsonUser(rec) {
   };
 }
 function getCategoryLevelName(level) {
-  const allowed = /* @__PURE__ */ new Set(["fonds", "subfonds", "series", "file", "item"]);
-  return allowed.has(level) ? level : "fonds";
+  const normalized = String(level || "").toLowerCase().replace(/[\s_-]/g, "");
+  if (normalized === "fonds") return "fonds";
+  if (normalized === "subfonds" || normalized === "department") return "subfonds";
+  if (normalized === "series") return "series";
+  if (normalized === "subseries") return "subseries";
+  if (normalized === "file") return "file";
+  if (normalized === "item") return "item";
+  return "fonds";
 }
 function materialSeqFromMaterialId(materialId) {
   const m = materialId.match(/^(\d{2})iA(\d{2})(\d{7})$/);
@@ -35255,10 +35278,30 @@ var DEMO_USERS2 = [
 function getDemoUserByEmail2(email) {
   return DEMO_USERS2.find((u) => u.email.toLowerCase() === (email || "").toLowerCase());
 }
+async function resolveUserProfile(db, uid, email) {
+  const byUid = await db.collection("users").doc(uid).get();
+  if (byUid.exists) return byUid;
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (!normalizedEmail) return byUid;
+  const byEmail = await db.collection("users").where("email", "==", normalizedEmail).limit(1).get();
+  if (byEmail.empty) return byUid;
+  const existingDoc = byEmail.docs[0];
+  const existingData = existingDoc.data();
+  await db.collection("users").doc(uid).set(
+    {
+      ...existingData,
+      id: uid,
+      email: existingData?.email || normalizedEmail,
+      updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+    },
+    { merge: true }
+  );
+  return db.collection("users").doc(uid).get();
+}
 async function signInWithPassword(email, password) {
-  const apiKey = process.env["FIREBASE_API_KEY"];
+  const apiKey = process.env["FIREBASE_API_KEY"] || process.env["VITE_FIREBASE_API_KEY"];
   if (!apiKey) {
-    throw new Error("Missing FIREBASE_API_KEY");
+    throw new Error("Missing FIREBASE_API_KEY (or VITE_FIREBASE_API_KEY)");
   }
   const res = await fetch(
     `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
@@ -35276,7 +35319,7 @@ async function signInWithPassword(email, password) {
   return await res.json();
 }
 async function verifyIdTokenRestFallback(idToken) {
-  const apiKey = process.env["FIREBASE_API_KEY"];
+  const apiKey = process.env["FIREBASE_API_KEY"] || process.env["VITE_FIREBASE_API_KEY"];
   if (!apiKey) {
     throw new Error("Missing FIREBASE_API_KEY for token lookup");
   }
@@ -35344,7 +35387,7 @@ router2.post("/auth/login", async (req, res) => {
     let profile = null;
     try {
       const db = getFirestoreDb();
-      const profileSnap = await db.collection("users").doc(decoded.uid).get();
+      const profileSnap = await resolveUserProfile(db, decoded.uid, decoded.email);
       if (!profileSnap.exists) {
         const now = (/* @__PURE__ */ new Date()).toISOString();
         profile = {
@@ -35500,7 +35543,7 @@ router2.post("/auth/register", async (req, res) => {
 router2.get("/auth/me", requireAuth, async (req, res) => {
   try {
     const db = getFirestoreDb();
-    const snap = await db.collection("users").doc(req.user.userId).get();
+    const snap = await resolveUserProfile(db, req.user.userId, req.user.email);
     if (!snap.exists) {
       const demoUser = DEMO_USERS2.find((u) => u.id === req.user.userId || u.email === req.user.email);
       if (demoUser) {
@@ -36275,11 +36318,30 @@ var materials_default = router4;
 // src/routes/categories.ts
 var import_express5 = __toESM(require_express2(), 1);
 var router5 = (0, import_express5.Router)();
+function normalizeCategoryLevel(level) {
+  const normalized = String(level || "").toLowerCase().replace(/[\s_-]/g, "");
+  if (normalized === "fonds") return "fonds";
+  if (normalized === "subfonds" || normalized === "department") return "subfonds";
+  if (normalized === "series") return "series";
+  if (normalized === "subseries") return "subseries";
+  if (normalized === "file") return "file";
+  if (normalized === "item") return "item";
+  return "fonds";
+}
 router5.get("/categories", async (_req, res) => {
   try {
     const db = getFirestoreDb();
     const catsSnap = await db.collection("categories").orderBy("categoryNo", "asc").get();
-    const cats = catsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const cats = catsSnap.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        ...data,
+        id: String(data.id || doc.id),
+        level: normalizeCategoryLevel(data.level),
+        parentId: data.parentId ?? data.parent_id ?? null,
+        categoryNo: Number(data.categoryNo ?? data.category_no ?? 0)
+      };
+    });
     const counts = await Promise.all(
       cats.map(async (c) => {
         const countSnap = await db.collection("materials").where("categoryId", "==", c.id).count().get();

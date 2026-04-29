@@ -83,13 +83,6 @@ function mockAuthPlugin(enabled: boolean): Plugin {
       const feedbacks: any[] = [];
       
       try {
-        const matPath = path.resolve(import.meta.dirname, "materials.json");
-        if (fs.existsSync(matPath)) {
-          materials = JSON.parse(fs.readFileSync(matPath, "utf-8"));
-        }
-      } catch (e) { console.error("MockAPI: Failed to load materials", e); }
-
-      try {
         const catPath = path.resolve(import.meta.dirname, "categories.json");
         if (fs.existsSync(catPath)) {
           categories = JSON.parse(fs.readFileSync(catPath, "utf-8"));

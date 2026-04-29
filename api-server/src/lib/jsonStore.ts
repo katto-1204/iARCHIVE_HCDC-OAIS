@@ -173,9 +173,14 @@ function mapUserCopyRecordToJsonUser(rec: JsonUserCopyRecord): JsonUser {
 }
 
 function getCategoryLevelName(level: string) {
-  // Mirror API-level values; fallback to fonds.
-  const allowed = new Set(["fonds", "subfonds", "series", "file", "item"]);
-  return allowed.has(level) ? level : "fonds";
+  const normalized = String(level || "").toLowerCase().replace(/[\s_-]/g, "");
+  if (normalized === "fonds") return "fonds";
+  if (normalized === "subfonds" || normalized === "department") return "subfonds";
+  if (normalized === "series") return "series";
+  if (normalized === "subseries") return "subseries";
+  if (normalized === "file") return "file";
+  if (normalized === "item") return "item";
+  return "fonds";
 }
 
 function materialSeqFromMaterialId(materialId: string) {

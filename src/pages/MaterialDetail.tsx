@@ -9,7 +9,6 @@ import {
   ChevronLeft, ChevronRight, X, Eye, Maximize, Hand, Move
 } from "lucide-react";
 import { useGetMe, useGetAccessRequests, useGetMaterial } from "../lib/api-client-react";
-import { getMaterialById } from "@/data/storage";
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   if (!value) return null;
@@ -528,11 +527,6 @@ export default function MaterialDetail() {
     
     if (apiMaterial) {
       setMaterial(apiMaterial);
-      setIsLoading(false);
-    } else if (params?.id) {
-      // Fallback to local if API fails or returns nothing (for items only in materials.json)
-      const local = getMaterialById(params.id);
-      setMaterial(local);
       setIsLoading(false);
     } else {
       setIsLoading(false);

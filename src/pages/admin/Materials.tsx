@@ -16,7 +16,7 @@ import { ArchivalTree } from "@/components/ArchivalTree";
 import { MetadataChecklist } from "@/components/MetadataChecklist";
 import { Barcode } from "@/components/Barcode";
 import {
-  SAMPLE_MATERIALS, SAMPLE_HIERARCHY, COMBINED_FIELDS, LEVEL_LABELS,
+  SAMPLE_HIERARCHY, COMBINED_FIELDS, LEVEL_LABELS,
   type ArchivalMaterial, type HierarchyNode, type HierarchyLevel
 } from "@/data/sampleData";
 import { 
@@ -37,7 +37,7 @@ import {
   getAllFieldValues, downloadMetadataExcel,
 } from "@/data/metadataUtils";
 import { useToast } from "@/hooks/use-toast";
-import { useGetMe, useGetCategories, useCreateMaterial, useUpdateMaterial, useDeleteMaterial, useGetMaterials as useGetMaterialsApi, useSubmitIngestRequest, useUploadMaterialPage, useUploadMaterialFileChunk } from "@workspace/api-client-react";
+import { useGetMe, useGetCategories, useCreateCategory, useCreateMaterial, useUpdateMaterial, useDeleteMaterial, useGetMaterials as useGetMaterialsApi, useSubmitIngestRequest, useUploadMaterialPage, useUploadMaterialFileChunk } from "@workspace/api-client-react";
 
 type ViewMode = "table" | "detail";
 
@@ -48,6 +48,35 @@ const slugify = (value: string | null | undefined) =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)+/g, "");
+
+const normalizeCategoryLevel = (level?: string | null) => {
+  const normalized = String(level || "").toLowerCase().replace(/[\s_-]/g, "");
+  if (normalized === "fonds") return "fonds";
+  if (normalized === "subfonds" || normalized === "department") return "subfonds";
+  if (normalized === "series") return "series";
+  if (normalized === "subseries") return "subseries";
+  if (normalized === "file") return "file";
+  if (normalized === "item") return "item";
+  return normalized;
+};
+
+const REQUIRED_SUBFONDS = ["CET", "CHATME", "STE", "SBME", "COME", "CCJE", "HUSOCOM", "CSAA"] as const;
+
+const extractDepartmentCode = (name?: string | null) => {
+  const text = String(name || "");
+  const m = text.match(/\(([A-Z]{2,})\)/);
+  if (m?.[1]) return m[1];
+  const upper = text.toUpperCase();
+  if (upper.includes("COLLEGE OF ENGINEERING")) return "CET";
+  if (upper.includes("HOSPITALITY") || upper.includes("TOURISM")) return "CHATME";
+  if (upper.includes("TEACHER EDUCATION")) return "STE";
+  if (upper.includes("BUSINESS") || upper.includes("MANAGEMENT")) return "SBME";
+  if (upper.includes("MARITIME")) return "COME";
+  if (upper.includes("CRIMINAL JUSTICE")) return "CCJE";
+  if (upper.includes("ARTS") || upper.includes("HUSOCOM")) return "HUSOCOM";
+  if (upper.includes("CSAA")) return "CSAA";
+  return "";
+};
 
 const buildHierarchyWithMaterials = (base: HierarchyNode, mats: ArchivalMaterial[]): HierarchyNode => {
   const root: HierarchyNode = JSON.parse(JSON.stringify(base));
@@ -195,8 +224,11 @@ export default function AdminMaterials() {
   const [lastIngestedId, setLastIngestedId] = React.useState<string | null>(null);
   const [ingestBusy, setIngestBusy] = React.useState(false);
   const [ingestStage, setIngestStage] = React.useState("Preparing ingest payload...");
+  const [customSubfonds, setCustomSubfonds] = React.useState<string[]>([]);
+  const [newSubfonds, setNewSubfonds] = React.useState("");
 
   const { mutateAsync: createMaterial, isPending: isCreating } = useCreateMaterial();
+  const { mutateAsync: createCategory } = useCreateCategory();
   const { mutateAsync: updateMaterial, isPending: isUpdating } = useUpdateMaterial();
   const { mutateAsync: submitIngestRequest } = useSubmitIngestRequest();
 
@@ -215,7 +247,7 @@ export default function AdminMaterials() {
     year: "26", catNo: "01", matNo: "0000001",
     
     // Cascade Selection
-    fonds: "HCDC — Holy Cross of Davao College", 
+    fonds: "",
     subfonds: "", 
     program: "",
     series: ""
@@ -938,7 +970,7 @@ export default function AdminMaterials() {
       year: mat.uniqueId?.substring(0, 2) || "26",
       catNo: mat.uniqueId?.substring(4, 6) || "01",
       matNo: mat.uniqueId?.substring(6) || "0000001",
-      fonds: parts[0] || "HCDC — Holy Cross of Davao College",
+      fonds: parts[0] || "",
       subfonds: parts[depth] || "",
       program: parts.length > depth + 1 ? parts[depth+1] : "",
       series: parts.length > depth + 2 ? parts[parts.length - 1] : ""
@@ -1078,27 +1110,52 @@ export default function AdminMaterials() {
   );
 
   // Hierarchy Helpers (driven by categories for proper fonds -> sub-fonds cascading)
-  const fondsOptions = React.useMemo(
-    () => categories.filter((c: any) => c.level === "fonds"),
+  const normalizedCategories = React.useMemo(
+    () =>
+      categories.map((c: any) => ({
+        ...c,
+        normalizedLevel: normalizeCategoryLevel(c.level),
+      })),
     [categories]
   );
-  const selectedFondsNode = React.useMemo(
-    () => fondsOptions.find((f: any) => f.name === uploadForm.fonds),
-    [fondsOptions, uploadForm.fonds]
+  const fondsOptions = React.useMemo(() => [{ id: "fonds-hcdc", name: "HCDC" }], []);
+  const subfondsOptions = React.useMemo(() => {
+    const byCode = new Map<string, { id: string; code: string; name: string; categoryId?: string }>();
+    normalizedCategories
+      .filter((c: any) => c.normalizedLevel === "subfonds")
+      .forEach((node: any) => {
+      const code = extractDepartmentCode(node.name);
+      if (!code) return;
+      byCode.set(code, { id: node.id, code, name: node.name, categoryId: node.id });
+      });
+    REQUIRED_SUBFONDS.forEach((code) => {
+      if (!byCode.has(code)) byCode.set(code, { id: `required-${code}`, code, name: code });
+    });
+    customSubfonds.forEach((code) => {
+      if (!byCode.has(code)) byCode.set(code, { id: `custom-${code}`, code, name: code });
+    });
+    return Array.from(byCode.values());
+  }, [normalizedCategories, customSubfonds]);
+  const selectedSubfondsOption = React.useMemo(
+    () => subfondsOptions.find((s) => s.code === uploadForm.subfonds),
+    [subfondsOptions, uploadForm.subfonds]
   );
-  const subfondsOptions = React.useMemo(
-    () => selectedFondsNode
-      ? categories.filter((c: any) => c.level === "subfonds" && c.parentId === selectedFondsNode.id)
-      : [],
-    [categories, selectedFondsNode]
+  const seriesOptions = React.useMemo(
+    () =>
+      normalizedCategories.filter(
+        (c: any) => c.normalizedLevel === "series" && (!selectedSubfondsOption?.categoryId || c.parentId === selectedSubfondsOption.categoryId)
+      ),
+    [normalizedCategories, selectedSubfondsOption]
+  );
+  const primaryFondsCategory = React.useMemo(
+    () => normalizedCategories.find((c: any) => c.normalizedLevel === "fonds" && /hcdc/i.test(String(c.name || ""))),
+    [normalizedCategories]
   );
   React.useEffect(() => {
-    if (!fondsOptions.length) return;
-    const hasValidFonds = fondsOptions.some((f: any) => f.name === uploadForm.fonds);
-    if (!hasValidFonds) {
-      setUploadForm((p) => ({ ...p, fonds: fondsOptions[0].name, subfonds: "", program: "", series: "" }));
+    if (uploadForm.fonds !== "HCDC") {
+      setUploadForm((p) => ({ ...p, fonds: "HCDC", subfonds: "", program: "", series: "" }));
     }
-  }, [fondsOptions, uploadForm.fonds]);
+  }, [uploadForm.fonds]);
 
   return (
     <AdminLayout>
@@ -1140,7 +1197,7 @@ export default function AdminMaterials() {
                  levelOfDescription: "Item", extentAndMedium: "", access: "public",
                  videoUrl: "", fileUrl: "", hierarchyPath: "", termsOfUse: "", referenceCode: "",
                  year: "26", catNo: "01", matNo: nextMatNo,
-                 fonds: "HCDC — Holy Cross of Davao College", subfonds: "", program: "", series: "", pageImages: []
+                 fonds: "HCDC", subfonds: "", program: "", series: "", pageImages: []
                } as any);
                setChecklistValues({
                  title: "", creator: "", dateOfDescription: new Date().toISOString().split('T')[0], format: "", description: "",
@@ -1774,10 +1831,64 @@ export default function AdminMaterials() {
                     <SelectTrigger className="h-10 bg-white border-border/60 hover:border-[#4169E1]/50 focus:ring-[#4169E1]/20 transition-all font-semibold text-[#0a1628]"><SelectValue placeholder="Select Department" /></SelectTrigger>
                     <SelectContent className="max-h-[300px] overflow-y-auto">
                       {subfondsOptions.map((subfonds: any) => (
-                        <SelectItem key={subfonds.id} value={subfonds.name}>{subfonds.name}</SelectItem>
+                        <SelectItem key={subfonds.id} value={subfonds.code}>{subfonds.code}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  <div className="mt-2 flex gap-2">
+                    <Input
+                      placeholder="Add sub-fond code (e.g. CSAA)"
+                      value={newSubfonds}
+                      onChange={(e) => setNewSubfonds(e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ""))}
+                      className="h-8 bg-white text-xs"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-8 px-2 text-xs"
+                      onClick={() => {
+                        const code = newSubfonds.trim();
+                        if (!code) return;
+                        const existing = subfondsOptions.find((s) => s.code === code);
+                        if (existing) {
+                          setUploadForm((p) => ({ ...p, subfonds: code, series: "" }));
+                          setNewSubfonds("");
+                          return;
+                        }
+                        if (!primaryFondsCategory?.id) {
+                          toast({
+                            title: "Cannot add sub-fond",
+                            description: "HCDC fonds is missing in categories. Please create/fix Fonds first.",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        createCategory({
+                          data: {
+                            name: code,
+                            level: "subfonds",
+                            parentId: primaryFondsCategory.id,
+                            description: `${code} sub-fond`,
+                          },
+                        })
+                          .then(() => {
+                            setCustomSubfonds((p) => (p.includes(code) ? p : [...p, code]));
+                            setUploadForm((p) => ({ ...p, subfonds: code, series: "" }));
+                            setNewSubfonds("");
+                            toast({ title: "Sub-fond added", description: `${code} saved to hierarchy.` });
+                          })
+                          .catch(() => {
+                            toast({
+                              title: "Failed to add sub-fond",
+                              description: "Could not save to backend right now.",
+                              variant: "destructive",
+                            });
+                          });
+                      }}
+                    >
+                      Add
+                    </Button>
+                  </div>
                 </div>
                 <div>
                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1.5 font-mono">
@@ -1791,8 +1902,7 @@ export default function AdminMaterials() {
                      className="h-10 bg-white"
                    />
                    <datalist id="series-suggestions">
-                     {categories
-                       .filter((c: any) => c.level === 'series' && (!uploadForm.subfonds || c.parentId === categories.find((cat: any) => cat.name === uploadForm.subfonds)?.id))
+                     {seriesOptions
                        .map((c: any) => <option key={c.id} value={c.name} />)}
                    </datalist>
                 </div>
@@ -2425,7 +2535,7 @@ export default function AdminMaterials() {
                      levelOfDescription: "Item", extentAndMedium: "", access: "public",
                      videoUrl: "", hierarchyPath: "", termsOfUse: "", referenceCode: "",
                      fileData: undefined, fileType: "", year: "26", catNo: "01", matNo: String(materials.length + 2).padStart(7, '0'),
-                     fonds: "HCDC — Holy Cross of Davao College", subfonds: "", program: "", series: ""
+                     fonds: "HCDC", subfonds: "", program: "", series: ""
                    });
                  }}
                  className="h-12 rounded-xl border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-all active:scale-[0.98]"

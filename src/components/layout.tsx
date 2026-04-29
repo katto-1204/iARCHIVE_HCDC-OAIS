@@ -69,6 +69,8 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const auditBadge = auditData?.logs?.length ? "New" : undefined;
   const { mutate: logoutMutate } = useLogout();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  const [badgeSeenCounts, setBadgeSeenCounts] = React.useState<Record<string, number>>({});
+  const [badgeSeenFlags, setBadgeSeenFlags] = React.useState<Record<string, boolean>>({});
   
   const { data: feedbackData } = useGetFeedbacks();
   const unreadFeedbackCount = feedbackData?.filter((f: any) => f.status === 'unread').length || 0;
@@ -83,6 +85,28 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   React.useEffect(() => {
+    if (!user?.id) return;
+    try {
+      const countsRaw = localStorage.getItem(`iarchive_badge_seen_counts_${user.id}`);
+      const flagsRaw = localStorage.getItem(`iarchive_badge_seen_flags_${user.id}`);
+      setBadgeSeenCounts(countsRaw ? JSON.parse(countsRaw) : {});
+      setBadgeSeenFlags(flagsRaw ? JSON.parse(flagsRaw) : {});
+    } catch {
+      setBadgeSeenCounts({});
+      setBadgeSeenFlags({});
+    }
+  }, [user?.id]);
+
+  const persistBadgeSeenState = React.useCallback(
+    (nextCounts: Record<string, number>, nextFlags: Record<string, boolean>) => {
+      if (!user?.id) return;
+      localStorage.setItem(`iarchive_badge_seen_counts_${user.id}`, JSON.stringify(nextCounts));
+      localStorage.setItem(`iarchive_badge_seen_flags_${user.id}`, JSON.stringify(nextFlags));
+    },
+    [user?.id]
+  );
+
+  React.useEffect(() => {
     if (!isLoading && !user) {
       window.location.href = "/login";
       return;
@@ -94,9 +118,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     }
   }, [user, isLoading, location, setLocation]);
 
-  if (isLoading || !user) return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
-
-  const links = user.role === "admin"
+  const links = user?.role === "admin"
     ? [
       { icon: LayoutDashboard, label: "Metadata Dashboard", href: "/admin", badge: unreadFeedbackCount || undefined },
       { icon: Database, label: "Archival Materials", href: "/admin/collections" },
@@ -108,7 +130,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       { icon: Search, label: "Audit Logs", href: "/admin/audit", badge: auditBadge },
       { icon: User, label: "My Profile", href: "/admin/profile" },
     ]
-    : user.role === "archivist"
+    : user?.role === "archivist"
       ? [
         { icon: LayoutDashboard, label: "Dashboard", href: "/archivist" },
         { icon: Database, label: "Archival Materials", href: "/archivist/collections" },
@@ -121,6 +143,46 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         { icon: Database, label: "Browse Collections", href: "/collections" },
         { icon: User, label: "My Profile", href: "/student/profile" },
       ];
+
+  const shouldShowBadge = React.useCallback(
+    (href: string, badge: unknown) => {
+      if (badge === undefined || badge === null || badge === "" || badge === 0) return false;
+      if (typeof badge === "number") {
+        const seen = badgeSeenCounts[href] ?? 0;
+        return badge > seen;
+      }
+      return !badgeSeenFlags[href];
+    },
+    [badgeSeenCounts, badgeSeenFlags]
+  );
+
+  const markBadgeAsRead = React.useCallback(
+    (href: string, badge: unknown) => {
+      if (badge === undefined || badge === null || badge === "" || badge === 0) return;
+      const nextCounts = { ...badgeSeenCounts };
+      const nextFlags = { ...badgeSeenFlags };
+      if (typeof badge === "number") {
+        nextCounts[href] = badge;
+      } else {
+        nextFlags[href] = true;
+      }
+      setBadgeSeenCounts(nextCounts);
+      setBadgeSeenFlags(nextFlags);
+      persistBadgeSeenState(nextCounts, nextFlags);
+    },
+    [badgeSeenCounts, badgeSeenFlags, persistBadgeSeenState]
+  );
+
+  React.useEffect(() => {
+    const activeLink = links.find((link) =>
+      location === link.href || (link.href !== "/admin" && link.href !== "/archivist" && location.startsWith(link.href))
+    );
+    if (!activeLink) return;
+    if (!shouldShowBadge(activeLink.href, activeLink.badge)) return;
+    markBadgeAsRead(activeLink.href, activeLink.badge);
+  }, [links, location, markBadgeAsRead, shouldShowBadge]);
+
+  if (isLoading || !user) return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
   const roleAsideBg =
     user.role === "admin" ? "bg-[#0B2D5A]" : user.role === "archivist" ? "bg-[#000000]" : "bg-[#960000]";
@@ -154,13 +216,16 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
             {links.map((link) => {
               const active = location === link.href || (link.href !== '/admin' && link.href !== '/archivist' && location.startsWith(link.href));
               return (
-                <Link key={link.href} href={link.href} onClick={() => { if (window.innerWidth < 1024) setSidebarOpen(false); }} className={cn(
+                <Link key={link.href} href={link.href} onClick={() => {
+                  if (window.innerWidth < 1024) setSidebarOpen(false);
+                  markBadgeAsRead(link.href, link.badge);
+                }} className={cn(
                   "flex items-center px-3 py-2.5 rounded-lg transition-colors font-medium text-sm group",
                   active ? `${roleActiveBg} text-white shadow-md` : "text-white/70 hover:bg-white/10 hover:text-white"
                 )}>
                   <link.icon className={cn("w-5 h-5 mr-3 transition-transform group-hover:scale-110", active ? "text-white" : "text-white/50")} />
                   <span className="flex-1">{link.label}</span>
-                  {link.badge ? (
+                  {shouldShowBadge(link.href, link.badge) ? (
                     <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">{link.badge}</span>
                   ) : null}
                 </Link>

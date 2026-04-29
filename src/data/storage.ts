@@ -1,5 +1,5 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import { SAMPLE_MATERIALS, ACTIVITY_FEED, type ArchivalMaterial, type ActivityEntry } from "./sampleData";
+import { ACTIVITY_FEED, type ArchivalMaterial, type ActivityEntry } from "./sampleData";
 
 const STORAGE_KEYS = {
   MATERIALS: "iarchive_materials",
@@ -19,7 +19,7 @@ export interface FeedbackEntry {
   status: "read" | "unread";
 }
 
-const STORAGE_VERSION = "4"; // Bump version
+const STORAGE_VERSION = "5";
 async function migrateBase64Media(materials: ArchivalMaterial[]) {
   let changed = false;
   for (const mat of materials) {
@@ -95,9 +95,8 @@ export function initializeStorage() {
   if (typeof window === "undefined") return;
   const currentVersion = localStorage.getItem(STORAGE_KEYS.VERSION);
   if (!localStorage.getItem(STORAGE_KEYS.MATERIALS) || currentVersion !== STORAGE_VERSION) {
-    // Archival materials are now strictly Firestore-only. 
-    // We only seed sample data if no API is available, but we don't persist ingestion changes here.
-    localStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify(SAMPLE_MATERIALS));
+    // No sample/preloaded materials. Keep local fallback empty.
+    localStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.VERSION, STORAGE_VERSION);
   }
   if (!localStorage.getItem(STORAGE_KEYS.ACTIVITY)) {
@@ -110,35 +109,35 @@ export function initializeStorage() {
 
 /** Read All Materials */
 export function getMaterials(): ArchivalMaterial[] {
-  if (typeof window === "undefined") return SAMPLE_MATERIALS;
+  if (typeof window === "undefined") return [];
   
   const currentVersion = localStorage.getItem(STORAGE_KEYS.VERSION);
   if (currentVersion !== STORAGE_VERSION) {
     const oldStored = localStorage.getItem(STORAGE_KEYS.MATERIALS);
-    let userAdded: ArchivalMaterial[] = [];
+    let existing: ArchivalMaterial[] = [];
     if (oldStored) {
-        try {
-            const oldMaterials = JSON.parse(oldStored) as ArchivalMaterial[];
-            userAdded = oldMaterials.filter(m => !SAMPLE_MATERIALS.some(s => s.id === m.id));
-        } catch(e) {}
+      try {
+        existing = JSON.parse(oldStored) as ArchivalMaterial[];
+      } catch {
+        existing = [];
+      }
     }
-    const merged = [...SAMPLE_MATERIALS, ...userAdded];
-    localStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify(merged));
+    localStorage.setItem(STORAGE_KEYS.MATERIALS, JSON.stringify(existing));
     localStorage.setItem(STORAGE_KEYS.VERSION, STORAGE_VERSION);
-    return merged;
+    return existing;
   }
   
   const stored = localStorage.getItem(STORAGE_KEYS.MATERIALS);
   if (!stored) {
     initializeStorage();
-    return SAMPLE_MATERIALS;
+    return [];
   }
   try {
     const parsed = JSON.parse(stored) as ArchivalMaterial[];
     void migrateBase64Media(parsed);
     return parsed;
   } catch (e) {
-    return SAMPLE_MATERIALS;
+    return [];
   }
 }
 

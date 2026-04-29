@@ -12,13 +12,37 @@ import {
 
 const router = Router();
 
+function normalizeCategoryLevel(level: unknown) {
+  const normalized = String(level || "").toLowerCase().replace(/[\s_-]/g, "");
+  if (normalized === "fonds") return "fonds";
+  if (normalized === "subfonds" || normalized === "department") return "subfonds";
+  if (normalized === "series") return "series";
+  if (normalized === "subseries") return "subseries";
+  if (normalized === "file") return "file";
+  if (normalized === "item") return "item";
+  return "fonds";
+}
+
 router.get("/categories", async (_req, res) => {
   try {
     const db = getFirestoreDb();
     if (!db) throw new Error("Firebase unavailable");
     
     const catsSnap = await db.collection("categories").orderBy("categoryNo", "asc").get();
-    const cats = catsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const cats = catsSnap.docs.map((doc) => {
+      const data = doc.data() as any;
+      return {
+        ...data,
+        id: String(data.id || doc.id),
+        level: normalizeCategoryLevel(data.level),
+        parentId: data.parentId ?? data.parent_id ?? null,
+        categoryNo: Number(data.categoryNo ?? data.category_no ?? 0),
+      };
+    });
+    if (!cats.length || !cats.some((c: any) => c.level === "fonds")) {
+      res.json(jsonStoreGetCategories());
+      return;
+    }
     
     const materialsSnap = await db.collection("materials").select("categoryId").get();
     const matCounts: Record<string, number> = {};

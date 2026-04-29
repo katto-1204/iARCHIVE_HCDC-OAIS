@@ -306,7 +306,7 @@ export default function AdminRequests() {
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setRejectAccessDialog(null)} disabled={isRejecting}>Cancel</Button>
-            <Button onClick={confirmRejectAccess} disabled={isRejecting} className="bg-destructive hover:bg-destructive/90 text-white">
+            <Button onClick={confirmRejectAccess} disabled={isRejecting} className="bg-red-600 hover:bg-red-700 text-white">
               {isRejecting ? "Rejecting..." : "Confirm Rejection"}
             </Button>
           </DialogFooter>
@@ -344,7 +344,7 @@ export default function AdminRequests() {
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setRejectIngestDialog(null)}>Cancel</Button>
-            <Button onClick={confirmRejectIngest} className="bg-destructive hover:bg-destructive/90 text-white">
+            <Button onClick={confirmRejectIngest} className="bg-red-600 hover:bg-red-700 text-white">
               Confirm Rejection
             </Button>
           </DialogFooter>
